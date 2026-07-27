@@ -7,11 +7,14 @@ import {
   annotateLine,
   generateSRT,
   ScriptLine,
+  Token,
 } from './utils/furigana';
 
-import { translateTextCN, TranslationConfig } from './utils/translator';
+import { translateTextCN, annotateLineWithAI, TranslationConfig } from './utils/translator';
 
 import mammoth from 'mammoth';
+import { buildDocxBlob } from './utils/docxExporter';
+import { initKuromoji, isKuromojiReady } from './utils/kuromojiEngine';
 
 interface BatchFileItem {
   id: string;
@@ -30,11 +33,15 @@ export default function DubbingStudioApp() {
   const [isDepModalOpen, setIsDepModalOpen] = useState(false);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [isTransConfigModalOpen, setIsTransConfigModalOpen] = useState(false);
+  const [isBatchDoneModalOpen, setIsBatchDoneModalOpen] = useState(false);
+  const [batchDoneResults, setBatchDoneResults] = useState<{ total: number; success: number; failed: number; filenames: string[] }>({ total: 0, success: 0, failed: 0, filenames: [] });
   const [activeTab, setActiveTab] = useState<'editor' | 'batch_files' | 'deps'>('editor');
 
   // Options
   const [rubyType, setRubyType] = useState<'hiragana' | 'katakana' | 'romaji'>('hiragana');
   const [fontSize, setFontSize] = useState<number>(16); // 默认小四 (16px)
+  const [rubyFontSize, setRubyFontSize] = useState<number>(10); // 假名字号 (10px)
+  const [lineSpacing, setLineSpacing] = useState<number>(1.8);  // 行距 (1.8x)
   const [autoTranslate, setAutoTranslate] = useState<boolean>(true);
   const [transConfig, setTransConfig] = useState<TranslationConfig>({
     engine: 'auto_cn',
@@ -51,6 +58,8 @@ export default function DubbingStudioApp() {
   const [exportProgress, setExportProgress] = useState<number>(0);
   const [isExporting, setIsExporting] = useState<boolean>(false);
   const [exportFormat, setExportFormat] = useState<'docx' | 'srt' | 'txt'>('docx');
+  const [isAiProcessing, setIsAiProcessing] = useState<boolean>(false);
+  const [isKuromojiLoading, setIsKuromojiLoading] = useState<boolean>(true);
 
   // Batch File Processing State
   const [batchFiles, setBatchFiles] = useState<BatchFileItem[]>([]);
@@ -67,35 +76,56 @@ export default function DubbingStudioApp() {
     { name: 'China AI Translator Engine', package: 'youdao-deepseek', status: 'ready', desc: '国内直连 AI 翻译与大模型引擎' },
   ]);
 
-  // Re-annotate editor script on input or option changes (Async China NMT / LLM Support)
+  // Initialize Kuromoji on mount
+  useEffect(() => {
+    initKuromoji()
+      .then(() => setIsKuromojiLoading(false))
+      .catch(() => setIsKuromojiLoading(false)); // fallback to normal dict if fails
+  }, []);
+
+  // Re-annotate editor script on input or option changes with Debounce
   useEffect(() => {
     let isCancelled = false;
-    const updateAnnotations = async () => {
+    const timeoutId = setTimeout(async () => {
+      setIsAiProcessing(true);
       const rawLines = rawText.split('\n');
-      const baseParsed = rawLines.map(line => annotateLine(line, rubyType));
+      const parsedLines = await Promise.all(
+        rawLines.map(async (rawLine) => {
+          if (!rawLine.trim()) return annotateLine(rawLine, rubyType);
 
-      if (autoTranslate) {
-        const withTranslations = await Promise.all(
-          baseParsed.map(async (item, idx) => {
-            const rawLine = rawLines[idx];
-            if (rawLine.trim()) {
-              const trans = await translateTextCN(rawLine, transConfig);
-              return { ...item, translation: trans };
-            }
-            return item;
-          })
-        );
-        if (!isCancelled) setAnnotatedLines(withTranslations);
-      } else {
-        if (!isCancelled) setAnnotatedLines(baseParsed);
+          let aiTokens = await annotateLineWithAI(rawLine, transConfig, rubyType);
+          let annotated: ScriptLine;
+
+          if (aiTokens && aiTokens.length > 0) {
+            annotated = {
+              id: Math.random().toString(36).substring(2, 9),
+              rawText: rawLine,
+              cleanText: rawLine,
+              tokens: aiTokens,
+            };
+          } else {
+            annotated = annotateLine(rawLine, rubyType);
+          }
+
+          if (autoTranslate && rawLine.trim()) {
+            annotated.translation = await translateTextCN(rawLine, transConfig);
+          }
+
+          return annotated;
+        })
+      );
+
+      if (!isCancelled) {
+        setAnnotatedLines(parsedLines);
+        setIsAiProcessing(false);
       }
-    };
+    }, 600); // 600ms debounce
 
-    updateAnnotations();
     return () => {
       isCancelled = true;
+      clearTimeout(timeoutId);
     };
-  }, [rawText, rubyType, autoTranslate, transConfig]);
+  }, [rawText, rubyType, autoTranslate, transConfig, isKuromojiLoading]);
 
   useEffect(() => {
     return () => {
@@ -112,39 +142,46 @@ export default function DubbingStudioApp() {
   };
 
   // Handle single script export
-  const handleExport = (format: 'docx' | 'srt' | 'txt') => {
+  const handleExport = async (format: 'docx' | 'srt' | 'txt') => {
     setExportFormat(format);
     setIsExporting(true);
     setExportProgress(10);
     setIsExportModalOpen(true);
 
-    let progress = 10;
-    exportIntervalRef.current = setInterval(() => {
-      progress += 20;
-      setExportProgress(Math.min(progress, 100));
-      if (progress >= 100) {
-        clearInterval(exportIntervalRef.current!);
-        setTimeout(() => {
-          setIsExporting(false);
-          triggerDownload(format, generateFileContent(annotatedLines, format), `dubbing_script_${Date.now()}.${format}`);
-        }, 500);
+    setExportProgress(30);
+    await new Promise(r => setTimeout(r, 200));
+
+    try {
+      const filename = `dubbing_script_${Date.now()}.${format}`;
+      let blob: Blob;
+
+      if (format === 'docx') {
+        setExportProgress(50);
+        blob = await buildDocxBlob(annotatedLines, { baseFontSize: fontSize, rubyFontSize, lineSpacing });
+      } else {
+        const content = generateTextContent(annotatedLines, format);
+        const mime = format === 'srt' ? 'application/x-subrip' : 'text/plain';
+        blob = new Blob([content], { type: mime });
       }
-    }, 250);
+
+      setExportProgress(80);
+      await new Promise(r => setTimeout(r, 200));
+
+      await saveBlob(blob, filename);
+      setExportProgress(100);
+    } catch (err) {
+      console.error('Export error:', err);
+    }
+
+    setTimeout(() => {
+      setIsExporting(false);
+    }, 500);
   };
 
-  // Content generator
-  const generateFileContent = (lines: ScriptLine[], format: 'docx' | 'srt' | 'txt'): string => {
+  // Text content generator (for srt / txt only)
+  const generateTextContent = (lines: ScriptLine[], format: 'srt' | 'txt'): string => {
     if (format === 'srt') {
       return generateSRT(lines);
-    } else if (format === 'docx') {
-      return `=======================================\n` +
-             `      日语假名配音台本 (Word 兼容模式)\n` +
-             `      默认字体大小: 小四 (12pt / 16px)\n` +
-             `=======================================\n\n` +
-             lines.map(l => {
-               const rubyText = l.tokens.map(t => t.ruby ? `${t.surface}(${t.ruby})` : t.surface).join('');
-               return rubyText + (l.translation ? `\n  ↳ ${l.translation}` : '');
-             }).join('\n\n');
     } else {
       return lines.map(l => {
         const rubyText = l.tokens.map(t => t.ruby ? `${t.surface}(${t.ruby})` : t.surface).join('');
@@ -153,17 +190,67 @@ export default function DubbingStudioApp() {
     }
   };
 
-  // Trigger file download
-  const triggerDownload = (format: 'docx' | 'srt' | 'txt', content: string, filename: string) => {
-    let mime = 'text/plain';
-    if (format === 'srt') mime = 'application/x-subrip';
-    const blob = new Blob([content], { type: mime });
+  // Save Blob: Native PyWebView dialog -> Web File System Access API -> Anchor Download
+  const saveBlob = async (blob: Blob, filename: string): Promise<{ success: boolean; path?: string }> => {
+    // 1. PyWebView Native File Save Bridge (Desktop EXE Mode - Opens Windows Native Save Dialog)
+    if (typeof window !== 'undefined' && (window as any).pywebview?.api?.save_file) {
+      try {
+        const reader = new FileReader();
+        const base64Promise = new Promise<string>((resolve, reject) => {
+          reader.onload = () => {
+            const dataUrl = reader.result as string;
+            const base64 = dataUrl.split(',')[1];
+            resolve(base64);
+          };
+          reader.onerror = reject;
+          reader.readAsDataURL(blob);
+        });
+        const base64Data = await base64Promise;
+        const res = await (window as any).pywebview.api.save_file(filename, base64Data);
+        if (res && res.success) {
+          return { success: true, path: res.path };
+        } else if (res && res.error === 'Cancelled') {
+          return { success: false };
+        }
+      } catch (err) {
+        console.error('PyWebView native save error:', err);
+      }
+    }
+
+    // 2. Web File System Access API (Standard Modern Browser Mode)
+    if (typeof window !== 'undefined' && 'showSaveFilePicker' in window) {
+      try {
+        const ext = filename.split('.').pop()?.toLowerCase() || 'txt';
+        const extMap: Record<string, { description: string; accept: Record<string, string[]> }> = {
+          txt: { description: 'TXT 文本文件', accept: { 'text/plain': ['.txt'] } },
+          srt: { description: 'SRT 字幕文件', accept: { 'application/x-subrip': ['.srt'] } },
+          docx: { description: 'Word 文档', accept: { 'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'] } },
+        };
+        const handle = await (window as any).showSaveFilePicker({
+          suggestedName: filename,
+          types: [extMap[ext] || extMap.txt],
+        });
+        const writable = await handle.createWritable();
+        await writable.write(blob);
+        await writable.close();
+        return { success: true, path: handle.name };
+      } catch (e: any) {
+        if (e?.name === 'AbortError') return { success: false };
+      }
+    }
+
+    // 3. Fallback: classic anchor download link
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
     a.download = filename;
+    a.style.display = 'none';
+    document.body.appendChild(a);
     a.click();
+    await new Promise(r => setTimeout(r, 500));
+    document.body.removeChild(a);
     URL.revokeObjectURL(url);
+    return { success: true, path: filename };
   };
 
   // File Upload Handlers for Batch Page
@@ -197,6 +284,9 @@ export default function DubbingStudioApp() {
   const processBatchQueue = async () => {
     if (batchFiles.length === 0) return;
     setIsBatchProcessing(true);
+    let successCount = 0;
+    let failCount = 0;
+    const exportedNames: string[] = [];
 
     for (let i = 0; i < batchFiles.length; i++) {
       const item = batchFiles[i];
@@ -217,14 +307,37 @@ export default function DubbingStudioApp() {
         const rawLines = textContent.split('\n');
         const parsedLines = await Promise.all(
           rawLines.map(async (line) => {
-            const annotated = annotateLine(line, rubyType);
+            if (!line.trim()) return annotateLine(line, rubyType);
+
+            let aiTokens = await annotateLineWithAI(line, transConfig, rubyType);
+            let annotated: ScriptLine;
+
+            if (aiTokens && aiTokens.length > 0) {
+              annotated = {
+                id: Math.random().toString(36).substring(2, 9),
+                rawText: line,
+                cleanText: line,
+                tokens: aiTokens,
+              };
+            } else {
+              annotated = annotateLine(line, rubyType);
+            }
+
             if (autoTranslate && line.trim()) {
               annotated.translation = await translateTextCN(line, transConfig);
             }
             return annotated;
           })
         );
-        const outputContent = generateFileContent(parsedLines, batchTargetFormat);
+        // Generate output based on target format
+        let outputBlob: Blob;
+        if (batchTargetFormat === 'docx') {
+          outputBlob = await buildDocxBlob(parsedLines, { baseFontSize: fontSize, rubyFontSize, lineSpacing });
+        } else {
+          const textOutput = generateTextContent(parsedLines, batchTargetFormat);
+          const mime = batchTargetFormat === 'srt' ? 'application/x-subrip' : 'text/plain';
+          outputBlob = new Blob([textOutput], { type: mime });
+        }
 
         setBatchFiles(prev =>
           prev.map(f => f.id === item.id ? { ...f, progress: 80 } : f)
@@ -234,19 +347,37 @@ export default function DubbingStudioApp() {
 
         const outExt = batchTargetFormat;
         const outName = `${item.name.replace(/\.[^/.]+$/, "")}_dubbing.${outExt}`;
-        triggerDownload(batchTargetFormat, outputContent, outName);
+        const saveRes = await saveBlob(outputBlob, outName);
 
-        setBatchFiles(prev =>
-          prev.map(f => f.id === item.id ? { ...f, status: 'done', progress: 100, lineCount: rawLines.length } : f)
-        );
+        if (saveRes.success) {
+          setBatchFiles(prev =>
+            prev.map(f => f.id === item.id ? { ...f, status: 'done', progress: 100, lineCount: rawLines.length } : f)
+          );
+          exportedNames.push(saveRes.path || outName);
+          successCount++;
+        } else {
+          setBatchFiles(prev =>
+            prev.map(f => f.id === item.id ? { ...f, status: 'pending', progress: 0 } : f)
+          );
+        }
       } catch (err) {
         setBatchFiles(prev =>
           prev.map(f => f.id === item.id ? { ...f, status: 'error', progress: 0 } : f)
         );
+        failCount++;
       }
     }
 
     setIsBatchProcessing(false);
+
+    // Show completion notification
+    setBatchDoneResults({
+      total: batchFiles.length,
+      success: successCount,
+      failed: failCount,
+      filenames: exportedNames,
+    });
+    setIsBatchDoneModalOpen(true);
   };
 
   // Neumorphism Utility Style Classes
@@ -374,9 +505,9 @@ export default function DubbingStudioApp() {
                 </div>
               </div>
 
-              <div className="flex items-center gap-6">
+              <div className="flex flex-wrap items-center gap-6">
                 <div className="flex items-center gap-3">
-                  <span className="font-semibold text-sm text-gray-800">字号:</span>
+                  <span className="font-semibold text-sm text-gray-800">正文字号:</span>
                   <div className="flex items-center bg-[#e0e5ec] rounded-xl shadow-[inset_2px_2px_4px_#b8bcc2,inset_-2px_-2px_4px_#ffffff] p-1">
                     <button
                       onClick={() => setFontSize(Math.max(12, fontSize - 2))}
@@ -384,7 +515,7 @@ export default function DubbingStudioApp() {
                     >
                       -
                     </button>
-                    <span className="px-3 py-1 font-semibold text-xs text-center text-gray-800 min-w-[60px]">
+                    <span className="px-3 py-1 font-semibold text-xs text-center text-gray-800 min-w-[50px]">
                       {fontSize}px
                     </span>
                     <button
@@ -396,20 +527,62 @@ export default function DubbingStudioApp() {
                   </div>
                 </div>
 
+                <div className="flex items-center gap-3">
+                  <span className="font-semibold text-sm text-gray-800">假名字号:</span>
+                  <div className="flex items-center bg-[#e0e5ec] rounded-xl shadow-[inset_2px_2px_4px_#b8bcc2,inset_-2px_-2px_4px_#ffffff] p-1">
+                    <button
+                      onClick={() => setRubyFontSize(Math.max(8, rubyFontSize - 1))}
+                      className="px-2.5 py-1 font-bold text-gray-600 hover:text-gray-900"
+                    >
+                      -
+                    </button>
+                    <span className="px-3 py-1 font-semibold text-xs text-center text-gray-800 min-w-[50px]">
+                      {rubyFontSize}px
+                    </span>
+                    <button
+                      onClick={() => setRubyFontSize(Math.min(18, rubyFontSize + 1))}
+                      className="px-2.5 py-1 font-bold text-gray-600 hover:text-gray-900"
+                    >
+                      +
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <span className="font-semibold text-sm text-gray-800">行间距:</span>
+                  <div className="flex items-center bg-[#e0e5ec] rounded-xl shadow-[inset_2px_2px_4px_#b8bcc2,inset_-2px_-2px_4px_#ffffff] p-1">
+                    <button
+                      onClick={() => setLineSpacing(Number(Math.max(1.2, lineSpacing - 0.2).toFixed(1)))}
+                      className="px-2.5 py-1 font-bold text-gray-600 hover:text-gray-900"
+                    >
+                      -
+                    </button>
+                    <span className="px-3 py-1 font-semibold text-xs text-center text-gray-800 min-w-[50px]">
+                      {lineSpacing}x
+                    </span>
+                    <button
+                      onClick={() => setLineSpacing(Number(Math.min(3.0, lineSpacing + 0.2).toFixed(1)))}
+                      className="px-2.5 py-1 font-bold text-gray-600 hover:text-gray-900"
+                    >
+                      +
+                    </button>
+                  </div>
+                </div>
+
                 <div className="flex items-center gap-2">
-                  <span className="font-semibold text-sm text-gray-800">AI 双语:</span>
+                  <span className="font-semibold text-sm text-gray-800">AI 智能注音与翻译:</span>
                   <button
                     onClick={() => setAutoTranslate(!autoTranslate)}
                     className={`${autoTranslate ? neuButtonActive : neuButton} px-3.5 py-2 text-xs`}
                   >
-                    {autoTranslate ? '开启' : '关闭'}
+                    {autoTranslate ? '🤖 开启 AI 引擎' : '关闭'}
                   </button>
                   <button
                     onClick={() => setIsTransConfigModalOpen(true)}
-                    title="配置 AI 翻译引擎"
+                    title="配置 AI 大模型 / 翻译引擎"
                     className={`${neuButton} px-2.5 py-1.5 text-xs font-semibold text-gray-700 flex items-center gap-1`}
                   >
-                    ⚙️ <span className="hidden sm:inline">配置</span>
+                    ⚙️ <span className="hidden sm:inline">AI 引擎配置</span>
                   </button>
                 </div>
               </div>
@@ -435,28 +608,42 @@ export default function DubbingStudioApp() {
                   onChange={(e) => setRawText(e.target.value)}
                   placeholder="请输入日语台本..."
                   className={`${neuInput} w-full h-[380px] p-4 resize-none`}
-                  style={{ fontSize: `${fontSize}px` }}
+                  style={{ fontSize: `${fontSize}px`, lineHeight: lineSpacing }}
                 />
               </div>
 
               {/* Right: Live Preview */}
               <div className={`${neuCard} flex flex-col p-6`}>
                 <div className="pb-4 flex items-center justify-between">
-                  <h3 className="font-semibold text-lg text-gray-800">
-                    🎙️ 配音台本实时预览
-                  </h3>
+                  <div className="flex items-center gap-3">
+                    <h3 className="font-semibold text-lg text-gray-800">
+                      👀 实时假名注音与排版预览
+                    </h3>
+                    {isKuromojiLoading && (
+                      <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded-full shadow-[inset_1px_1px_2px_#d1d5db,inset_-1px_-1px_2px_#ffffff] flex items-center gap-1">
+                        <svg className="animate-spin h-3 w-3" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+                        加载词典...
+                      </span>
+                    )}
+                    {isAiProcessing && !isKuromojiLoading && (
+                      <span className="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full shadow-[inset_1px_1px_2px_#d1d5db,inset_-1px_-1px_2px_#ffffff] flex items-center gap-1">
+                        <svg className="animate-spin h-3 w-3" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+                        AI 解析中...
+                      </span>
+                    )}
+                  </div>
                   <span className={neuBadge}>
                     {annotatedLines.length} 行
                   </span>
                 </div>
                 <div className={`${neuInput} w-full h-[380px] p-6 overflow-y-auto flex flex-col gap-4`}>
                   {annotatedLines.map((line) => (
-                    <div key={line.id} className="border-b border-gray-300/50 pb-3 last:border-0">
-                      <div className="leading-relaxed text-gray-800 font-semibold flex flex-wrap items-end gap-x-1.5" style={{ fontSize: `${fontSize}px` }}>
+                    <div key={line.id} className="border-b border-gray-300/50 pb-3 last:border-0" style={{ marginBottom: `${(lineSpacing - 1.5) * 8}px` }}>
+                      <div className="text-gray-800 font-semibold flex flex-wrap items-end gap-x-1.5" style={{ fontSize: `${fontSize}px`, lineHeight: lineSpacing }}>
                         {line.tokens.map((t, tidx) => (
                           <ruby key={tidx}>
                             {t.surface}
-                            {t.ruby && <rt className="text-[0.65em] text-blue-600 select-none">{t.ruby}</rt>}
+                            {t.ruby && <rt className="text-blue-600 select-none" style={{ fontSize: `${rubyFontSize}px` }}>{t.ruby}</rt>}
                           </ruby>
                         ))}
                       </div>
@@ -607,9 +794,10 @@ export default function DubbingStudioApp() {
                   <button
                     onClick={processBatchQueue}
                     disabled={isBatchProcessing}
-                    className={`${neuButtonActive} px-6 py-3 text-sm font-semibold`}
+                    className={`${isBatchProcessing ? neuButtonActive : neuButton} px-8 py-3 text-sm font-bold text-blue-600 whitespace-nowrap flex items-center gap-2`}
                   >
-                    {isBatchProcessing ? '处理中...' : '⚡ 开始批量处理'}
+                    <span className="text-lg">⚡</span>
+                    {isBatchProcessing ? '正在处理...' : '开始批量处理'}
                   </button>
                 </div>
               )}
@@ -773,6 +961,59 @@ export default function DubbingStudioApp() {
               className={`${neuButtonActive} px-6 py-2 text-xs font-semibold text-blue-600`}
             >
               保存并关闭
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Batch Processing Completion Modal */}
+      <Modal
+        isOpen={isBatchDoneModalOpen}
+        onClose={() => setIsBatchDoneModalOpen(false)}
+        title="✅ 批量处理完成"
+      >
+        <div className="space-y-5">
+          <div className="grid grid-cols-3 gap-3">
+            <div className="p-4 bg-[#e0e5ec] rounded-xl shadow-[inset_3px_3px_6px_#b8bcc2,inset_-3px_-3px_6px_#ffffff] text-center">
+              <div className="text-2xl font-bold text-gray-800">{batchDoneResults.total}</div>
+              <div className="text-xs text-gray-500 mt-1">总文件数</div>
+            </div>
+            <div className="p-4 bg-[#e0e5ec] rounded-xl shadow-[inset_3px_3px_6px_#b8bcc2,inset_-3px_-3px_6px_#ffffff] text-center">
+              <div className="text-2xl font-bold text-green-600">{batchDoneResults.success}</div>
+              <div className="text-xs text-gray-500 mt-1">成功导出</div>
+            </div>
+            <div className="p-4 bg-[#e0e5ec] rounded-xl shadow-[inset_3px_3px_6px_#b8bcc2,inset_-3px_-3px_6px_#ffffff] text-center">
+              <div className="text-2xl font-bold text-red-500">{batchDoneResults.failed}</div>
+              <div className="text-xs text-gray-500 mt-1">失败</div>
+            </div>
+          </div>
+
+          {batchDoneResults.filenames.length > 0 && (
+            <div>
+              <h4 className="text-xs font-semibold text-gray-700 mb-2">已导出文件：</h4>
+              <div className="max-h-[160px] overflow-y-auto space-y-1.5">
+                {batchDoneResults.filenames.map((name, idx) => (
+                  <div key={idx} className="flex items-center gap-2 px-3 py-2 bg-[#e0e5ec] rounded-lg shadow-[2px_2px_4px_#b8bcc2,-2px_-2px_4px_#ffffff]">
+                    <span className="text-green-500 text-sm">✓</span>
+                    <span className="text-xs text-gray-700 truncate">{name}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="p-3 bg-[#e0e5ec] rounded-xl shadow-[inset_2px_2px_4px_#b8bcc2,inset_-2px_-2px_4px_#ffffff]">
+            <p className="text-xs font-medium text-gray-700 text-center">
+              📁 文件已成功保存至您选择的存储位置！
+            </p>
+          </div>
+
+          <div className="flex justify-end pt-2">
+            <button
+              onClick={() => setIsBatchDoneModalOpen(false)}
+              className={`${neuButton} px-8 py-2.5 text-sm font-bold text-blue-600`}
+            >
+              确定
             </button>
           </div>
         </div>

@@ -59,6 +59,52 @@ def wait_for_server(port, timeout=10):
     return False
 
 
+import base64
+
+
+class Api:
+    def __init__(self):
+        self._window = None
+
+    def set_window(self, window):
+        self._window = window
+
+    def save_file(self, filename, base64_data):
+        """Open native Windows Save File Dialog and write base64 file data."""
+        try:
+            if not self._window:
+                return {'success': False, 'error': 'Window not ready'}
+
+            ext = os.path.splitext(filename)[1].lower()
+            if ext == '.docx':
+                file_types = ('Word Document (*.docx)', 'All files (*.*)')
+            elif ext == '.srt':
+                file_types = ('SubRip Subtitle (*.srt)', 'All files (*.*)')
+            else:
+                file_types = ('Text Document (*.txt)', 'All files (*.*)')
+
+            file_path = self._window.create_file_dialog(
+                webview.SAVE_DIALOG,
+                save_filename=filename,
+                file_types=file_types
+            )
+
+            if file_path:
+                if isinstance(file_path, (list, tuple)):
+                    if not file_path:
+                        return {'success': False, 'error': 'Cancelled'}
+                    file_path = file_path[0]
+
+                raw_bytes = base64.b64decode(base64_data)
+                with open(file_path, 'wb') as f:
+                    f.write(raw_bytes)
+                return {'success': True, 'path': file_path}
+            else:
+                return {'success': False, 'error': 'Cancelled'}
+        except Exception as e:
+            return {'success': False, 'error': str(e)}
+
+
 def main():
     # Resolve static web assets directory
     web_dir = get_bundle_dir()
@@ -89,9 +135,10 @@ def main():
 
     url = f"http://127.0.0.1:{port}"
 
-    # Use PyWebView for a stable, dedicated application window
-    # This blocks until the window is closed, keeping our server alive.
-    window = webview.create_window('Furigana Dubbing Studio', url, width=1280, height=830)
+    # Use PyWebView for a stable, dedicated application window with Native Save Dialog API bridge
+    api = Api()
+    window = webview.create_window('Furigana Dubbing Studio', url, width=1280, height=830, js_api=api)
+    api.set_window(window)
     webview.start(private_mode=False)
 
 
