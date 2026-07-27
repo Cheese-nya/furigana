@@ -11,6 +11,8 @@ import {
 
 import { translateTextCN, TranslationConfig } from './utils/translator';
 
+import mammoth from 'mammoth';
+
 interface BatchFileItem {
   id: string;
   file: File;
@@ -144,7 +146,10 @@ export default function DubbingStudioApp() {
                return rubyText + (l.translation ? `\n  ↳ ${l.translation}` : '');
              }).join('\n\n');
     } else {
-      return lines.map(l => l.cleanText).join('\n');
+      return lines.map(l => {
+        const rubyText = l.tokens.map(t => t.ruby ? `${t.surface}(${t.ruby})` : t.surface).join('');
+        return rubyText + (l.translation ? `\n  ↳ ${l.translation}` : '');
+      }).join('\n\n');
     }
   };
 
@@ -201,8 +206,15 @@ export default function DubbingStudioApp() {
       );
 
       try {
-        const text = await item.file.text();
-        const rawLines = text.split('\n');
+        let textContent = '';
+        if (item.name.toLowerCase().endsWith('.docx')) {
+          const arrayBuffer = await item.file.arrayBuffer();
+          const res = await mammoth.extractRawText({ arrayBuffer });
+          textContent = res.value;
+        } else {
+          textContent = await item.file.text();
+        }
+        const rawLines = textContent.split('\n');
         const parsedLines = await Promise.all(
           rawLines.map(async (line) => {
             const annotated = annotateLine(line, rubyType);
@@ -220,7 +232,7 @@ export default function DubbingStudioApp() {
 
         await new Promise(r => setTimeout(r, 400));
 
-        const outExt = batchTargetFormat === 'docx' ? 'txt' : batchTargetFormat;
+        const outExt = batchTargetFormat;
         const outName = `${item.name.replace(/\.[^/.]+$/, "")}_dubbing.${outExt}`;
         triggerDownload(batchTargetFormat, outputContent, outName);
 
@@ -461,7 +473,7 @@ export default function DubbingStudioApp() {
             <div className={`${neuCard} p-6 flex flex-col md:flex-row items-center justify-between gap-6`}>
               <div>
                 <h4 className="font-semibold text-lg text-gray-800 mb-1">单文件导出</h4>
-                <p className="text-sm text-gray-600">导出符合配音要求的 Word (.docx)、SRT 字幕与文本</p>
+                <p className="text-sm text-gray-600">导出符合配音要求的 Word (.docx)、SRT 字幕与 TXT 文本</p>
               </div>
               <div className="flex flex-wrap items-center gap-3">
                 <button onClick={() => handleExport('txt')} className={`${neuButton} px-4 py-2.5 text-sm`}>导出 TXT</button>
@@ -485,7 +497,7 @@ export default function DubbingStudioApp() {
                   台本批量注音与导出
                 </h2>
                 <p className="text-sm md:text-base text-gray-600">
-                  拖拽或选择多个台本文件（支持 .txt, .srt），系统将自动完成分词注音并一键导出。
+                  拖拽或选择多个台本文件（支持 .txt, .srt, .docx），系统将自动完成分词注音并一键导出。
                 </p>
               </div>
 
@@ -521,7 +533,7 @@ export default function DubbingStudioApp() {
                 ref={fileInputRef}
                 type="file"
                 multiple
-                accept=".txt,.srt"
+                accept=".txt,.srt,.docx"
                 onChange={handleFileSelect}
                 onClick={(e) => e.stopPropagation()}
                 className="hidden"
@@ -531,7 +543,7 @@ export default function DubbingStudioApp() {
               </div>
               <div>
                 <h4 className="font-bold text-xl text-gray-800 mb-2">点击或拖拽文件至此处</h4>
-                <p className="text-sm text-gray-600">支持 .txt、.srt 文件，可一次选择多个</p>
+                <p className="text-sm text-gray-600">支持 .txt、.srt、.docx 文件，可一次选择多个</p>
               </div>
             </div>
 
