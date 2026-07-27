@@ -1,0 +1,46 @@
+@import "tailwindcss";
+
+/* ======================================
+   Neumorphism (新拟物派) Design System
+   Dual shadow convex/concave tactile UI
+   ====================================== */
+
+@layer base {
+  body {
+    background-color: #e0e5ec;
+    color: #4a5568;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+}
+
+/* Neumorphic Scrollbar */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: #e0e5ec;
+  box-shadow: inset 2px 2px 5px #b8bcc2, inset -2px -2px 5px #ffffff;
+}
+::-webkit-scrollbar-thumb {
+  background: #e0e5ec;
+  border-radius: 5px;
+  box-shadow: 2px 2px 5px #b8bcc2, -2px -2px 5px #ffffff;
+}
+::-webkit-scrollbar-thumb:hover {
+  box-shadow: 1px 1px 3px #b8bcc2, -1px -1px 3px #ffffff;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #b8bcc2 #e0e5ec;
+}
+
+/* Ruby Reading alignment */
+rt {
+  font-family: -apple-system, system-ui, sans-serif;
+  color: #3182ce;
+  font-weight: 600;
+}

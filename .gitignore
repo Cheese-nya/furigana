@@ -1,0 +1,32 @@
+# dependencies
+/node_modules
+/.pnp
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+
+# Next.js export & build
+/.next/
+/out/
+/build/
+/dist/
+
+# Python & PyInstaller artifacts
+*.spec
+*.log
+__pycache__/
+*.pyc
+
+# Local binary outputs
+/*.exe
+
+# Environment & IDE
+.env*
+.DS_Store
+.vscode/
+.idea/
+*.pem
+*.tsbuildinfo
