@@ -4,9 +4,10 @@
 
   # 🎌 Furigana Dubbing Studio (假名标注工具)
 
-  **基于新拟物派 (Neumorphism) 设计系统的专业级日语假名注音、国内直连 AI 翻译与配音台本处理系统**
+  **基于新拟物派 (Neumorphism) 设计系统的高精度日语上下文假名注音、动态台本标题与多格式配音台本导出系统**
 
   [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+  [![Version](https://img.shields.io/badge/Version-v1.0.1-emerald.svg)](RELEASE_NOTES.md)
   [![Next.js](https://img.shields.io/badge/Framework-Next.js_16-black?logo=next.js)](https://nextjs.org/)
   [![TailwindCSS](https://img.shields.io/badge/Style-Tailwind_v4-38bdf8?logo=tailwindcss)](https://tailwindcss.com/)
   [![Python](https://img.shields.io/badge/Desktop-PyWebView_&_PyInstaller-3776ab?logo=python)](https://python.org/)
@@ -19,30 +20,38 @@
 
 **Furigana Dubbing Studio** 是一款专为声优配音、日语学习者、字幕组与台本编辑设计的现代化日语假名注音与台本导出工具。
 
-本工具采用了极其精致的 **新拟物派 (Neumorphism)** 视觉语言，通过完美的极性双重阴影（亮/暗）打造凸起与凹陷的柔和立体触感，提供流畅无缝的在线编辑、国内直连 AI 翻译与桌面本地应用体验。
+本工具采用精致的 **新拟物派 (Neumorphism)** 视觉设计，通过极性双重光影（亮/暗）打造凸起与凹陷的柔和立体触感。内核配备**前后文多音字消歧形态素引擎**与**原生 Word Ruby 排版生成器**，提供极速流畅的在线编辑、动态台本命名、交互式校对与一键批量导出体验。
 
 ---
 
 ## ✨ 核心特性 (Features)
 
-- 🎙️ **台本在线编辑器**
-  - 支持智能假名注音（平假名 / 片假名 / 罗马音一键切换）。
-  - 内置 AI 双语翻译实时预览。
-  - 动态字号调节（默认小四 16px 规范）。
-- 🇨🇳 **国内直连 AI 翻译引擎**
-  - **国内免 Key 在线引擎**：无需翻墙、零门槛直连，自动降级容错。
-  - **国内主流大模型接入**：支持 DeepSeek 官方 API、硅基流动 (SiliconFlow) 高并发节点及豆包/智谱 GLM/通义千问等自定义 OpenAI 协议大模型。
+- 🎯 **前后文（上下文）高精度假名消歧**
+  - **语义感知定音**：基于形态素上下文 Viterbi 最优路径，结合双向滑动窗口语义规则，彻底解决高频同形異音語（如 `辛い(からい/つらい)`、`何(なん/なに)`、`角(かど/つの/かく)`、`風(ふう/かぜ)`、`方(かた/ほう)`、`一日(いちにち/ついたち)` 等）。
+  - **熟字训与送假名剥离**：支持 `日本人(にっぽんじん)`、`大人(おとな)`、`山田先生(やまだせんせい)` 完美逐字切分对齐。
+  - **双引擎同步**：Web 端 Kuromoji 引擎与 Python 原生端 `fugashi` + `unidic_lite` 同步消歧规则。
+
+- 📝 **智能动态台本标题联动**
+  - **自适应文件名**：导入 `.txt` / `.srt` / `.docx` 文本时，系统自动识别原文件名（如《歪な鳥籠》），导出 Word 时顶部一级大标题自动命名为对应的台本名称。
+  - **实时修改**：编辑区顶部常驻台本标题输入框与快速导入按钮，方便随时自定义。
+
+- ⚡ **纯粹极速、零网络依赖**
+  - 去除繁琐的网络外部翻译 API 与配置门槛，全部注音与消歧逻辑均在本地毫秒级完成。
+  - 界面排版专注纯净，无多余副行干扰，离线断网环境下依然稳定高效。
+
+- ✏️ **交互式点击读音校对**
+  - 在实时排版预览区，直接点击任意汉字/假名即可弹出校对浮窗，提供该语境下的常见候选读音，亦支持输入自定义声优特殊读音。
+
+- 📄 **全格式专业配音台本导出**
+  - **Word (`.docx`)**：完美兼容 Microsoft Word 原生 `<w:ruby>` 振假名结构（假名位于汉字正上方），正文字号、假名字号、行间距自由调节。
+  - **字幕 (`.srt`)**：带假名注音的标准配音台本与字幕格式。
+  - **纯文本 (`.txt`)**：干净整洁的标注纯文本。
+
 - 📁 **批量文件处理中心**
-  - 支持拖拽上传与批量解析 `.txt` / `.srt` / `.docx` 台本文件。
-  - 自动化并行注音并一键批量导出。
-- 📄 **全格式专业导出**
-  - **Word (`.docx`)**：完美兼容 Microsoft Word 原生 Ruby 节点格式。
-  - **字幕 (`.srt`)**：带假名注音的声优练习字幕。
-  - **纯文本 (`.txt`)**：干净的纯文本台本。
-- 🛠️ **依赖诊断与一键修复**
-  - 内置 MeCab (Fugashi)、UniDic Lite 词典及导出组件健康度检查与自动修复。
-- 💻 **独立桌面端封装**
-  - 基于 `PyWebView` + `PyInstaller` 独立原生窗口打包，嵌入全尺寸 Windows 原生 ICO 图标，双击即用。
+  - 支持拖拽多文件同时导入，自动化并行队列注音，一键批量生成导出。
+
+- 💻 **独立原生桌面程序**
+  - 提供单文件绿色版 `FuriganaDubbingStudio.exe`，免安装任何环境，双击即用。
 
 ---
 
@@ -53,16 +62,18 @@
 - **双重极性阴影**：
   - 凸起元素（卡片/按钮）：`shadow-[6px_6px_12px_#b8bcc2,-6px_-6px_12px_#ffffff]`
   - 沉降/内凹元素（输入框/激活态）：`shadow-[inset_4px_4px_8px_#b8bcc2,inset_-4px_-4px_8px_#ffffff]`
-- **零显性边框**：摒弃粗边框，纯靠光影重塑层次。
+- **真实物理反馈**：按钮默认立体凸起，按压时触发下陷，松开平滑回弹。
+- **零显性边框**：摒弃生硬边框线条，纯靠自然光影重塑空间层次。
 
 ---
 
 ## 🛠️ 技术栈 (Tech Stack)
 
 * **前端框架**：[Next.js 16](https://nextjs.org/) + [React 19](https://react.dev/)
-* **样式引擎**：[Tailwind CSS v4](https://tailwindcss.com/) (Vanilla Tailwind CSS)
-* **桌面端封装**：[Python 3](https://python.org/) + [PyWebView](https://pywebview.flowrl.com/) + [PyInstaller](https://pyinstaller.org/)
-* **图标与资源**：多分辨率 Windows 原生 Icon / 矢量 SVG / 赞赏二维码
+* **样式系统**：[Tailwind CSS v4](https://tailwindcss.com/)
+* **分词注音**：Kuromoji (Web) / Fugashi + UniDic Lite (Python)
+* **Word 渲染**：[docx](https://docx.js.org/) (Native Ruby w:ruby generator)
+* **桌面端内核**：[Python 3](https://python.org/) + [PyWebView](https://pywebview.flowrl.com/) + [PyInstaller](https://pyinstaller.org/)
 
 ---
 
@@ -71,8 +82,8 @@
 ### 1. 克隆仓库
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/furigana-dubbing-studio.git
-cd furigana-dubbing-studio
+git clone https://github.com/Cheese-nya/furigana.git
+cd furigana
 ```
 
 ### 2. 安装依赖
@@ -88,38 +99,41 @@ npm run dev
 ```
 打开浏览器访问 [http://localhost:3000](http://localhost:3000)。
 
-### 4. 静态导出与打包 EXE
+### 4. 静态导出与打包 Windows EXE
 
 确保本地已安装 Python 3 及相关依赖：
 ```bash
-pip install pywebview pyinstaller pillow
+pip install pywebview pyinstaller fugashi unidic-lite python-docx
 ```
 
-执行一键打包命令：
+执行打包命令：
 ```bash
-npm run package:exe
+npm run build
+python -m PyInstaller --noconfirm FuriganaDubbingStudio.spec
 ```
-打包完成后将在项目根目录下生成可直接双击运行的 **`FuriganaDubbingStudio.exe`**。
+编译完成后将在根目录下生成可直接双击运行的 **`FuriganaDubbingStudio.exe`**。
 
 ---
 
 ## 📁 目录结构 (Project Structure)
 
 ```text
-liquid-glass/
+furigana/
 ├── app/
-│   ├── components/       # 核心 Neumorphism 组件 (Sidebar, Modal, Dropdown, Tooltip)
-│   ├── utils/            # 假名分词、翻译引擎与 SRT/Word 导出解析器
+│   ├── components/       # 新拟物核心组件 (Sidebar, Modal, Dropdown 等)
+│   ├── utils/            # 假名分词消歧、Word 原生 Ruby 导出器等
 │   ├── globals.css       # 核心 Design System CSS 变量与阴影 Token
 │   ├── layout.tsx        # 根布局容器
-│   └── page.tsx          # 假名标注工具主业务页面
-├── public/               # 静态资源 (Logo, 二维码, 打赏图标)
-├── app_icon.ico          # Windows 多分辨率原生应用程序图标
-├── desktop_runner.py     # PyWebView 桌面端启动内核
-├── make_proper_ico.py    # Windows 多分辨率 ICO 图标生成器
-├── package.json          # npm 脚本与依赖清单
+│   └── page.tsx          # 假名配音台本主业务界面
+├── public/               # 静态资源 (Logo, 词典文件, 打赏二维码)
+├── app_icon.ico          # Windows 原生多分辨率应用程序图标
+├── desktop_runner.py     # PyWebView 桌面端启动核心
+├── exporter.py           # Python 端多格式导出脚本
+├── furigana_engine.py    # Python 端形态素与消歧引擎
+├── FuriganaDubbingStudio.spec # PyInstaller 打包描述文件
+├── RELEASE_NOTES.md      # 版本更新发布说明
 ├── LICENSE               # MIT 开源协议
-└── README.md             # GitHub 说明文档
+└── README.md             # 仓库说明文档
 ```
 
 ---
