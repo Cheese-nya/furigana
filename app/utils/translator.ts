@@ -70,7 +70,7 @@ export function parseRubyFormattedString(
 }
 
 /**
- * High-Precision AI Furigana Annotation Engine
+ * High-Precision AI Furigana Annotation Engine with Full Context Awareness
  * Uses LLMs (DeepSeek, SiliconFlow, Zhipu, Doubao) to generate context-aware readings for all Japanese Kanji
  */
 export async function annotateLineWithAI(
@@ -81,7 +81,7 @@ export async function annotateLineWithAI(
   const trimmed = text.trim();
   if (!trimmed) return null;
   
-  const cacheKey = `ai_anno_v2_${config.engine}_${rubyType}_${trimmed}`;
+  const cacheKey = `ai_anno_v3_${config.engine}_${rubyType}_${trimmed}`;
   if (typeof window !== 'undefined') {
     const cached = localStorage.getItem(cacheKey);
     if (cached) {
@@ -112,9 +112,18 @@ export async function annotateLineWithAI(
           messages: [
             {
               role: 'system',
-              content: `你是一个专业的日语配音台本假名注音专家。请为输入的日语句子中的汉字标注准确的平假名。
-输出格式要求：将每个汉字或汉字词组后面用括号跟上其准确的平假名读音，如："山田(やまだ)先生(せんせい)：みなさん、今日(きょう)の日本語(にほんご)台本(だいほん)へようこそ。"
-非汉字部分（平假名、片假名、标点）保持原样，不要额外标注。只返回注音后的文本，严禁包含任何说明或Markdown代码块。`
+              content: `你是一个专业的日语声优配音台本假名注音与多音字前后文消歧专家。
+请根据输入的日语句子中的前后文完整语境，为所有汉字标注最准确的读音。
+特别注意前后文消歧：
+- 「辛い」：根据前后文判断是辛辣（からい）还是痛苦（つらい）
+- 「角」：根据前后文判断是拐弯处（かど）、角（つの）还是角度（かく）
+- 「風」：判断是样态/风格（ふう）还是自然风（かぜ）
+- 「何」：判断是「なん」还是「なに」
+- 「方」：判断是方法/人称（かた）还是方向/比较（ほう）
+- 「一日」：判断是一整天（いちにち）还是初一（ついたち）
+- 「行く/行う」：准确区分「いく/ゆく」与「おこなう」
+输出格式严格要求：将每个汉字后面紧跟圆括号其读音，例如："山田(やまだ)先生(せんせい)：今日(きょう)の日本語(にほんご)台本(だいほん)へようこそ。"
+非汉字部分（假名、标点符号、英数）保持原样不变。严禁输出任何多余说明或代码块。`
             },
             { role: 'user', content: trimmed }
           ],
@@ -124,8 +133,9 @@ export async function annotateLineWithAI(
 
       if (response.ok) {
         const data = await response.json();
-        const content = data.choices?.[0]?.message?.content?.trim();
+        let content = data.choices?.[0]?.message?.content?.trim();
         if (content) {
+          content = content.replace(/^```[a-zA-Z]*\n?/, '').replace(/\n?```$/, '').trim();
           const tokens = parseRubyFormattedString(content, rubyType);
           if (tokens.length > 0) {
             if (typeof window !== 'undefined') {
@@ -138,6 +148,78 @@ export async function annotateLineWithAI(
     } catch (e) {
       console.error('AI Furigana annotation error:', e);
     }
+  }
+
+  return null;
+}
+
+/**
+ * Full Script Contextual AI Annotation
+ * Takes full script text to give the LLM entire conversation context (speakers, storylines) for maximum homonym accuracy.
+ */
+export async function annotateFullScriptWithAIContext(
+  fullScript: string,
+  config: TranslationConfig,
+  rubyType: 'hiragana' | 'katakana' | 'romaji' = 'hiragana'
+): Promise<Map<string, Token[]> | null> {
+  const trimmed = fullScript.trim();
+  if (!trimmed || !config.apiKey) return null;
+
+  try {
+    let defaultUrl = 'https://api.deepseek.com/v1';
+    let defaultModel = 'deepseek-chat';
+    if (config.engine === 'siliconflow') {
+      defaultUrl = 'https://api.siliconflow.cn/v1';
+      defaultModel = 'deepseek-ai/DeepSeek-V3';
+    }
+    const baseUrl = config.baseUrl || defaultUrl;
+    const model = config.model || defaultModel;
+
+    const response = await fetch(`${baseUrl}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${config.apiKey.trim()}`
+      },
+      body: JSON.stringify({
+        model,
+        messages: [
+          {
+            role: 'system',
+            content: `你是一个专业的日语声优配音台本假名注音与多音字前后文消歧专家。
+请根据整篇台本的完整前后文与角色对话，为输入的每一行日语句子中的汉字标注最准确的平假名。
+输出格式要求：保持原有的行数和换行，对每行中的汉字后面跟上圆括号及其读音，例如：
+山田(やまだ)先生(せんせい)：みなさん、今日(きょう)の日本語(にほんご)台本(だいほん)へようこそ。
+非汉字部分原样保留，只输出注音后的台本内容，不要添加任何序号或代码块。`
+          },
+          { role: 'user', content: trimmed }
+        ],
+        temperature: 0.1
+      })
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      let content = data.choices?.[0]?.message?.content?.trim();
+      if (content) {
+        content = content.replace(/^```[a-zA-Z]*\n?/, '').replace(/\n?```$/, '').trim();
+        const originalLines = fullScript.split('\n');
+        const annotatedLines = content.split('\n');
+        const resultMap = new Map<string, Token[]>();
+
+        for (let idx = 0; idx < originalLines.length; idx++) {
+          const orig = originalLines[idx];
+          const anno = annotatedLines[idx] || orig;
+          if (orig.trim()) {
+            const tokens = parseRubyFormattedString(anno, rubyType);
+            resultMap.set(orig, tokens);
+          }
+        }
+        return resultMap;
+      }
+    }
+  } catch (e) {
+    console.error('Full script AI annotation error:', e);
   }
 
   return null;

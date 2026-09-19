@@ -70,6 +70,7 @@ class RubyElement extends XmlComponent {
 }
 
 export interface DocxExportOptions {
+  title?: string;        // Document title (defaults to text name or '日语假名配音台本')
   baseFontSize?: number; // in px (e.g. 16)
   rubyFontSize?: number; // in px (e.g. 10)
   lineSpacing?: number;  // e.g. 1.8
@@ -86,12 +87,14 @@ export async function buildDocxBlob(lines: ScriptLine[], options?: DocxExportOpt
   const rubySizeHalfPts = Math.round((options?.rubyFontSize || 10) * 1.5);
   const lineSpacingVal = Math.round((options?.lineSpacing || 1.8) * 240);
 
+  const docTitle = options?.title?.trim() || '日语假名配音台本';
+
   // Title
   children.push(
     new Paragraph({
       children: [
         new TextRun({
-          text: '日语假名配音台本',
+          text: docTitle,
           bold: true,
           size: 36, // 18pt
           font: 'Yu Gothic',
@@ -176,24 +179,7 @@ export async function buildDocxBlob(lines: ScriptLine[], options?: DocxExportOpt
       })
     );
 
-    // Translation line (if present)
-    if (line.translation) {
-      children.push(
-        new Paragraph({
-          children: [
-            new TextRun({
-              text: `↳ ${line.translation}`,
-              italics: true,
-              size: 20, // 10pt
-              font: 'Microsoft YaHei',
-              color: '777777',
-            }),
-          ],
-          spacing: { after: 240 },
-          indent: { left: 360 }, // Indent translation
-        })
-      );
-    }
+
   }
 
   // Footer

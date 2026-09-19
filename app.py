@@ -157,7 +157,8 @@ class FuriganaApp(ctk.CTk):
                 with open(path, 'w', encoding='utf-8') as f:
                     f.write(generate_srt(lines))
             elif ext == "docx":
-                generate_docx(lines, path, font_size_pt=12) # Approximate size
+                doc_title = os.path.splitext(os.path.basename(path))[0] or "日语假名配音台本"
+                generate_docx(lines, path, font_size_pt=12, title=doc_title)
                 
             messagebox.showinfo("成功", f"文件成功导出到:\n{path}")
         except Exception as e:
@@ -225,7 +226,7 @@ class FuriganaApp(ctk.CTk):
                     elif fmt == "srt":
                         with open(out_path, 'w', encoding='utf-8') as f: f.write(generate_srt(lines))
                     elif fmt == "docx":
-                        generate_docx(lines, out_path)
+                        generate_docx(lines, out_path, title=base)
                     
                     success_count += 1
                 except Exception as e:

@@ -100,13 +100,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <span>打赏作者</span>
             </button>
 
-            {/* Author Handle with Twitter Icon */}
-            <div className="flex items-center justify-center gap-1.5 text-xs font-semibold text-gray-600 tracking-wider">
-              {/* Twitter / X Logo */}
-              <svg className="w-3.5 h-3.5 fill-current text-gray-600" viewBox="0 0 24 24">
-                <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
-              </svg>
-              <span>チーズ@beimisama</span>
+            {/* Author Handle with Twitter Icon & Version */}
+            <div className="flex flex-col items-center justify-center gap-2 pt-0.5">
+              <div className="flex items-center justify-center gap-1.5 text-xs font-semibold text-gray-600 tracking-wider">
+                {/* Twitter / X Logo */}
+                <svg className="w-3.5 h-3.5 fill-current text-gray-600" viewBox="0 0 24 24">
+                  <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+                </svg>
+                <span>チーズ@beimisama</span>
+              </div>
+              <div className="text-[11px] font-semibold text-gray-500 tracking-wide bg-[#e0e5ec] px-3 py-1 rounded-lg shadow-[inset_2px_2px_4px_#b8bcc2,inset_-2px_-2px_4px_#ffffff]">
+                Furigana V1.0.1
+              </div>
             </div>
           </div>
         </div>

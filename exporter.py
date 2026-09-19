@@ -76,7 +76,7 @@ def create_ruby_element(base_text, ruby_text):
     
     return ruby
 
-def generate_docx(lines, output_path, font_size_pt=12):
+def generate_docx(lines, output_path, font_size_pt=12, title='日语假名配音台本'):
     doc = Document()
     
     style = doc.styles['Normal']
@@ -84,7 +84,7 @@ def generate_docx(lines, output_path, font_size_pt=12):
     # Set default font to MS Mincho or similar for Japanese
     font.name = 'MS Mincho'
     
-    doc.add_heading('日语假名配音台本', 0)
+    doc.add_heading(title or '日语假名配音台本', 0)
     
     for line in lines:
         p = doc.add_paragraph()
