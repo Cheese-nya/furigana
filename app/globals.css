@@ -38,6 +38,24 @@
   scrollbar-color: #b8bcc2 #e0e5ec;
 }
 
+/* Keep Japanese prose in inline flow so token boundaries add no spaces. */
+.script-line {
+  font-family: "Yu Gothic", "Noto Sans JP", "Meiryo", sans-serif;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  min-height: 1lh;
+}
+
+.script-line ruby {
+  ruby-position: over;
+  ruby-align: center;
+}
+
+.script-line rt {
+  text-align: center;
+  line-height: 1;
+}
+
 /* Ruby Reading alignment */
 rt {
   font-family: -apple-system, system-ui, sans-serif;

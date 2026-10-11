@@ -1,18 +1,19 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Modal } from './components/Modal';
 import { Sidebar } from './components/Sidebar';
 import {
   annotateLine,
   generateSRT,
   ScriptLine,
-  Token,
 } from './utils/furigana';
 
-import mammoth from 'mammoth';
+import { importDocx } from './utils/docxImporter';
+import { applyRubyOverrides, upsertRubyOverride, type RubyOverride } from './utils/rubyOverrides';
+import { loadCorrections, saveCorrections, type CorrectionLibrary } from './utils/correctionStorage';
 import { buildDocxBlob } from './utils/docxExporter';
-import { initKuromoji, isKuromojiReady } from './utils/kuromojiEngine';
+import { initKuromoji } from './utils/kuromojiEngine';
 
 interface BatchFileItem {
   id: string;
@@ -45,11 +46,27 @@ export default function DubbingStudioApp() {
   const [rawText, setRawText] = useState<string>(
     `山田先生：みなさん、こんにちは！今日の日本語アフレコ台本へようこそ。\n佐藤：先生、この漢字の読み方は何ですか？\n山田先生：これは「未来」と「希望」です。\n鈴木：声優の配音練習を始めましょう！`
   );
-  const [annotatedLines, setAnnotatedLines] = useState<ScriptLine[]>([]);
+  const [sourceOverrides, setSourceOverrides] = useState<RubyOverride[]>([]);
+  const [correctionLibrary, setCorrectionLibrary] = useState<CorrectionLibrary>({});
+  const [correctionsReady, setCorrectionsReady] = useState(false);
+  const [correctionError, setCorrectionError] = useState('');
   const [exportProgress, setExportProgress] = useState<number>(0);
   const [isExporting, setIsExporting] = useState<boolean>(false);
   const [exportFormat, setExportFormat] = useState<'docx' | 'srt' | 'txt'>('docx');
   const [isKuromojiLoading, setIsKuromojiLoading] = useState<boolean>(true);
+
+  const documentKey = docTitle.trim() || '日语假名配音台本';
+  const documentCorrections = useMemo(() => correctionLibrary[documentKey] || [], [correctionLibrary, documentKey]);
+  const annotatedLines = useMemo(() => {
+    // Recompute after dictionary initialization, including the fallback on failure.
+    void isKuromojiLoading;
+    return rawText.split('\n').map((text, index) => {
+      const line = { ...annotateLine(text, rubyType), id: String(index) };
+      return applyRubyOverrides(applyRubyOverrides(line, sourceOverrides, rubyType), documentCorrections, rubyType);
+    });
+  }, [rawText, rubyType, isKuromojiLoading, sourceOverrides, documentCorrections]);
+
+  const missingReadings = annotatedLines.reduce((sum, line) => sum + line.tokens.filter(token => token.hasKanji && !token.ruby).length, 0);
 
   // File import ref for Editor
   const editorFileInputRef = useRef<HTMLInputElement>(null);
@@ -58,6 +75,7 @@ export default function DubbingStudioApp() {
   const [editingToken, setEditingToken] = useState<{
     lineId: string;
     tokenIndex: number;
+    tokenEndIndex: number;
     surface: string;
     currentRuby: string;
     alternatives: string[];
@@ -71,38 +89,36 @@ export default function DubbingStudioApp() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const exportIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Save modified token ruby
-  const saveTokenRuby = () => {
+  const updateTokenRuby = (reading: string) => {
     if (!editingToken) return;
-    setAnnotatedLines(prev => prev.map(line => {
-      if (line.id !== editingToken.lineId) return line;
-      const newTokens = [...line.tokens];
-      if (newTokens[editingToken.tokenIndex]) {
-        newTokens[editingToken.tokenIndex] = {
-          ...newTokens[editingToken.tokenIndex],
-          ruby: customRubyInput.trim() || undefined,
-        };
-      }
-      return { ...line, tokens: newTokens };
+    const line = annotatedLines.find(value => value.id === editingToken.lineId);
+    if (!line) return;
+    const start = line.tokens.slice(0, editingToken.tokenIndex).reduce((sum, token) => sum + token.surface.length, 0);
+    const entry: RubyOverride = { line: line.cleanText, start, surface: editingToken.surface, reading, type: rubyType };
+    setCorrectionLibrary(previous => ({ ...previous,
+      [documentKey]: upsertRubyOverride(previous[documentKey] || [], entry),
     }));
     setEditingToken(null);
   };
 
-  // Remove token ruby
-  const removeTokenRuby = () => {
+  const saveTokenRuby = () => updateTokenRuby(customRubyInput.trim());
+  const removeTokenRuby = () => updateTokenRuby('');
+
+  const resizeRubyRange = (start: number, end: number) => {
     if (!editingToken) return;
-    setAnnotatedLines(prev => prev.map(line => {
-      if (line.id !== editingToken.lineId) return line;
-      const newTokens = [...line.tokens];
-      if (newTokens[editingToken.tokenIndex]) {
-        newTokens[editingToken.tokenIndex] = {
-          ...newTokens[editingToken.tokenIndex],
-          ruby: undefined,
-        };
-      }
-      return { ...line, tokens: newTokens };
-    }));
-    setEditingToken(null);
+    const line = annotatedLines.find(line => line.id === editingToken.lineId);
+    if (!line) return;
+    const selected = line.tokens.slice(start, end + 1);
+    const reading = selected.map(token => token.ruby || token.surface).join('');
+    setEditingToken({
+      ...editingToken,
+      tokenIndex: start,
+      tokenEndIndex: end,
+      surface: selected.map(token => token.surface).join(''),
+      currentRuby: reading,
+      alternatives: selected.length === 1 ? selected[0].alternatives || [] : [],
+    });
+    setCustomRubyInput(reading);
   };
 
   // Dependency health status
@@ -120,12 +136,33 @@ export default function DubbingStudioApp() {
       .catch(() => setIsKuromojiLoading(false)); // fallback to normal dict if fails
   }, []);
 
-  // Instant local annotation on text or option changes
   useEffect(() => {
-    const rawLines = rawText.split('\n');
-    const parsedLines = rawLines.map(rawLine => annotateLine(rawLine, rubyType));
-    setAnnotatedLines(parsedLines);
-  }, [rawText, rubyType, isKuromojiLoading]);
+    let active = true;
+    const load = () => {
+      setCorrectionsReady(false);
+      loadCorrections().then(data => {
+        if (active) {
+          setCorrectionLibrary(previous => ({ ...data, ...previous }));
+          setCorrectionError('');
+          setCorrectionsReady(true);
+        }
+      }).catch(error => {
+        if (active) setCorrectionError(`校对记录读取失败：${String(error)}`);
+      });
+    };
+    load();
+    window.addEventListener('pywebviewready', load);
+    return () => { active = false; window.removeEventListener('pywebviewready', load); };
+  }, []);
+
+  useEffect(() => {
+    if (!correctionsReady) return;
+    const timer = setTimeout(() => {
+      saveCorrections(correctionLibrary).then(() => setCorrectionError(''))
+        .catch(error => setCorrectionError(`校对记录保存失败：${String(error)}`));
+    }, 200);
+    return () => clearTimeout(timer);
+  }, [correctionLibrary, correctionsReady]);
 
   useEffect(() => {
     return () => {
@@ -264,11 +301,14 @@ export default function DubbingStudioApp() {
       let content = '';
       if (file.name.toLowerCase().endsWith('.docx')) {
         const arrayBuffer = await file.arrayBuffer();
-        const res = await mammoth.extractRawText({ arrayBuffer });
-        content = res.value;
+        const imported = await importDocx(arrayBuffer);
+        content = imported.text;
+        setSourceOverrides(imported.overrides);
       } else {
         content = await file.text();
+        setSourceOverrides([]);
       }
+      setEditingToken(null);
       setRawText(content);
     } catch (err) {
       console.error('Import file error:', err);
@@ -333,16 +373,19 @@ export default function DubbingStudioApp() {
 
       try {
         let textContent = '';
+        let importedOverrides: RubyOverride[] = [];
         if (item.name.toLowerCase().endsWith('.docx')) {
           const arrayBuffer = await item.file.arrayBuffer();
-          const res = await mammoth.extractRawText({ arrayBuffer });
-          textContent = res.value;
+          const imported = await importDocx(arrayBuffer);
+          textContent = imported.text;
+          importedOverrides = imported.overrides;
         } else {
           textContent = await item.file.text();
         }
-        const rawLines = textContent.split('\n');
-        const parsedLines = rawLines.map(line => annotateLine(line, rubyType));
         const itemTitle = item.name.replace(/\.[^/.]+$/, "") || '日语假名配音台本';
+        const parsedLines = textContent.split('\n').map(text =>
+          applyRubyOverrides(applyRubyOverrides(annotateLine(text, rubyType), importedOverrides, rubyType), correctionLibrary[itemTitle] || [], rubyType)
+        );
 
         // Generate output based on target format
         let outputBlob: Blob;
@@ -366,7 +409,7 @@ export default function DubbingStudioApp() {
 
         if (saveRes.success) {
           setBatchFiles(prev =>
-            prev.map(f => f.id === item.id ? { ...f, status: 'done', progress: 100, lineCount: rawLines.length } : f)
+            prev.map(f => f.id === item.id ? { ...f, status: 'done', progress: 100, lineCount: parsedLines.length } : f)
           );
           exportedNames.push(saveRes.path || outName);
           successCount++;
@@ -586,7 +629,7 @@ export default function DubbingStudioApp() {
 
                 <div className="flex items-center gap-2">
                   <span className="text-xs text-emerald-700 bg-emerald-100/90 px-3 py-1.5 rounded-xl font-medium shadow-[inset_1px_1px_2px_#a7f3d0,inset_-1px_-1px_2px_#ffffff] flex items-center gap-1">
-                    ✨ 前后文高精度假名消歧已生效
+                    {isKuromojiLoading ? '正在加载离线词典' : '离线词典与上下文规则已启用'}
                   </span>
                 </div>
               </div>
@@ -662,36 +705,60 @@ export default function DubbingStudioApp() {
                     {annotatedLines.length} 行
                   </span>
                 </div>
-                <div className={`${neuInput} w-full h-[360px] p-6 overflow-y-auto flex flex-col gap-4`}>
+                <p className="text-xs text-gray-500 mb-2">点击汉字修改读音；可扩展标注范围，设置词组整体注音。已有 Word 注音会保留。</p>
+                <div className="flex items-center justify-between gap-2 text-xs text-gray-500 mb-3">
+                  <span>{correctionsReady ? `已记住 ${documentCorrections.length} 处校对（按台本标题保存）` : '正在读取校对记录...'}</span>
+                  {documentCorrections.length > 0 && <button type="button" className="underline" onClick={() => {
+                    setCorrectionLibrary(previous => ({ ...previous, [documentKey]: [] }));
+                    setEditingToken(null);
+                  }}>重置此台本校对</button>}
+                </div>
+                {correctionError && <p role="alert" className="text-xs text-red-600 mb-3">{correctionError}</p>}
+                {missingReadings > 0 && <p className="text-xs text-amber-700 mb-3">{missingReadings} 处汉字未标注读音（含手工清除项），可点击补充。</p>}
+                <div lang="ja" className={`${neuInput} w-full h-[360px] p-6 overflow-y-auto`}>
                   {annotatedLines.map((line) => (
-                    <div key={line.id} className="border-b border-gray-300/50 pb-3 last:border-0" style={{ marginBottom: `${(lineSpacing - 1.5) * 8}px` }}>
-                      <div className="text-gray-800 font-semibold flex flex-wrap items-end gap-x-1.5" style={{ fontSize: `${fontSize}px`, lineHeight: lineSpacing }}>
-                        {line.tokens.map((t, tidx) => (
-                          <ruby
-                            key={tidx}
-                            onClick={() => {
-                              if (t.hasKanji) {
-                                setEditingToken({
-                                  lineId: line.id,
-                                  tokenIndex: tidx,
-                                  surface: t.surface,
-                                  currentRuby: t.ruby || '',
-                                  alternatives: t.alternatives || (t.ruby ? [t.ruby] : [])
-                                });
-                                setCustomRubyInput(t.ruby || '');
-                              }
-                            }}
-                            className={t.hasKanji ? 'cursor-pointer hover:bg-blue-200/60 rounded px-0.5 transition-colors group relative' : ''}
-                            title={t.hasKanji ? '点击切换备选读音或自定义修改' : undefined}
-                          >
-                            {t.surface}
-                            {t.ruby && (
-                              <rt className="text-blue-600 select-none group-hover:text-blue-800 font-bold" style={{ fontSize: `${rubyFontSize}px` }}>
-                                {t.ruby}
-                              </rt>
-                            )}
-                          </ruby>
-                        ))}
+                    <div key={line.id} className="border-b border-gray-300/50 pb-3 mb-4 last:border-0 last:mb-0">
+                      <div className="script-line text-gray-800 font-semibold" style={{ fontSize: `${fontSize}px`, lineHeight: lineSpacing }}>
+                        {line.speaker && <span>{line.speaker}：</span>}
+                        {line.tokens.length === 0 && <br />}
+                        {line.tokens.map((t, tidx) => {
+                          const TokenElement = t.ruby ? 'ruby' : 'span';
+                          return (
+                            <TokenElement
+                              key={tidx}
+                              onClick={() => {
+                                if (t.hasKanji) {
+                                  setEditingToken({
+                                    lineId: line.id,
+                                    tokenIndex: tidx,
+                                    tokenEndIndex: tidx,
+                                    surface: t.surface,
+                                    currentRuby: t.ruby || '',
+                                    alternatives: t.alternatives || (t.ruby ? [t.ruby] : [])
+                                  });
+                                  setCustomRubyInput(t.ruby || '');
+                                }
+                              }}
+                              className={t.hasKanji ? 'cursor-pointer hover:bg-blue-200/60 rounded transition-colors group relative' : ''}
+                              tabIndex={t.hasKanji ? 0 : undefined}
+                              role={t.hasKanji ? 'button' : undefined}
+                              onKeyDown={(event) => {
+                                if (t.hasKanji && (event.key === 'Enter' || event.key === ' ')) {
+                                  event.preventDefault();
+                                  event.currentTarget.click();
+                                }
+                              }}
+                              title={t.hasKanji ? '点击切换备选读音或自定义修改' : undefined}
+                            >
+                              {t.surface}
+                              {t.ruby && (
+                                <rt className="text-blue-600 select-none group-hover:text-blue-800 font-bold" style={{ fontSize: `${rubyFontSize}px` }}>
+                                  {t.ruby}
+                                </rt>
+                              )}
+                            </TokenElement>
+                          );
+                        })}
                       </div>
                     </div>
                   ))}
@@ -1007,12 +1074,40 @@ export default function DubbingStudioApp() {
           <div className="space-y-5">
             <div className="flex items-center justify-between bg-[#e0e5ec] p-4 rounded-xl shadow-[inset_2px_2px_4px_#b8bcc2,inset_-2px_-2px_4px_#ffffff]">
               <div>
-                <div className="text-xs text-gray-500 mb-1">当前汉字</div>
+                <div className="text-xs text-gray-500 mb-1">当前标注文字</div>
                 <div className="text-2xl font-bold text-gray-800">{editingToken.surface}</div>
               </div>
               <div className="text-right">
                 <div className="text-xs text-gray-500 mb-1">当前注音</div>
                 <div className="text-xl font-bold text-blue-600">{editingToken.currentRuby || '(无注音)'}</div>
+              </div>
+            </div>
+
+            <div>
+              <div className="text-xs font-semibold text-gray-700 mb-2">标注范围（词组共享一组居中注音）：</div>
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  disabled={editingToken.tokenIndex === 0}
+                  onClick={() => resizeRubyRange(editingToken.tokenIndex - 1, editingToken.tokenEndIndex)}
+                  className={`${neuButton} px-3 py-2 text-xs disabled:opacity-40`}
+                >向左扩展</button>
+                <button
+                  type="button"
+                  disabled={editingToken.tokenEndIndex >= (annotatedLines.find(line => line.id === editingToken.lineId)?.tokens.length || 0) - 1}
+                  onClick={() => resizeRubyRange(editingToken.tokenIndex, editingToken.tokenEndIndex + 1)}
+                  className={`${neuButton} px-3 py-2 text-xs disabled:opacity-40`}
+                >向右扩展</button>
+                <button
+                  type="button"
+                  disabled={editingToken.tokenIndex === editingToken.tokenEndIndex}
+                  onClick={() => resizeRubyRange(editingToken.tokenIndex, editingToken.tokenEndIndex - 1)}
+                  className={`${neuButton} px-3 py-2 text-xs disabled:opacity-40`}
+                >缩小范围</button>
+              </div>
+              <p className="text-xs text-gray-500 mt-2">例如选择「二」后向右扩展至「二人」，输入「ふたり」并保存。修改会按当前台本标题记住，仅应用于相同原文行。</p>
+              <div lang="ja" className="script-line text-center py-4 text-2xl text-gray-800">
+                <ruby>{editingToken.surface}<rt style={{ fontSize: `${rubyFontSize}px` }}>{customRubyInput || '\u00a0'}</rt></ruby>
               </div>
             </div>
 
@@ -1057,7 +1152,7 @@ export default function DubbingStudioApp() {
                 onClick={removeTokenRuby}
                 className="text-xs text-red-500 hover:text-red-700 underline font-medium"
               >
-                清除此字假名
+                清除所选文字注音
               </button>
               <div className="flex items-center gap-3">
                 <button

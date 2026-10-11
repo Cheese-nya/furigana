@@ -92,7 +92,8 @@ def generate_docx(lines, output_path, font_size_pt=12, title='日语假名配音
             if token.get('ruby'):
                 # Add ruby text
                 ruby_el = create_ruby_element(token['surface'], token['ruby'])
-                p._p.append(ruby_el)
+                # Ruby must be inside a run; WPS skips invalid paragraph-level ruby.
+                p.add_run()._r.append(ruby_el)
             else:
                 # Add normal text
                 run = p.add_run(token['surface'])

@@ -17,8 +17,10 @@ import {
 import type { ScriptLine } from './furigana';
 
 class ElementComponent extends XmlComponent {
-  constructor(name: string) {
+  constructor(name: string, children: XmlComponent[] = [], value?: string) {
     super(name);
+    if (value !== undefined) this.root.push({ _attr: { 'w:val': value } });
+    this.root.push(...children);
   }
 }
 
@@ -31,41 +33,35 @@ class RubyElement extends XmlComponent {
     super('w:ruby');
 
     // w:rubyPr (Properties)
-    const rubyPr = new ElementComponent('w:rubyPr');
-    const rubyAlign = new ElementComponent('w:rubyAlign');
-    (rubyAlign as any).root.push({ _attr: { 'w:val': 'distributeSpace' } });
-    const hps = new ElementComponent('w:hps');
-    (hps as any).root.push({ _attr: { 'w:val': String(rubySize) } });
-    const hpsRaise = new ElementComponent('w:hpsRaise');
-    (hpsRaise as any).root.push({ _attr: { 'w:val': '18' } });
-    const hpsBaseText = new ElementComponent('w:hpsBaseText');
-    (hpsBaseText as any).root.push({ _attr: { 'w:val': String(baseSize) } });
-    const lid = new ElementComponent('w:lid');
-    (lid as any).root.push({ _attr: { 'w:val': 'ja-JP' } });
-
-    (rubyPr as any).root.push(rubyAlign, hps, hpsRaise, hpsBaseText, lid);
+    const rubyPr = new ElementComponent('w:rubyPr', [
+      new ElementComponent('w:rubyAlign', [], 'center'),
+      new ElementComponent('w:hps', [], String(rubySize)),
+      new ElementComponent('w:hpsRaise', [], String(baseSize)),
+      new ElementComponent('w:hpsBaseText', [], String(baseSize)),
+      new ElementComponent('w:lid', [], 'ja-JP'),
+    ]);
 
     // w:rt (Ruby Text - Furigana positioned directly ABOVE kanji)
-    const rt = new ElementComponent('w:rt');
     const rtRun = new TextRun({
       text: rubyText,
       size: rubySize,
       color: '2563EB', // Blue furigana on top
       font: 'Yu Gothic',
+      language: { eastAsia: 'ja-JP' },
     });
-    (rt as any).root.push(rtRun);
+    const rt = new ElementComponent('w:rt', [rtRun]);
 
     // w:rubyBase (Base Kanji Text)
-    const rubyBase = new ElementComponent('w:rubyBase');
     const baseRun = new TextRun({
       text: baseText,
       size: baseSize, // 12pt = 小四
       font: 'Yu Gothic',
       color: '1A1A1A',
+      language: { eastAsia: 'ja-JP' },
     });
-    (rubyBase as any).root.push(baseRun);
+    const rubyBase = new ElementComponent('w:rubyBase', [baseRun]);
 
-    (this as any).root.push(rubyPr, rt, rubyBase);
+    this.root.push(rubyPr, rt, rubyBase);
   }
 }
 
@@ -137,7 +133,7 @@ export async function buildDocxBlob(lines: ScriptLine[], options?: DocxExportOpt
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
 
-    const paragraphChildren: (TextRun | RubyElement)[] = [];
+    const paragraphChildren: TextRun[] = [];
 
     // Speaker prefix (bold)
     if (line.speaker) {
@@ -157,7 +153,11 @@ export async function buildDocxBlob(lines: ScriptLine[], options?: DocxExportOpt
       if (token.ruby) {
         // Kanji with furigana directly ABOVE it!
         paragraphChildren.push(
-          new RubyElement(token.surface, token.ruby, baseSizeHalfPts, rubySizeHalfPts)
+          // Ruby is run content in OpenXML; a direct paragraph child is invalid
+          // and causes WPS to omit the annotated base text.
+          new TextRun({
+            children: [new RubyElement(token.surface, token.ruby, baseSizeHalfPts, rubySizeHalfPts)],
+          })
         );
       } else {
         // Normal text without furigana

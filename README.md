@@ -26,10 +26,10 @@
 
 ## ✨ 核心特性 (Features)
 
-- 🎯 **前后文（上下文）高精度假名消歧**
-  - **语义感知定音**：基于形态素上下文 Viterbi 最优路径，结合双向滑动窗口语义规则，彻底解决高频同形異音語（如 `辛い(からい/つらい)`、`何(なん/なに)`、`角(かど/つの/かく)`、`風(ふう/かぜ)`、`方(かた/ほう)`、`一日(いちにち/ついたち)` 等）。
-  - **熟字训与送假名剥离**：支持 `日本人(にっぽんじん)`、`大人(おとな)`、`山田先生(やまだせんせい)` 完美逐字切分对齐。
-  - **双引擎同步**：Web 端 Kuromoji 引擎与 Python 原生端 `fugashi` + `unidic_lite` 同步消歧规则。
+- 🎯 **离线词典与上下文读音规则**
+  - 网页及 PyWebView 桌面版使用本地 Kuromoji 词典，结合 `辛い`、`何`、`風`、`行っ` 等上下文规则。歧义、人名、古语仍需要人工校对。
+  - **词组与送假名对齐**：保留连续汉字的整体读音，例如 `二人(ふたり)`、`大人(おとな)`；按词中的假名对齐 `取り戻し` 等送假名，不再猜测每个汉字的音节分配。
+  - **Word 导入保真**：保留带注音的汉字正文，优先使用原文件读音；兼容标准及旧版段落级 Ruby。
 
 - 📝 **智能动态台本标题联动**
   - **自适应文件名**：导入 `.txt` / `.srt` / `.docx` 文本时，系统自动识别原文件名（如《歪な鳥籠》），导出 Word 时顶部一级大标题自动命名为对应的台本名称。
@@ -40,7 +40,10 @@
   - 界面排版专注纯净，无多余副行干扰，离线断网环境下依然稳定高效。
 
 - ✏️ **交互式点击读音校对**
-  - 在实时排版预览区，直接点击任意汉字/假名即可弹出校对浮窗，提供该语境下的常见候选读音，亦支持输入自定义声优特殊读音。
+  - 在实时排版预览区，直接点击汉字即可弹出校对浮窗，选择候选读音或输入自定义读音。
+  - **词组整体注音**：例如点击「二」，使用「向右扩展」选中「二人」，输入「ふたり」后保存。假名会居中显示在整个词组上方，Word 导出保留该标注。
+  - **记住校对**：修改按台本标题、完整原文行和字符范围保存；切换注音模式、修改其他行、重新导入和批量导出会保留校对。已改动的原文行需要重新检查；重名台本共享校对记录，可通过「重置此台本校对」清除。
+  - 浏览器版使用 localStorage；Windows 桌面版写入 `%LOCALAPPDATA%\\FuriganaDubbingStudio\\corrections.json`，不受启动端口变化影响。平假名与片假名校对可随模式转换；直接输入的罗马音按原样保留。
 
 - 📄 **全格式专业配音台本导出**
   - **Word (`.docx`)**：完美兼容 Microsoft Word 原生 `<w:ruby>` 振假名结构（假名位于汉字正上方），正文字号、假名字号、行间距自由调节。
@@ -71,8 +74,8 @@
 
 * **前端框架**：[Next.js 16](https://nextjs.org/) + [React 19](https://react.dev/)
 * **样式系统**：[Tailwind CSS v4](https://tailwindcss.com/)
-* **分词注音**：Kuromoji (Web) / Fugashi + UniDic Lite (Python)
-* **Word 渲染**：[docx](https://docx.js.org/) (Native Ruby w:ruby generator)
+* **分词注音**：Kuromoji（网页与 PyWebView 桌面版）；独立旧 Python 界面使用 Fugashi + UniDic Lite
+* **Word 导入与导出**：JSZip + 原生 DOMParser 保留原注音；[docx](https://docx.js.org/) 生成标准 Word Ruby
 * **桌面端内核**：[Python 3](https://python.org/) + [PyWebView](https://pywebview.flowrl.com/) + [PyInstaller](https://pyinstaller.org/)
 
 ---
@@ -101,17 +104,25 @@ npm run dev
 
 ### 4. 静态导出与打包 Windows EXE
 
-确保本地已安装 Python 3 及相关依赖：
+在 Windows 构建机上安装 Node.js、Python 3 和桌面打包依赖：
 ```bash
-pip install pywebview pyinstaller fugashi unidic-lite python-docx
+npm ci
+pip install pywebview pyinstaller
+npm run package:exe
+```
+该命令构建 `out/` 并将页面、词典一起打包，生成根目录下的 **`FuriganaDubbingStudio.exe`**。此桌面版无需 Fugashi、Sudachi 或 UniDic；这些依赖仅用于独立旧 Python 界面或可选对照评估。Windows 使用 PyWebView 的 WebView2 渲染环境。
+
+离线注音、导入与导出不调用外部服务。校对记录保存于用户数据目录，重新打包程序不会覆盖。Linux 环境只能验证网页产物与桌面桥接逻辑，Windows EXE 需要在 Windows 上构建并验证。
+
+### 5. 验证与真实台本评估
+
+```bash
+npm test
+python -m unittest discover -s tests -p "test_*.py"
+node tools/audit-scripts.mjs "台本目录" audit.json
 ```
 
-执行打包命令：
-```bash
-npm run build
-python -m PyInstaller --noconfirm FuriganaDubbingStudio.spec
-```
-编译完成后将在根目录下生成可直接双击运行的 **`FuriganaDubbingStudio.exe`**。
+评估工具只读原台本，检查正文完整性并对比文件已有注音。详细结果和可选 Sudachi／MeCab 对照流程见 [离线引擎评估报告](docs/offline-engine-evaluation.md)。
 
 ---
 
@@ -130,7 +141,7 @@ furigana/
 ├── desktop_runner.py     # PyWebView 桌面端启动核心
 ├── exporter.py           # Python 端多格式导出脚本
 ├── furigana_engine.py    # Python 端形态素与消歧引擎
-├── FuriganaDubbingStudio.spec # PyInstaller 打包描述文件
+├── tools/                # 只读真实台本评估与可选引擎对照
 ├── RELEASE_NOTES.md      # 版本更新发布说明
 ├── LICENSE               # MIT 开源协议
 └── README.md             # 仓库说明文档

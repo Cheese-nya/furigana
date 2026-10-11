@@ -5,7 +5,10 @@
  * Includes Context-Aware Disambiguation (前後文上下文多音字消歧) & Mora-Aligned Rubies
  */
 
-import { getTokenizer, isKuromojiReady } from './kuromojiEngine';
+import { getTokenizer, isKuromojiReady, type KuromojiToken } from './kuromojiEngine';
+import { findCounterCompound } from './counterReadings';
+
+export type RubyType = 'hiragana' | 'katakana' | 'romaji';
 
 export interface Token {
   surface: string;
@@ -56,6 +59,16 @@ export const GRAMMAR_PATTERNS: Record<string, string> = {
   '使い方': 'つかいかた',
   '教え方': 'おしえかた',
   '仕方': 'しかた',
+  '二人': 'ふたり',
+  '一人': 'ひとり',
+  '三人': 'さんにん',
+  '四人': 'よにん',
+  '五人': 'ごにん',
+  '六人': 'ろくにん',
+  '七人': 'しちにん',
+  '八人': 'はちにん',
+  '九人': 'きゅうにん',
+  '十人': 'じゅうにん',
   '思った': 'おもった',
   '思って': 'おもって',
   '思い': 'おもい',
@@ -77,119 +90,6 @@ export const GRAMMAR_PATTERNS: Record<string, string> = {
   '見つけて': 'みつけて',
   '久しぶり': 'ひさしぶり',
 };
-
-// Kanji reading variants for accurate multi-kanji compound mora splitting
-export const KANJI_READING_VARIANTS: Record<string, string[]> = {
-  '日': ['にち', 'じつ', 'ひ', 'び', 'か'],
-  '本': ['ほん', 'ぼん', 'ぽん', 'もと'],
-  '語': ['ご', 'かた'],
-  '人': ['じん', 'にん', 'ひと', 'びと', 'り'],
-  '山': ['さん', 'ざん', 'やま'],
-  '田': ['でん', 'た', 'だ'],
-  '先': ['せん', 'さき'],
-  '生': ['せい', 'しょう', 'なま', 'い', 'う'],
-  '学': ['がく', 'がっ', 'まな'],
-  '校': ['こう'],
-  '声': ['せい', 'しょう', 'こえ', 'ごえ'],
-  '優': ['ゆう', 'やさ'],
-  '未': ['み', 'いま'],
-  '来': ['らい', 'き', 'く', 'こ'],
-  '希': ['き', 'け'],
-  '望': ['ぼう', 'もう', 'のぞ'],
-  '練': ['れん', 'ね'],
-  '習': ['しゅう', 'なら'],
-  '台': ['だい', 'たい'],
-  '配': ['はい', 'ぱい', 'くば'],
-  '音': ['おん', 'いん', 'おと', 'ね'],
-  '響': ['きょう', 'ひび'],
-  '銀': ['ぎん', 'しろがね'],
-  '行': ['こう', 'ぎょう', 'あん', 'い', 'ゆ', 'おこな'],
-  '道': ['どう', 'とう', 'みち'],
-  '食': ['しょく', 'じき', 'た', 'く'],
-  '物': ['ぶつ', 'もつ', 'もの'],
-  '花': ['か', 'はな', 'ばな'],
-  '咲': ['さ'],
-  '読': ['どく', 'とう', 'よ'],
-  '書': ['しょ', 'か'],
-  '話': ['わ', 'はなし', 'はな'],
-  '見': ['けん', 'み'],
-  '聞': ['ぶん', 'もん', 'き'],
-  '牛': ['ぎゅう', 'うし'],
-  '曲': ['きょく', 'ま'],
-  '字': ['じ', 'あざ'],
-  '幕': ['まく', 'ばく'],
-  '吹': ['すい', 'ふ'],
-  '替': ['たい', 'か'],
-  '役': ['やく', 'えき'],
-  '割': ['かつ', 'わ', 'わり'],
-  '時': ['じ', 'とき', 'どき'],
-  '間': ['かん', 'けん', 'あいだ', 'ま'],
-  '心': ['しん', 'こころ'],
-  '愛': ['あい', 'いと'],
-  '光': ['こう', 'ひかり'],
-  '空': ['くう', 'そら', 'ぞら', 'から', 'あ'],
-  '海': ['かい', 'うみ'],
-  '風': ['ふう', 'ふ', 'かぜ', 'かざ'],
-  '雨': ['う', 'あめ', 'あま'],
-  '夢': ['む', 'ぼう', 'ゆめ'],
-  '真': ['しん', 'ま'],
-  '実': ['じつ', 'み'],
-  '嘘': ['きょ', 'うそ'],
-  '約': ['やく'],
-  '束': ['そく', 'たば'],
-  '勝': ['しょう', 'か'],
-  '利': ['り'],
-  '仲': ['ちゅう', 'なか'],
-  '感': ['かん'],
-  '情': ['じょう', 'せい', 'なさ'],
-  '記': ['き', 'しる'],
-  '憶': ['おく'],
-  '言': ['げん', 'ごん', 'こと', 'い'],
-  '葉': ['よう', 'は', 'ば'],
-  '運': ['うん', 'はこ'],
-  '命': ['めい', 'みょう', 'いのち'],
-  '地': ['ち', 'じ'],
-  '球': ['きゅう', 'たま'],
-  '宇': ['う'],
-  '宙': ['ちゅう'],
-  '星': ['せい', 'しょう', 'ほし', 'ぼし'],
-  '太': ['たい', 'た', 'ふと'],
-  '陽': ['よう', 'ひ'],
-  '月': ['げつ', 'がつ', 'つき'],
-  '朝': ['ちょう', 'あさ'],
-  '昼': ['ちゅう', 'ひる'],
-  '夜': ['や', 'よる', 'よ'],
-  '春': ['しゅん', 'はる'],
-  '夏': ['か', 'げ', 'なつ'],
-  '秋': ['しゅう', 'あき'],
-  '冬': ['とう', 'ふゆ'],
-  '雪': ['せつ', 'ゆき'],
-  '神': ['しん', 'じん', 'かみ', 'がみ'],
-  '悪': ['あく', 'お', 'わる'],
-  '魔': ['ま'],
-  '勇': ['ゆう', 'いさ'],
-  '者': ['しゃ', 'もの'],
-  '王': ['おう'],
-  '法': ['ほう', 'ほっ', 'ぽう'],
-  '科': ['か'],
-  '技': ['ぎ', 'わざ'],
-  '術': ['じゅつ'],
-  '力': ['りょく', 'りき', 'ちから'],
-  '能': ['のう'],
-  '限': ['げん', 'かぎ'],
-  '界': ['かい'],
-  '私': ['し', 'わたし', 'わたくし'],
-  '僕': ['ぼく'],
-  '俺': ['おれ'],
-  '君': ['くん', 'きみ'],
-  '合': ['ごう', 'がっ', 'かっ', 'あ'],
-  '手': ['しゅ', 'て', 'で']
-};
-
-// Words that should stay intact as compounds (熟字訓 or unified compounds)
-export const ATEMI_COMPOUNDS = new Set([
-  '今日', '明日', '昨日', '大人', '友達', '久しぶり', '今度', '日曜日'
-]);
 
 // Fallback Kanji Dictionary for words Kuromoji doesn't recognize
 export const KANJI_READINGS: Record<string, string> = {
@@ -277,100 +177,65 @@ export function katakanaToHiragana(kataText: string): string {
 }
 
 /**
- * Break down a phrase like "大好きな" with reading "だいすきな" into exact tokens:
- * "大" (ruby: "だい"), "好" (ruby: "す"), "きな" (no ruby)
+ * Format a dictionary reading for the selected annotation mode.
  */
+export function formatRuby(reading: string, rubyType: RubyType): string {
+  const hira = katakanaToHiragana(reading);
+  if (rubyType === 'katakana') {
+    return hira.replace(/[\u3041-\u3096]/g, ch => String.fromCharCode(ch.charCodeAt(0) + 0x60));
+  }
+  return rubyType === 'romaji' ? kanaToRomaji(hira) : hira;
+}
+
 export function parseCompoundToTokens(
   phrase: string,
   reading: string,
-  rubyType: 'hiragana' | 'katakana' | 'romaji' = 'hiragana',
+  rubyType: RubyType = 'hiragana',
   alternatives?: string[]
 ): Token[] {
-  if (!KANJI_REGEX.test(phrase)) {
-    return [{ surface: phrase, hasKanji: false }];
+  if (!KANJI_REGEX.test(phrase) || !reading) {
+    return [{ surface: phrase, hasKanji: KANJI_REGEX.test(phrase) }];
   }
-
-  let prefixKanaLen = 0;
-  while (prefixKanaLen < phrase.length && !KANJI_REGEX.test(phrase[prefixKanaLen])) {
-    prefixKanaLen++;
-  }
-
-  let suffixKanaLen = 0;
-  while (
-    suffixKanaLen < phrase.length - prefixKanaLen &&
-    !KANJI_REGEX.test(phrase[phrase.length - 1 - suffixKanaLen])
-  ) {
-    suffixKanaLen++;
-  }
-
-  const prefixKana = phrase.slice(0, prefixKanaLen);
-  const kanjiPart = phrase.slice(prefixKanaLen, phrase.length - suffixKanaLen);
-  const suffixKana = phrase.slice(phrase.length - suffixKanaLen);
-
-  let kanjiReading = reading;
-  if (prefixKana && kanjiReading.startsWith(prefixKana)) {
-    kanjiReading = kanjiReading.slice(prefixKana.length);
-  }
-  if (suffixKana && kanjiReading.endsWith(suffixKana)) {
-    kanjiReading = kanjiReading.slice(0, kanjiReading.length - suffixKana.length);
-  }
-
-  const tokens: Token[] = [];
-  if (prefixKana) tokens.push({ surface: prefixKana, hasKanji: false });
-
-  const formatRuby = (r: string) => {
-    if (rubyType === 'katakana') {
-      return r.replace(/[\u3041-\u3096]/g, ch => String.fromCharCode(ch.charCodeAt(0) + 0x60));
-    } else if (rubyType === 'romaji') {
-      return kanaToRomaji(r);
+  // Align the actual kana in the word, rather than guessing individual kanji readings.
+  // Keep adjacent kanji together (二人/ふたり); split only at unambiguous okurigana.
+  const parts = phrase.match(/[\u4E00-\u9FFF\u3400-\u4DBF]+|[^\u4E00-\u9FFF\u3400-\u4DBF]+/gu) || [phrase];
+  const hira = katakanaToHiragana(reading);
+  const solutions: Token[][] = [];
+  const align = (index: number, offset: number, result: Token[]) => {
+    if (solutions.length > 1) return;
+    if (index === parts.length) {
+      if (offset === hira.length) solutions.push(result);
+      return;
     }
-    return r;
-  };
-
-  if (kanjiPart) {
-    // Keep unified compounds intact (e.g. 大人, 今日, 明日) or single kanji
-    if (ATEMI_COMPOUNDS.has(phrase) || ATEMI_COMPOUNDS.has(kanjiPart) || kanjiPart.length <= 1) {
-      tokens.push({
-        surface: kanjiPart,
-        ruby: formatRuby(kanjiReading),
-        hasKanji: true,
-        ...(alternatives ? { alternatives } : {})
-      });
-    } else {
-      // Try multi-kanji splitting using KANJI_READING_VARIANTS
-      const findSplit = (kIndex: number, curReading: string): Token[] | null => {
-        if (kIndex === kanjiPart.length) {
-          return curReading.length === 0 ? [] : null;
-        }
-        const char = kanjiPart[kIndex];
-        const variants = KANJI_READING_VARIANTS[char] || [];
-        for (const v of variants) {
-          if (curReading.startsWith(v)) {
-            const rest = findSplit(kIndex + 1, curReading.slice(v.length));
-            if (rest !== null) {
-              return [{ surface: char, ruby: formatRuby(v), hasKanji: true }, ...rest];
-            }
-          }
-        }
-        return null;
-      };
-
-      const splitRes = findSplit(0, kanjiReading);
-      if (splitRes && splitRes.length === kanjiPart.length) {
-        tokens.push(...splitRes);
-      } else {
-        tokens.push({
-          surface: kanjiPart,
-          ruby: formatRuby(kanjiReading),
-          hasKanji: true,
-          ...(alternatives ? { alternatives } : {})
-        });
+    const surface = parts[index];
+    if (!KANJI_REGEX.test(surface)) {
+      const literal = katakanaToHiragana(surface);
+      if (hira.startsWith(literal, offset)) {
+        align(index + 1, offset + literal.length, [...result, { surface, hasKanji: false }]);
       }
+      return;
     }
+    const nextLiteral = parts[index + 1];
+    for (let end = offset + 1; end <= hira.length; end++) {
+      if (nextLiteral ? !hira.startsWith(katakanaToHiragana(nextLiteral), end) : end !== hira.length) continue;
+      align(index + 1, end, [...result, { surface, ruby: formatRuby(hira.slice(offset, end), rubyType), hasKanji: true }]);
+    }
+  };
+  align(0, 0, []);
+  if (solutions.length !== 1) {
+    return [{ surface: phrase, ruby: formatRuby(hira, rubyType), hasKanji: true,
+      alternatives: alternatives?.map(value => formatRuby(value, rubyType)) }];
   }
-
-  if (suffixKana) tokens.push({ surface: suffixKana, hasKanji: false });
-
+  const tokens = solutions[0];
+  if (alternatives && tokens.filter(token => token.hasKanji).length === 1) {
+    const kanjiIndex = tokens.findIndex(token => token.hasKanji);
+    const prefix = katakanaToHiragana(parts.slice(0, kanjiIndex).join(''));
+    const suffix = katakanaToHiragana(parts.slice(kanjiIndex + 1).join(''));
+    tokens[kanjiIndex].alternatives = alternatives
+      .map(value => katakanaToHiragana(value))
+      .filter(value => value.startsWith(prefix) && value.endsWith(suffix))
+      .map(value => formatRuby(value.slice(prefix.length, suffix ? -suffix.length : undefined), rubyType));
+  }
   return tokens;
 }
 
@@ -379,9 +244,9 @@ export function parseCompoundToTokens(
  * Analyzes surrounding tokens, grammatical markers, and sentence semantics to pick the correct reading for Japanese heteronyms.
  */
 export function disambiguateToken(
-  kt: any,
+  kt: KuromojiToken,
   i: number,
-  allTokens: any[],
+  allTokens: KuromojiToken[],
   fullSentence: string
 ): { reading: string; alternatives?: string[] } {
   const surface = kt.surface_form;
@@ -408,8 +273,8 @@ export function disambiguateToken(
       reading = 'つらい';
       alternatives = ['つらい', 'からい'];
     } else {
-      reading = 'からい';
-      alternatives = ['からい', 'つらい'];
+      // Keep the dictionary's contextual choice when keyword rules add no evidence.
+      alternatives = [reading, reading === 'つらい' ? 'からい' : 'つらい'];
     }
   }
 
@@ -500,6 +365,14 @@ export function disambiguateToken(
   }
 
   // 7. 行く (いく vs ゆく) / 行う (おこなう)
+  else if (surface === '行っ') {
+    const before = allTokens.slice(Math.max(0, i - 3), i).map(token => token.surface_form).join('');
+    const after = allTokens.slice(i + 1, i + 5).map(token => token.surface_form).join('');
+    const motion = /(?:に|へ|どこ|出て)$/.test(before) || /^て(?:おいで|来|き|くる)/.test(after);
+    const eventObject = /を$/.test(before);
+    if (motion && !eventObject) reading = 'いっ';
+    alternatives = [reading, reading === 'いっ' ? 'おこなっ' : 'いっ'];
+  }
   else if (surface === '行く') {
     reading = 'いく';
     alternatives = ['いく', 'ゆく'];
@@ -526,9 +399,31 @@ export function disambiguateToken(
  * Tokenizes Japanese text line into tokens with Kanji readings, keeping original text intact.
  * Context-aware and mora-aligned.
  */
+const PERSON_COMPOUNDS: Record<string, string> = {
+  '一人': 'ひとり', '二人': 'ふたり', '三人': 'さんにん', '四人': 'よにん',
+  '五人': 'ごにん', '六人': 'ろくにん', '七人': 'しちにん', '八人': 'はちにん',
+  '九人': 'きゅうにん', '十人': 'じゅうにん', '何人': 'なんにん',
+};
+
+function findPersonCompound(tokens: KuromojiToken[], index: number): { length: number; surface: string; reading: string } | null {
+  const first = tokens[index]?.surface_form || '';
+  const second = tokens[index + 1]?.surface_form || '';
+  const surface = `${first}${second}`;
+  if (/[0-9０-９一二三四五六七八九十百千万億兆]$/.test(tokens[index - 1]?.surface_form || '')) return null;
+  if (PERSON_COMPOUNDS[surface] && tokens[index + 2]?.surface_form !== '称') {
+    return { length: 2, surface, reading: PERSON_COMPOUNDS[surface] };
+  }
+  if (/^[0-9０-９]$/.test(first) && second === '人') {
+    const digit = first.normalize('NFKC');
+    const readings: Record<string, string> = { '1': 'ひとり', '2': 'ふたり', '3': 'さんにん', '4': 'よにん', '5': 'ごにん', '6': 'ろくにん', '7': 'しちにん', '8': 'はちにん', '9': 'きゅうにん' };
+    if (readings[digit]) return { length: 2, surface, reading: readings[digit] };
+  }
+  return null;
+}
+
 export function annotateLine(
   rawLine: string,
-  rubyType: 'hiragana' | 'katakana' | 'romaji' = 'hiragana'
+  rubyType: RubyType = 'hiragana'
 ): ScriptLine {
   const content = rawLine;
   const tokens: Token[] = [];
@@ -543,6 +438,18 @@ export function annotateLine(
 
     for (let i = 0; i < kuromojiTokens.length; i++) {
       const kt = kuromojiTokens[i];
+      const counterCompound = findCounterCompound(kuromojiTokens, i);
+      if (counterCompound) {
+        tokens.push(...parseCompoundToTokens(counterCompound.surface, counterCompound.reading, rubyType));
+        i += counterCompound.length - 1;
+        continue;
+      }
+      const personCompound = findPersonCompound(kuromojiTokens, i);
+      if (personCompound) {
+        tokens.push(...parseCompoundToTokens(personCompound.surface, personCompound.reading, rubyType));
+        i += personCompound.length - 1;
+        continue;
+      }
 
       if (!KANJI_REGEX.test(kt.surface_form)) {
         tokens.push({ surface: kt.surface_form, hasKanji: false });
@@ -575,7 +482,8 @@ export function annotateLine(
 
       // 2a. Check multi-char grammar idioms
       for (const pat of patternKeys) {
-        if (content.startsWith(pat, i)) {
+        if (content.startsWith(pat, i) && !(PERSON_COMPOUNDS[pat] &&
+          (/[0-9０-９一二三四五六七八九十百千万億兆]/.test(content[i - 1] || '') || content[i + pat.length] === '称'))) {
           if (currentWord) {
             tokens.push({ surface: currentWord, hasKanji: KANJI_REGEX.test(currentWord) });
             currentWord = '';
@@ -598,7 +506,7 @@ export function annotateLine(
               tokens.push({ surface: currentWord, hasKanji: KANJI_REGEX.test(currentWord) });
               currentWord = '';
             }
-            let reading = KANJI_READINGS[sub];
+            const reading = KANJI_READINGS[sub];
             const subTokens = parseCompoundToTokens(sub, reading, rubyType);
             tokens.push(...subTokens);
             i += len - 1;

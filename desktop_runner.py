@@ -9,6 +9,8 @@ import time
 import socket
 import threading
 import urllib.request
+import json
+from pathlib import Path
 from http.server import SimpleHTTPRequestHandler, HTTPServer
 import webview
 
@@ -63,8 +65,35 @@ import base64
 
 
 class Api:
-    def __init__(self):
+    def __init__(self, data_dir=None):
         self._window = None
+        # The HTTP port changes on every launch, so browser localStorage alone
+        # cannot retain corrections. Store them outside the temporary EXE bundle.
+        root = Path(data_dir) if data_dir else Path(os.environ.get('LOCALAPPDATA') or Path.home() / '.local' / 'share') / 'FuriganaDubbingStudio'
+        self._corrections_path = root / 'corrections.json'
+        self._corrections_lock = threading.Lock()
+
+    def load_corrections(self):
+        with self._corrections_lock:
+            if not self._corrections_path.exists():
+                return {}
+            with self._corrections_path.open(encoding='utf-8') as handle:
+                data = json.load(handle)
+            return data if isinstance(data, dict) else {}
+
+    def save_corrections(self, data):
+        try:
+            if not isinstance(data, dict):
+                return {'success': False, 'error': 'Invalid correction data'}
+            with self._corrections_lock:
+                self._corrections_path.parent.mkdir(parents=True, exist_ok=True)
+                temporary = self._corrections_path.with_suffix('.tmp')
+                with temporary.open('w', encoding='utf-8') as handle:
+                    json.dump(data, handle, ensure_ascii=False)
+                os.replace(temporary, self._corrections_path)
+            return {'success': True}
+        except Exception as error:
+            return {'success': False, 'error': str(error)}
 
     def set_window(self, window):
         self._window = window
@@ -133,7 +162,7 @@ def main():
             f.write(f"Error: HTTP server failed to start on port {port}\n")
         sys.exit(1)
 
-    url = f"http://127.0.0.1:{port}"
+    url = f"http://127.0.0.1:{port}/?desktop=1"
 
     # Use PyWebView for a stable, dedicated application window with Native Save Dialog API bridge
     api = Api()

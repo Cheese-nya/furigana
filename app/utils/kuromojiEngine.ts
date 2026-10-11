@@ -16,15 +16,13 @@ export interface KuromojiToken {
   pronunciation?: string;
 }
 
-let tokenizer: any = null;
-let isInitializing = false;
+let tokenizer: { tokenize(text: string): KuromojiToken[] } | null = null;
 let initPromise: Promise<void> | null = null;
 
 export const initKuromoji = async (): Promise<void> => {
   if (tokenizer) return;
   if (initPromise) return initPromise;
 
-  isInitializing = true;
   initPromise = new Promise((resolve, reject) => {
     // Determine the dictionary path based on window.location if in browser
     let dictPath = '/dict';
@@ -47,12 +45,11 @@ export const initKuromoji = async (): Promise<void> => {
     kuromoji.builder({ dicPath: dictPath }).build((err, _tokenizer) => {
       if (err) {
         console.error('Kuromoji initialization failed:', err);
-        isInitializing = false;
+        initPromise = null;
         reject(err);
         return;
       }
       tokenizer = _tokenizer;
-      isInitializing = false;
       resolve();
     });
   });
@@ -60,6 +57,9 @@ export const initKuromoji = async (): Promise<void> => {
   return initPromise;
 };
 
-export const getTokenizer = () => tokenizer;
+export const getTokenizer = () => {
+  if (!tokenizer) throw new Error('Kuromoji is not initialized');
+  return tokenizer;
+};
 
 export const isKuromojiReady = () => !!tokenizer;
