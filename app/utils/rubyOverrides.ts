@@ -1,4 +1,4 @@
-import { formatRuby, KANJI_REGEX, katakanaToHiragana, type RubyType, type ScriptLine, type Token } from './furigana';
+import { formatRuby, KANJI_REGEX, katakanaToHiragana, type ReadingSource, type RubyType, type ScriptLine, type Token } from './furigana';
 
 // Anchored to the exact line and character range: the same word can have different
 // readings elsewhere. A changed line must be checked again, rather than guessed.
@@ -16,7 +16,7 @@ export function upsertRubyOverride(entries: RubyOverride[], entry: RubyOverride)
     value.start + value.surface.length <= entry.start || value.start >= end), entry];
 }
 
-export function applyRubyOverrides(line: ScriptLine, overrides: RubyOverride[], type: RubyType): ScriptLine {
+export function applyRubyOverrides(line: ScriptLine, overrides: RubyOverride[], type: RubyType, source: ReadingSource = 'manual'): ScriptLine {
   let tokens = line.tokens;
   for (const entry of overrides.filter(value => value.line === line.cleanText).sort((a, b) => a.start - b.start)) {
     const end = entry.start + entry.surface.length;
@@ -31,16 +31,17 @@ export function applyRubyOverrides(line: ScriptLine, overrides: RubyOverride[], 
       } else {
         if (offset < entry.start) {
           const surface = token.surface.slice(0, entry.start - offset);
-          replacement.push({ surface, hasKanji: KANJI_REGEX.test(surface) });
+          replacement.push({ surface, hasKanji: KANJI_REGEX.test(surface), needsReview: KANJI_REGEX.test(surface) });
         }
         if (!inserted) {
           replacement.push({ surface: entry.surface, hasKanji: KANJI_REGEX.test(entry.surface),
-            ruby: entry.reading ? (entry.type === 'romaji' ? entry.reading : formatRuby(katakanaToHiragana(entry.reading), type)) : undefined });
+            ruby: entry.reading ? (entry.type === 'romaji' ? entry.reading : formatRuby(katakanaToHiragana(entry.reading), type)) : undefined,
+            readingSource: source, needsReview: false, annotationSuppressed: !entry.reading });
           inserted = true;
         }
         if (tokenEnd > end) {
           const surface = token.surface.slice(end - offset);
-          replacement.push({ surface, hasKanji: KANJI_REGEX.test(surface) });
+          replacement.push({ surface, hasKanji: KANJI_REGEX.test(surface), needsReview: KANJI_REGEX.test(surface) });
         }
       }
       offset = tokenEnd;

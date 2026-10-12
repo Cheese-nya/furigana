@@ -85,7 +85,7 @@ export async function annotateLineWithAI(
   if (typeof window !== 'undefined') {
     const cached = localStorage.getItem(cacheKey);
     if (cached) {
-      try { return JSON.parse(cached); } catch(e) {}
+      try { return JSON.parse(cached); } catch { /* ignore corrupted cache */ }
     }
   }
 
@@ -308,12 +308,14 @@ export async function translateTextCN(
         const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=ja&tl=zh-CN&dt=t&q=${encodeURIComponent(speech)}`;
         const res = await fetch(url);
         if (res.ok) {
-          const data = await res.json();
-          if (data && data[0]) {
-            translatedSpeech = data[0].map((item: any) => item[0]).join('');
+          const data = (await res.json()) as unknown;
+          if (Array.isArray(data) && Array.isArray(data[0])) {
+            translatedSpeech = data[0]
+              .map((item: unknown) => (Array.isArray(item) && typeof item[0] === 'string' ? item[0] : ''))
+              .join('');
           }
         }
-      } catch (e) {
+      } catch {
         translatedSpeech = speech;
       }
     }

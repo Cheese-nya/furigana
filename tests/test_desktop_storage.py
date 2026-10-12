@@ -24,6 +24,31 @@ class DesktopCorrectionsTest(unittest.TestCase):
             self.assertTrue(api.save_corrections({'歪な鳥篭': []})['success'])
             self.assertEqual(launcher.Api(directory).load_corrections(), {'歪な鳥篭': []})
 
+    def test_v2_database_keeps_legacy_file_and_survives_restarts(self):
+        with tempfile.TemporaryDirectory() as directory:
+            api = launcher.Api(directory)
+            legacy = {'台本': [{'line': '二人で', 'start': 0, 'surface': '二人', 'reading': 'ふたり', 'type': 'hiragana'}]}
+            api.save_corrections(legacy)
+            legacy_bytes = (Path(directory) / 'corrections.json').read_bytes()
+            self.assertEqual(api.load_correction_database(), legacy)
+            data = {'version': 2, 'glossary': {}, 'scripts': {'script:test': {'title': '改名', 'overrides': legacy['台本']}}}
+            self.assertTrue(api.save_correction_database(data)['success'])
+            self.assertEqual(launcher.Api(directory).load_correction_database(), data)
+            self.assertEqual((Path(directory) / 'corrections.json').read_bytes(), legacy_bytes)
+            self.assertFalse((Path(directory) / 'corrections-v2.tmp').exists())
+            self.assertFalse(api.save_correction_database({'version': 3})['success'])
+            self.assertEqual(api.load_correction_database(), data)
+
+    def test_corrupt_database_is_not_replaced(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'corrections-v2.json'
+            path.write_text('{broken', encoding='utf-8')
+            api = launcher.Api(directory)
+            with self.assertRaises(ValueError):
+                api.load_correction_database()
+            self.assertFalse(api.save_correction_database({'version': 2, 'glossary': {}, 'scripts': {}})['success'])
+            self.assertEqual(path.read_text(encoding='utf-8'), '{broken')
+
     def test_invalid_data_does_not_replace_existing_corrections(self):
         with tempfile.TemporaryDirectory() as directory:
             api = launcher.Api(directory)

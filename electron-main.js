@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-require-imports */
 const { app, BrowserWindow } = require('electron');
 const path = require('path');
 
@@ -8,6 +9,7 @@ function createWindow() {
     minWidth: 960,
     minHeight: 640,
     title: 'Furigana Dubbing Studio — Apple Liquid Glass',
+    icon: path.join(__dirname, 'app_icon.ico'),
     titleBarStyle: 'hiddenInset', // Apple HIG macOS style titlebar
     vibrancy: 'ultra-dark',        // macOS Native Glass Vibrancy
     backgroundMaterial: 'acrylic', // Windows 11 Native Glass Acrylic

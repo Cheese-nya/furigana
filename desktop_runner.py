@@ -71,6 +71,7 @@ class Api:
         # cannot retain corrections. Store them outside the temporary EXE bundle.
         root = Path(data_dir) if data_dir else Path(os.environ.get('LOCALAPPDATA') or Path.home() / '.local' / 'share') / 'FuriganaDubbingStudio'
         self._corrections_path = root / 'corrections.json'
+        self._database_path = root / 'corrections-v2.json'
         self._corrections_lock = threading.Lock()
 
     def load_corrections(self):
@@ -91,6 +92,38 @@ class Api:
                 with temporary.open('w', encoding='utf-8') as handle:
                     json.dump(data, handle, ensure_ascii=False)
                 os.replace(temporary, self._corrections_path)
+            return {'success': True}
+        except Exception as error:
+            return {'success': False, 'error': str(error)}
+
+    def load_correction_database(self):
+        with self._corrections_lock:
+            path = self._database_path if self._database_path.exists() else self._corrections_path
+            if not path.exists():
+                return {'version': 2, 'glossary': {}, 'scripts': {}}
+            with path.open(encoding='utf-8') as handle:
+                data = json.load(handle)
+            if not isinstance(data, dict):
+                raise ValueError('Invalid correction database; original file retained')
+            return data
+
+    def save_correction_database(self, data):
+        try:
+            if not isinstance(data, dict) or data.get('version') != 2 or not isinstance(data.get('scripts'), dict) or not isinstance(data.get('glossary'), dict):
+                return {'success': False, 'error': 'Invalid v2 correction database'}
+            with self._corrections_lock:
+                # Validate existing files before replacing: corrupt data must stay recoverable.
+                for path in (self._database_path, self._corrections_path):
+                    if path.exists():
+                        with path.open(encoding='utf-8') as handle:
+                            json.load(handle)
+                self._database_path.parent.mkdir(parents=True, exist_ok=True)
+                temporary = self._database_path.with_suffix('.tmp')
+                with temporary.open('w', encoding='utf-8') as handle:
+                    json.dump(data, handle, ensure_ascii=False)
+                    handle.flush()
+                    os.fsync(handle.fileno())
+                os.replace(temporary, self._database_path)
             return {'success': True}
         except Exception as error:
             return {'success': False, 'error': str(error)}

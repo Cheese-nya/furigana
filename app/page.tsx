@@ -3,17 +3,18 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Modal } from './components/Modal';
 import { Sidebar } from './components/Sidebar';
-import {
-  annotateLine,
-  generateSRT,
-  ScriptLine,
-} from './utils/furigana';
+import { GlossaryModal } from './components/GlossaryModal';
+import type { ScriptLine } from './utils/furigana';
+import { useFuriganaWorker } from './hooks/useFuriganaWorker';
+import { generateSRT, parseSRT, type SrtCue } from './utils/srt';
 
 import { importDocx } from './utils/docxImporter';
-import { applyRubyOverrides, upsertRubyOverride, type RubyOverride } from './utils/rubyOverrides';
-import { loadCorrections, saveCorrections, type CorrectionLibrary } from './utils/correctionStorage';
+import { upsertRubyOverride, type RubyOverride } from './utils/rubyOverrides';
+import { loadCorrections, saveCorrections } from './utils/correctionStorage';
+import { emptyDatabase, fingerprintText, resolveScript, updateScript, setScriptOverrides, learnReading, deleteLearnedReading, type CorrectionDatabaseV2 } from './utils/correctionDatabase';
+import { selectReviewWord, makeLearnedReading } from './utils/review';
 import { buildDocxBlob } from './utils/docxExporter';
-import { initKuromoji } from './utils/kuromojiEngine';
+import { saveBlob } from './utils/fileSave';
 
 interface BatchFileItem {
   id: string;
@@ -24,15 +25,17 @@ interface BatchFileItem {
   progress: number;
   lineCount?: number;
   content?: string;
+  error?: string;
 }
 
 export default function DubbingStudioApp() {
   // Navigation & UI states
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isDepModalOpen, setIsDepModalOpen] = useState(false);
+  const [isGlossaryOpen, setIsGlossaryOpen] = useState(false);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [isBatchDoneModalOpen, setIsBatchDoneModalOpen] = useState(false);
-  const [batchDoneResults, setBatchDoneResults] = useState<{ total: number; success: number; failed: number; filenames: string[] }>({ total: 0, success: 0, failed: 0, filenames: [] });
+  const [batchDoneResults, setBatchDoneResults] = useState<{ total: number; success: number; failed: number; cancelled: number; filenames: string[] }>({ total: 0, success: 0, failed: 0, cancelled: 0, filenames: [] });
   const [activeTab, setActiveTab] = useState<'editor' | 'batch_files' | 'deps'>('editor');
 
   // Options
@@ -47,26 +50,54 @@ export default function DubbingStudioApp() {
     `山田先生：みなさん、こんにちは！今日の日本語アフレコ台本へようこそ。\n佐藤：先生、この漢字の読み方は何ですか？\n山田先生：これは「未来」と「希望」です。\n鈴木：声優の配音練習を始めましょう！`
   );
   const [sourceOverrides, setSourceOverrides] = useState<RubyOverride[]>([]);
-  const [correctionLibrary, setCorrectionLibrary] = useState<CorrectionLibrary>({});
+  const [srtCues, setSrtCues] = useState<SrtCue[]>([]);
+  const [database, setDatabase] = useState<CorrectionDatabaseV2>(emptyDatabase);
+  const databaseRef = useRef(database);
+  useEffect(() => { databaseRef.current = database; }, [database]);
+  const [documentId, setDocumentId] = useState('');
+  const [storageRetry, setStorageRetry] = useState(0);
+  const initialDocumentRef = useRef({ title: docTitle, text: rawText });
   const [correctionsReady, setCorrectionsReady] = useState(false);
   const [correctionError, setCorrectionError] = useState('');
   const [exportProgress, setExportProgress] = useState<number>(0);
   const [isExporting, setIsExporting] = useState<boolean>(false);
   const [exportFormat, setExportFormat] = useState<'docx' | 'srt' | 'txt'>('docx');
-  const [isKuromojiLoading, setIsKuromojiLoading] = useState<boolean>(true);
 
-  const documentKey = docTitle.trim() || '日语假名配音台本';
-  const documentCorrections = useMemo(() => correctionLibrary[documentKey] || [], [correctionLibrary, documentKey]);
-  const annotatedLines = useMemo(() => {
-    // Recompute after dictionary initialization, including the fallback on failure.
-    void isKuromojiLoading;
-    return rawText.split('\n').map((text, index) => {
-      const line = { ...annotateLine(text, rubyType), id: String(index) };
-      return applyRubyOverrides(applyRubyOverrides(line, sourceOverrides, rubyType), documentCorrections, rubyType);
+  const [exportOutcome, setExportOutcome] = useState<'processing' | 'saved' | 'download' | 'cancelled' | 'error'>('processing');
+  const [exportError, setExportError] = useState('');
+  const [importError, setImportError] = useState('');
+  const [isImporting, setIsImporting] = useState(false);
+  const importSequenceRef = useRef(0);
+
+  const learnedReadings = useMemo(() => database.scripts[documentId]?.learned || [], [database.scripts, documentId]);
+  const documentCorrections = useMemo(() => database.scripts[documentId]?.overrides || [], [database.scripts, documentId]);
+  const glossaryEntries = useMemo(() => Object.values(database.glossary), [database.glossary]);
+  const annotationInput = useMemo(() => ({ text: rawText, rubyType, glossary: glossaryEntries, sourceOverrides, overrides: documentCorrections, learned: learnedReadings }),
+    [rawText, rubyType, glossaryEntries, sourceOverrides, documentCorrections, learnedReadings]);
+  const { lines: annotatedLines, busy: isAnnotating, engine, progress: annotationProgress, error: annotationError,
+    annotate, retry: retryEngine } = useFuriganaWorker(annotationInput);
+  const dictionaryStatus = engine.status;
+  const dictionaryError = engine.error || '';
+  const isKuromojiLoading = dictionaryStatus === 'loading';
+
+  const reviewTargets = annotatedLines.flatMap(line => {
+    const targets: Array<{ lineId: string; tokenIndex: number; endIndex: number; token: typeof line.tokens[number]; surface: string; reading: string; alternatives: string[]; context: string }> = [];
+    line.tokens.forEach((token, tokenIndex) => {
+      if (!token.hasKanji || !token.needsReview || !token.word) return;
+      const word = token.word;
+      const previous = targets[targets.length - 1];
+      if (previous && previous.surface === word.surface && previous.endIndex + 1 === tokenIndex) {
+        previous.endIndex = tokenIndex;
+        return;
+      }
+      const start = Math.max(0, tokenIndex - 12);
+      targets.push({ lineId: line.id, tokenIndex, endIndex: tokenIndex, token, surface: word.surface,
+        reading: word.reading, alternatives: word.alternatives, context: line.cleanText.slice(start, start + word.surface.length + 24) });
     });
-  }, [rawText, rubyType, isKuromojiLoading, sourceOverrides, documentCorrections]);
-
-  const missingReadings = annotatedLines.reduce((sum, line) => sum + line.tokens.filter(token => token.hasKanji && !token.ruby).length, 0);
+    return targets;
+  });
+  const reviewCount = reviewTargets.length;
+  const missingReadings = annotatedLines.reduce((sum, line) => sum + line.tokens.filter(token => token.hasKanji && !token.ruby && !token.annotationSuppressed).length, 0);
 
   // File import ref for Editor
   const editorFileInputRef = useRef<HTMLInputElement>(null);
@@ -80,29 +111,109 @@ export default function DubbingStudioApp() {
     currentRuby: string;
     alternatives: string[];
   } | null>(null);
+  const reviewCursorRef = useRef(0);
+  const [previewPage, setPreviewPage] = useState(0);
+  const previewStart = Math.min(previewPage * 200, Math.max(0, Math.floor((annotatedLines.length - 1) / 200) * 200));
   const [customRubyInput, setCustomRubyInput] = useState<string>('');
+  const [correctionScope, setCorrectionScope] = useState<'occurrence' | 'glossary'>('occurrence');
+  const [isAdvancingReview, setIsAdvancingReview] = useState(false);
+  const [isLearnedModalOpen, setIsLearnedModalOpen] = useState(false);
+  const [reviewError, setReviewError] = useState('');
 
   // Batch File Processing State
   const [batchFiles, setBatchFiles] = useState<BatchFileItem[]>([]);
   const [isBatchProcessing, setIsBatchProcessing] = useState<boolean>(false);
   const [batchTargetFormat, setBatchTargetFormat] = useState<'docx' | 'srt' | 'txt'>('docx');
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const exportIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const rubyCompositionRef = useRef(false);
+  const advanceControllerRef = useRef<AbortController | null>(null);
+  useEffect(() => () => { advanceControllerRef.current?.abort(); }, [rawText, rubyType, documentId]);
 
   const updateTokenRuby = (reading: string) => {
-    if (!editingToken) return;
+    if (!editingToken || isAnnotating || !correctionsReady) return;
     const line = annotatedLines.find(value => value.id === editingToken.lineId);
     if (!line) return;
     const start = line.tokens.slice(0, editingToken.tokenIndex).reduce((sum, token) => sum + token.surface.length, 0);
     const entry: RubyOverride = { line: line.cleanText, start, surface: editingToken.surface, reading, type: rubyType };
-    setCorrectionLibrary(previous => ({ ...previous,
-      [documentKey]: upsertRubyOverride(previous[documentKey] || [], entry),
-    }));
+    const selection = selectReviewWord(line, editingToken.tokenIndex);
+    const learned = makeLearnedReading(selection, reading, rubyType);
+    setDatabase(previous => {
+      let updated = setScriptOverrides(previous, documentId, upsertRubyOverride(previous.scripts[documentId]?.overrides || [], entry));
+      if (reading) {
+        updated = learnReading(updated, documentId, learned);
+      }
+      if (correctionScope === 'glossary' && reading) {
+        updated = { ...updated, glossary: { ...updated.glossary,
+          [entry.surface]: { surface: entry.surface, reading, type: rubyType, createdAt: previous.glossary[entry.surface]?.createdAt || Date.now() } } };
+      }
+      return updated;
+    });
     setEditingToken(null);
   };
 
+  const openTokenEditor = (lineId: string, tokenIndex: number, lines = annotatedLines, endIndex = tokenIndex) => {
+    const line = lines.find(value => value.id === lineId);
+    const token = line?.tokens[tokenIndex];
+    if (!line || !token?.hasKanji || !correctionsReady || isAdvancingReview) return;
+    setCorrectionScope('occurrence');
+    setReviewError('');
+    rubyCompositionRef.current = false;
+    setPreviewPage(Math.floor(Number(lineId) / 200));
+    const selection = selectReviewWord(line, tokenIndex);
+    const end = endIndex !== tokenIndex ? endIndex : selection.tokenEndIndex;
+    const selected = line.tokens.slice(selection.tokenIndex, end + 1);
+    const surface = selected.map(value => value.surface).join('');
+    const currentRuby = selected.length === 1 ? (selected[0].ruby || '') : selection.currentRuby;
+    setEditingToken({ lineId, tokenIndex: selection.tokenIndex, tokenEndIndex: end, surface,
+      currentRuby, alternatives: selection.alternatives || (token.ruby ? [token.ruby] : []) });
+    setCustomRubyInput(currentRuby);
+    requestAnimationFrame(() => {
+      document.getElementById(`ruby-token-${lineId}-${selection.tokenIndex}`)?.scrollIntoView({ block: 'nearest' });
+    });
+  };
+
   const saveTokenRuby = () => updateTokenRuby(customRubyInput.trim());
+  const saveAndOpenNextReview = async () => {
+    if (!editingToken || isAdvancingReview) return;
+    const line = annotatedLines.find(value => value.id === editingToken.lineId);
+    if (!line) return;
+    const start = line.tokens.slice(0, editingToken.tokenIndex).reduce((sum, token) => sum + token.surface.length, 0);
+    const entry: RubyOverride = { line: line.cleanText, start, surface: editingToken.surface, reading: customRubyInput.trim(), type: rubyType };
+    const overrides = upsertRubyOverride(documentCorrections, entry);
+    const glossary = correctionScope === 'glossary' && entry.reading ? [...glossaryEntries.filter(value => value.surface !== entry.surface),
+      { surface: entry.surface, reading: entry.reading, type: rubyType, createdAt: Date.now() }] : glossaryEntries;
+    const selection = selectReviewWord(line, editingToken.tokenIndex);
+    const learnedEntry = makeLearnedReading(selection, entry.reading, rubyType);
+    const learned = entry.reading ? [...learnedReadings.filter(l => !(l.surface === learnedEntry.surface && l.before === learnedEntry.before && l.after === learnedEntry.after)), learnedEntry] : learnedReadings;
+    updateTokenRuby(entry.reading);
+    setIsAdvancingReview(true);
+    const controller = new AbortController();
+    advanceControllerRef.current?.abort();
+    advanceControllerRef.current = controller;
+    try {
+      const lines = await annotate({ ...annotationInput, overrides, glossary, learned }, controller.signal);
+      if (controller.signal.aborted) return;
+      const candidates = lines.flatMap(value => {
+        let offset = 0;
+        return value.tokens.flatMap((token, tokenIndex) => {
+          const position = offset; offset += token.surface.length;
+          return token.hasKanji && token.needsReview ? [{ lineId: value.id, tokenIndex, position }] : [];
+        });
+      });
+      const next = candidates.find(value => Number(value.lineId) > Number(line.id) ||
+        (value.lineId === line.id && value.position >= start + entry.surface.length)) || candidates[0];
+      if (next) openTokenEditor(next.lineId, next.tokenIndex, lines);
+    } catch (error) {
+      if (!controller.signal.aborted) setReviewError(`继续校对失败：${String(error)}`);
+    } finally { setIsAdvancingReview(false); }
+  };
   const removeTokenRuby = () => updateTokenRuby('');
+  const jumpToNextReview = () => {
+    if (!reviewTargets.length || isAnnotating) return;
+    const target = reviewTargets[reviewCursorRef.current % reviewTargets.length];
+    reviewCursorRef.current++;
+    openTokenEditor(target.lineId, target.tokenIndex, annotatedLines, target.endIndex);
+  };
 
   const resizeRubyRange = (start: number, end: number) => {
     if (!editingToken) return;
@@ -121,72 +232,68 @@ export default function DubbingStudioApp() {
     setCustomRubyInput(reading);
   };
 
-  // Dependency health status
-  const [deps, setDeps] = useState([
-    { name: 'Fugashi (MeCab Tokenizer)', package: 'fugashi', status: 'ready', desc: '日语形态素分词核心引擎' },
-    { name: 'UniDic Lite Dictionary', package: 'unidic-lite', status: 'ready', desc: '离线日语发音与假名词典' },
-    { name: 'Python-Docx Builder', package: 'python-docx', status: 'ready', desc: 'Word 原生 Ruby 节点导出器' },
-    { name: 'Contextual Furigana Engine', package: 'context-engine', status: 'ready', desc: '本地高精度多音字前后文消歧引擎' },
-  ]);
-
-  // Initialize Kuromoji on mount
-  useEffect(() => {
-    initKuromoji()
-      .then(() => setIsKuromojiLoading(false))
-      .catch(() => setIsKuromojiLoading(false)); // fallback to normal dict if fails
-  }, []);
+  const dictionaryLabel = dictionaryStatus === 'loading' ? '正在加载离线词典' :
+    dictionaryStatus === 'ready' ? '离线词典与上下文规则已启用' : '词典加载失败，正在使用基础词表';
+  const deps = [
+    { name: 'Kuromoji 离线词典', status: dictionaryStatus === 'loading' ? 'repairing' : dictionaryStatus === 'ready' ? 'ready' : 'error', desc: dictionaryError || dictionaryLabel },
+    { name: '校对记录存储', status: correctionError ? 'error' : correctionsReady ? 'ready' : 'repairing', desc: correctionError || (correctionsReady ? '校对记录已读取；修改后自动保存' : '正在读取校对记录') },
+  ];
 
   useEffect(() => {
     let active = true;
-    const load = () => {
-      setCorrectionsReady(false);
-      loadCorrections().then(data => {
-        if (active) {
-          setCorrectionLibrary(previous => ({ ...data, ...previous }));
-          setCorrectionError('');
-          setCorrectionsReady(true);
-        }
-      }).catch(error => {
-        if (active) setCorrectionError(`校对记录读取失败：${String(error)}`);
-      });
-    };
-    load();
-    window.addEventListener('pywebviewready', load);
-    return () => { active = false; window.removeEventListener('pywebviewready', load); };
-  }, []);
+    const initial = initialDocumentRef.current;
+    Promise.all([loadCorrections(), fingerprintText(initial.text)]).then(([data, fingerprint]) => {
+      if (!active) return;
+      const resolved = resolveScript(data, initial.title, initial.text, fingerprint);
+      setDatabase(resolved.database);
+      setDocumentId(resolved.scriptId);
+      setCorrectionError('');
+      setCorrectionsReady(true);
+    }).catch(error => {
+      if (active) setCorrectionError(`校对记录读取失败：${String(error)}`);
+    });
+    return () => { active = false; };
+  }, [storageRetry]);
+
+  useEffect(() => {
+    if (!correctionsReady || !documentId) return;
+    let active = true;
+    const timer = setTimeout(() => {
+      fingerprintText(rawText).then(fingerprint => {
+        if (active) setDatabase(previous => updateScript(previous, documentId, docTitle, fingerprint));
+      }).catch(error => { if (active) setCorrectionError(`台本指纹更新失败：${String(error)}`); });
+    }, 300);
+    return () => { active = false; clearTimeout(timer); };
+  }, [rawText, docTitle, documentId, correctionsReady]);
 
   useEffect(() => {
     if (!correctionsReady) return;
+    let active = true;
     const timer = setTimeout(() => {
-      saveCorrections(correctionLibrary).then(() => setCorrectionError(''))
-        .catch(error => setCorrectionError(`校对记录保存失败：${String(error)}`));
+      saveCorrections(database).then(() => { if (active) setCorrectionError(''); })
+        .catch(error => { if (active) setCorrectionError(`校对记录保存失败：${String(error)}`); });
     }, 200);
-    return () => clearTimeout(timer);
-  }, [correctionLibrary, correctionsReady]);
+    return () => { active = false; clearTimeout(timer); };
+  }, [database, correctionsReady]);
 
-  useEffect(() => {
-    return () => {
-      if (exportIntervalRef.current) clearInterval(exportIntervalRef.current);
-    };
-  }, []);
-
-  // Run mock dependency repair
-  const runDependencyRepair = () => {
-    setDeps(prev => prev.map(d => ({ ...d, status: 'repairing' })));
-    setTimeout(() => {
-      setDeps(prev => prev.map(d => ({ ...d, status: 'ready' })));
-    }, 1500);
+  const runDependencyRepair = async () => {
+    retryEngine();
+    await Promise.all([
+      correctionsReady ? saveCorrections(database).then(() => setCorrectionError(''))
+        .catch(error => setCorrectionError(`校对记录保存失败：${String(error)}`)) :
+        Promise.resolve().then(() => setStorageRetry(value => value + 1)),
+    ]);
   };
 
   // Handle single script export
   const handleExport = async (format: 'docx' | 'srt' | 'txt') => {
+    if (isExporting || isKuromojiLoading || isAnnotating || annotationError || !correctionsReady) return;
     setExportFormat(format);
     setIsExporting(true);
+    setExportOutcome('processing');
+    setExportError('');
     setExportProgress(10);
     setIsExportModalOpen(true);
-
-    setExportProgress(30);
-    await new Promise(r => setTimeout(r, 200));
 
     try {
       const safeTitle = docTitle.trim() || '日语假名配音台本';
@@ -203,23 +310,25 @@ export default function DubbingStudioApp() {
       }
 
       setExportProgress(80);
-      await new Promise(r => setTimeout(r, 200));
-
-      await saveBlob(blob, filename);
-      setExportProgress(100);
+      const result = await saveBlob(blob, filename);
+      if (result.success) {
+        setExportProgress(100);
+        setExportOutcome(result.downloadStarted ? 'download' : 'saved');
+      } else {
+        setExportOutcome('cancelled');
+      }
     } catch (err) {
-      console.error('Export error:', err);
-    }
-
-    setTimeout(() => {
+      setExportOutcome('error');
+      setExportError(err instanceof Error ? err.message : String(err));
+    } finally {
       setIsExporting(false);
-    }, 500);
+    }
   };
 
   // Text content generator (for srt / txt only)
-  const generateTextContent = (lines: ScriptLine[], format: 'srt' | 'txt'): string => {
+  const generateTextContent = (lines: ScriptLine[], format: 'srt' | 'txt', preserveSrtCues = true): string => {
     if (format === 'srt') {
-      return generateSRT(lines);
+      return generateSRT(lines, preserveSrtCues && srtCues.reduce((sum, cue) => sum + cue.lines.length, 0) === lines.length ? srtCues : undefined);
     } else {
       return lines.map(l => {
         return l.tokens.map(t => t.ruby ? `${t.surface}(${t.ruby})` : t.surface).join('');
@@ -227,93 +336,52 @@ export default function DubbingStudioApp() {
     }
   };
 
-  // Save Blob: Native PyWebView dialog -> Web File System Access API -> Anchor Download
-  const saveBlob = async (blob: Blob, filename: string): Promise<{ success: boolean; path?: string }> => {
-    // 1. PyWebView Native File Save Bridge (Desktop EXE Mode - Opens Windows Native Save Dialog)
-    if (typeof window !== 'undefined' && (window as any).pywebview?.api?.save_file) {
-      try {
-        const reader = new FileReader();
-        const base64Promise = new Promise<string>((resolve, reject) => {
-          reader.onload = () => {
-            const dataUrl = reader.result as string;
-            const base64 = dataUrl.split(',')[1];
-            resolve(base64);
-          };
-          reader.onerror = reject;
-          reader.readAsDataURL(blob);
-        });
-        const base64Data = await base64Promise;
-        const res = await (window as any).pywebview.api.save_file(filename, base64Data);
-        if (res && res.success) {
-          return { success: true, path: res.path };
-        } else if (res && res.error === 'Cancelled') {
-          return { success: false };
-        }
-      } catch (err) {
-        console.error('PyWebView native save error:', err);
-      }
-    }
-
-    // 2. Web File System Access API (Standard Modern Browser Mode)
-    if (typeof window !== 'undefined' && 'showSaveFilePicker' in window) {
-      try {
-        const ext = filename.split('.').pop()?.toLowerCase() || 'txt';
-        const extMap: Record<string, { description: string; accept: Record<string, string[]> }> = {
-          txt: { description: 'TXT 文本文件', accept: { 'text/plain': ['.txt'] } },
-          srt: { description: 'SRT 字幕文件', accept: { 'application/x-subrip': ['.srt'] } },
-          docx: { description: 'Word 文档', accept: { 'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'] } },
-        };
-        const handle = await (window as any).showSaveFilePicker({
-          suggestedName: filename,
-          types: [extMap[ext] || extMap.txt],
-        });
-        const writable = await handle.createWritable();
-        await writable.write(blob);
-        await writable.close();
-        return { success: true, path: handle.name };
-      } catch (e: any) {
-        if (e?.name === 'AbortError') return { success: false };
-      }
-    }
-
-    // 3. Fallback: classic anchor download link
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    a.style.display = 'none';
-    document.body.appendChild(a);
-    a.click();
-    await new Promise(r => setTimeout(r, 500));
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    return { success: true, path: filename };
-  };
-
   // File import for Editor
   const handleEditorFileImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!e.target.files || e.target.files.length === 0) return;
+    if (!e.target.files || e.target.files.length === 0 || !correctionsReady) return;
+    const input = e.target;
+    const request = ++importSequenceRef.current;
+    setIsImporting(true);
+    advanceControllerRef.current?.abort();
     const file = e.target.files[0];
     const baseName = file.name.replace(/\.[^/.]+$/, "");
-    setDocTitle(baseName);
+    setImportError('');
 
     try {
       let content = '';
+      let importedRuby: RubyOverride[] = [];
+      let importedCues: SrtCue[] = [];
       if (file.name.toLowerCase().endsWith('.docx')) {
         const arrayBuffer = await file.arrayBuffer();
         const imported = await importDocx(arrayBuffer);
         content = imported.text;
-        setSourceOverrides(imported.overrides);
+        importedRuby = imported.overrides;
       } else {
-        content = await file.text();
-        setSourceOverrides([]);
+        const text = await file.text();
+        if (file.name.toLowerCase().endsWith('.srt')) {
+          const parsed = parseSRT(text);
+          if (!parsed.cues.length) throw new Error('未找到有效的 SRT 时间轴');
+          content = parsed.text;
+          importedCues = parsed.cues;
+        } else {
+          content = text;
+        }
       }
+      const fingerprint = await fingerprintText(content);
+      if (request !== importSequenceRef.current) return;
+      // Reconcile with current state; metadata saves may finish while DOCX parses.
+      const resolved = resolveScript(databaseRef.current, baseName, content, fingerprint);
+      setDatabase(resolved.database);
+      setDocumentId(resolved.scriptId);
       setEditingToken(null);
+      setSourceOverrides(importedRuby);
+      setSrtCues(importedCues);
+      setDocTitle(baseName);
       setRawText(content);
     } catch (err) {
-      console.error('Import file error:', err);
+      if (request === importSequenceRef.current) setImportError(`导入失败：${err instanceof Error ? err.message : String(err)}`);
     } finally {
-      if (e.target) e.target.value = '';
+      if (request === importSequenceRef.current) { setIsImporting(false); input.value = ''; }
     }
   };
 
@@ -358,41 +426,54 @@ export default function DubbingStudioApp() {
 
   // Execute Batch Processing on Queue
   const processBatchQueue = async () => {
-    if (batchFiles.length === 0) return;
+    if (batchFiles.length === 0 || isBatchProcessing || isKuromojiLoading || !correctionsReady) return;
     setIsBatchProcessing(true);
     let successCount = 0;
     let failCount = 0;
+    let cancelCount = 0;
     const exportedNames: string[] = [];
+    let batchDatabase = database;
 
     for (let i = 0; i < batchFiles.length; i++) {
       const item = batchFiles[i];
 
       setBatchFiles(prev =>
-        prev.map(f => f.id === item.id ? { ...f, status: 'processing', progress: 30 } : f)
+        prev.map(f => f.id === item.id ? { ...f, status: 'processing', progress: 30, error: undefined } : f)
       );
 
       try {
         let textContent = '';
         let importedOverrides: RubyOverride[] = [];
+        let importedCues: SrtCue[] = [];
         if (item.name.toLowerCase().endsWith('.docx')) {
           const arrayBuffer = await item.file.arrayBuffer();
           const imported = await importDocx(arrayBuffer);
           textContent = imported.text;
           importedOverrides = imported.overrides;
         } else {
-          textContent = await item.file.text();
+          const original = await item.file.text();
+          if (item.name.toLowerCase().endsWith('.srt')) {
+            const parsed = parseSRT(original);
+            if (!parsed.cues.length) throw new Error('未找到有效的 SRT 时间轴');
+            textContent = parsed.text;
+            importedCues = parsed.cues;
+          } else textContent = original;
         }
         const itemTitle = item.name.replace(/\.[^/.]+$/, "") || '日语假名配音台本';
-        const parsedLines = textContent.split('\n').map(text =>
-          applyRubyOverrides(applyRubyOverrides(annotateLine(text, rubyType), importedOverrides, rubyType), correctionLibrary[itemTitle] || [], rubyType)
-        );
+        const fingerprint = await fingerprintText(textContent);
+        const resolved = resolveScript(batchDatabase, itemTitle, textContent, fingerprint);
+        batchDatabase = resolved.database;
+        setDatabase(previous => resolveScript(previous, itemTitle, textContent, fingerprint, resolved.scriptId).database);
+        const parsedLines = await annotate({ text: textContent, rubyType, glossary: glossaryEntries,
+          sourceOverrides: importedOverrides, overrides: batchDatabase.scripts[resolved.scriptId].overrides,
+          learned: batchDatabase.scripts[resolved.scriptId]?.learned || [] });
 
         // Generate output based on target format
         let outputBlob: Blob;
         if (batchTargetFormat === 'docx') {
           outputBlob = await buildDocxBlob(parsedLines, { title: itemTitle, baseFontSize: fontSize, rubyFontSize, lineSpacing });
         } else {
-          const textOutput = generateTextContent(parsedLines, batchTargetFormat);
+          const textOutput = batchTargetFormat === 'srt' ? generateSRT(parsedLines, importedCues) : generateTextContent(parsedLines, 'txt');
           const mime = batchTargetFormat === 'srt' ? 'application/x-subrip' : 'text/plain';
           outputBlob = new Blob([textOutput], { type: mime });
         }
@@ -414,13 +495,14 @@ export default function DubbingStudioApp() {
           exportedNames.push(saveRes.path || outName);
           successCount++;
         } else {
+          cancelCount++;
           setBatchFiles(prev =>
             prev.map(f => f.id === item.id ? { ...f, status: 'pending', progress: 0 } : f)
           );
         }
       } catch (err) {
         setBatchFiles(prev =>
-          prev.map(f => f.id === item.id ? { ...f, status: 'error', progress: 0 } : f)
+          prev.map(f => f.id === item.id ? { ...f, status: 'error', progress: 0, error: err instanceof Error ? err.message : String(err) } : f)
         );
         failCount++;
       }
@@ -433,6 +515,7 @@ export default function DubbingStudioApp() {
       total: batchFiles.length,
       success: successCount,
       failed: failCount,
+      cancelled: cancelCount,
       filenames: exportedNames,
     });
     setIsBatchDoneModalOpen(true);
@@ -550,11 +633,14 @@ export default function DubbingStudioApp() {
             <div className={`${neuCard} p-6 flex flex-wrap items-center justify-between gap-6`}>
               <div className="flex flex-col sm:flex-row gap-4 sm:items-center">
                 <span className="font-semibold text-sm text-gray-800">注音模式:</span>
+                <button type="button" disabled={!correctionsReady} className={`${neuButton} px-3 py-2 text-xs disabled:opacity-50`} onClick={() => { advanceControllerRef.current?.abort(); setIsGlossaryOpen(true); }}>
+                  专名词典 ({glossaryEntries.length})
+                </button>
                 <div className="flex items-center gap-3">
                   {(['hiragana', 'katakana', 'romaji'] as const).map(type => (
                     <button
                       key={type}
-                      onClick={() => setRubyType(type)}
+                      onClick={() => { setEditingToken(null); setRubyType(type); }}
                       className={`${rubyType === type ? neuButtonActive : neuButton} px-3.5 py-2 text-xs`}
                     >
                       {type === 'hiragana' ? '平假名' : type === 'katakana' ? '片假名' : '罗马音'}
@@ -564,6 +650,9 @@ export default function DubbingStudioApp() {
               </div>
 
               <div className="flex flex-wrap items-center gap-6">
+                <details className="relative">
+                  <summary className="cursor-pointer list-none rounded-lg px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-white/40">排版设置</summary>
+                  <div className="absolute right-0 top-full z-10 mt-2 grid min-w-64 gap-4 rounded-lg bg-[#e0e5ec] p-4 shadow-[6px_6px_12px_#b8bcc2,-6px_-6px_12px_#ffffff]">
                 <div className="flex items-center gap-3">
                   <span className="font-semibold text-sm text-gray-800">正文字号:</span>
                   <div className="flex items-center bg-[#e0e5ec] rounded-xl shadow-[inset_2px_2px_4px_#b8bcc2,inset_-2px_-2px_4px_#ffffff] p-1">
@@ -627,13 +716,22 @@ export default function DubbingStudioApp() {
                   </div>
                 </div>
 
+                  </div>
+                </details>
                 <div className="flex items-center gap-2">
-                  <span className="text-xs text-emerald-700 bg-emerald-100/90 px-3 py-1.5 rounded-xl font-medium shadow-[inset_1px_1px_2px_#a7f3d0,inset_-1px_-1px_2px_#ffffff] flex items-center gap-1">
-                    {isKuromojiLoading ? '正在加载离线词典' : '离线词典与上下文规则已启用'}
+                  <span className={`text-xs ${dictionaryStatus === 'degraded' ? 'text-amber-800 bg-amber-100' : 'text-emerald-700 bg-emerald-100/90'} px-3 py-1.5 rounded-xl font-medium shadow-[inset_1px_1px_2px_#a7f3d0,inset_-1px_-1px_2px_#ffffff] flex items-center gap-1`}>
+                    {dictionaryLabel}
                   </span>
                 </div>
               </div>
             </div>
+
+            {dictionaryStatus === 'degraded' && <p role="alert" className="text-sm text-amber-800">
+              离线词典加载失败，当前基础词表可能漏注或误注。请重新加载词典后检查读音。
+              <button type="button" onClick={runDependencyRepair} className="ml-2 underline">重新加载</button>
+            </p>}
+            {isImporting && <p role="status" className="text-sm">正在读取台本…</p>}
+            {importError && <p role="alert" className="text-sm text-red-600">{importError}</p>}
 
             {/* Workspace Dual Pane */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -647,6 +745,7 @@ export default function DubbingStudioApp() {
                     <input
                       type="text"
                       value={docTitle}
+                      disabled={!correctionsReady || isImporting}
                       onChange={(e) => setDocTitle(e.target.value)}
                       placeholder="输入台本标题（用于 Word 导出标题）"
                       className={`${neuInput} px-3 py-1 text-sm font-semibold text-gray-800 w-full max-w-[280px]`}
@@ -661,6 +760,7 @@ export default function DubbingStudioApp() {
                       className="hidden"
                     />
                     <button
+                      disabled={!correctionsReady || isImporting}
                       onClick={() => editorFileInputRef.current?.click()}
                       className={`${neuButton} px-3.5 py-1.5 text-xs font-semibold text-blue-700 flex items-center gap-1`}
                       title="导入 .txt, .srt 或 .docx 文件，将自动将标题设置为文件名"
@@ -668,8 +768,17 @@ export default function DubbingStudioApp() {
                       📂 导入文本
                     </button>
                     <button
-                      onClick={() => {
+                      disabled={!correctionsReady || isImporting}
+                      onClick={async () => {
+                        const id = `script:${crypto.randomUUID()}`;
+                        const fingerprint = await fingerprintText('');
+                        setDatabase(previous => ({ ...previous, scripts: { ...previous.scripts,
+                          [id]: { scriptId: id, title: '日语假名配音台本', fingerprints: [fingerprint], updatedAt: Date.now(), overrides: [], learned: [] } } }));
+                        setDocumentId(id);
+                        setEditingToken(null);
                         setRawText('');
+                        setSourceOverrides([]);
+                        setSrtCues([]);
                         setDocTitle('日语假名配音台本');
                       }}
                       className={`${neuButton} px-3 py-1.5 text-xs text-gray-600`}
@@ -680,9 +789,10 @@ export default function DubbingStudioApp() {
                 </div>
                 <textarea
                   value={rawText}
-                  onChange={(e) => setRawText(e.target.value)}
+                  disabled={!correctionsReady || isImporting}
+                  onChange={(e) => { setEditingToken(null); setRawText(e.target.value); }}
                   placeholder="请输入日语台本或点击上方「导入文本」..."
-                  className={`${neuInput} w-full h-[360px] p-4 resize-none`}
+                  className={`${neuInput} w-full h-[min(58vh,680px)] min-h-[280px] p-4 resize-y`}
                   style={{ fontSize: `${fontSize}px`, lineHeight: lineSpacing }}
                 />
               </div>
@@ -706,17 +816,47 @@ export default function DubbingStudioApp() {
                   </span>
                 </div>
                 <p className="text-xs text-gray-500 mb-2">点击汉字修改读音；可扩展标注范围，设置词组整体注音。已有 Word 注音会保留。</p>
-                <div className="flex items-center justify-between gap-2 text-xs text-gray-500 mb-3">
-                  <span>{correctionsReady ? `已记住 ${documentCorrections.length} 处校对（按台本标题保存）` : '正在读取校对记录...'}</span>
-                  {documentCorrections.length > 0 && <button type="button" className="underline" onClick={() => {
-                    setCorrectionLibrary(previous => ({ ...previous, [documentKey]: [] }));
-                    setEditingToken(null);
-                  }}>重置此台本校对</button>}
+                <div role="status" aria-live="polite" className="mb-3 text-xs text-gray-700">
+                  {isAnnotating ? `正在注音 ${annotationProgress}% · 已完成 ${annotatedLines.length} 行` : '注音已完成，可校对和导出'}
+                  {engine.mode === 'fallback' && ' · 当前使用分块兼容模式'}
+                  {isAnnotating && <progress aria-label="注音进度" className="mt-1 w-full" value={annotationProgress} max={100} />}
+                </div>
+                {annotationError && <p role="alert" className="mb-3 text-sm text-red-700">注音失败：{annotationError}</p>}
+                {reviewError && <p role="alert" className="mb-3 text-sm text-red-700">{reviewError}</p>}
+                <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-gray-600 mb-3">
+                  <div className="flex flex-wrap gap-x-3 gap-y-1" aria-label="注音来源统计">
+                    <span>自动 {annotatedLines.flatMap(line => line.tokens).filter(token => token.hasKanji && token.readingSource === 'automatic').length}</span>
+                    <span>专名词典 {annotatedLines.flatMap(line => line.tokens).filter(token => token.hasKanji && token.readingSource === 'glossary').length}</span>
+                    <span>语境学习 {annotatedLines.flatMap(line => line.tokens).filter(token => token.hasKanji && token.readingSource === 'learned').length}</span>
+                    <span>源文件 {annotatedLines.flatMap(line => line.tokens).filter(token => token.hasKanji && token.readingSource === 'source').length}</span>
+                    <span>人工确认 {annotatedLines.flatMap(line => line.tokens).filter(token => token.hasKanji && token.readingSource === 'manual').length}</span>
+                    <button type="button" disabled={!reviewCount || isAnnotating} onClick={jumpToNextReview} className="font-semibold text-amber-800 underline disabled:opacity-50">
+                      待复核 {reviewCount} · 下一处
+                    </button>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    {!correctionsReady && <span>正在读取校对记录...</span>}
+                    {learnedReadings.length > 0 && (
+                      <button type="button" className="underline text-blue-700" onClick={() => setIsLearnedModalOpen(true)}>
+                        已学语境 ({learnedReadings.length})
+                      </button>
+                    )}
+                    {documentCorrections.length > 0 && <button type="button" className="underline" onClick={() => {
+                      setDatabase(previous => setScriptOverrides(previous, documentId, []));
+                      setEditingToken(null);
+                    }}>重置此台本校对</button>}
+                  </div>
                 </div>
                 {correctionError && <p role="alert" className="text-xs text-red-600 mb-3">{correctionError}</p>}
-                {missingReadings > 0 && <p className="text-xs text-amber-700 mb-3">{missingReadings} 处汉字未标注读音（含手工清除项），可点击补充。</p>}
-                <div lang="ja" className={`${neuInput} w-full h-[360px] p-6 overflow-y-auto`}>
-                  {annotatedLines.map((line) => (
+                {missingReadings > 0 && <p className="text-xs text-amber-800 mb-3">{missingReadings} 处汉字缺少读音，可点击补充。</p>}
+                {annotatedLines.some(line => line.tokens.some(token => token.annotationSuppressed)) && <p className="text-xs text-gray-600 mb-3">包含人工选择不注音的文字，不计入缺失读音。</p>}
+                {annotatedLines.length > 200 && <div className="mb-3 flex items-center justify-between gap-3 text-xs">
+                  <button type="button" disabled={previewStart === 0} className="underline disabled:opacity-40" onClick={() => setPreviewPage(Math.max(0, previewStart / 200 - 1))}>上一页</button>
+                  <span>预览第 {previewStart + 1}–{Math.min(previewStart + 200, annotatedLines.length)} 行，共 {annotatedLines.length} 行</span>
+                  <button type="button" disabled={previewStart + 200 >= annotatedLines.length} className="underline disabled:opacity-40" onClick={() => setPreviewPage(previewStart / 200 + 1)}>下一页</button>
+                </div>}
+                <div lang="ja" className={`${neuInput} w-full h-[min(58vh,680px)] min-h-[280px] p-6 overflow-y-auto`}>
+                  {annotatedLines.slice(previewStart, previewStart + 200).map((line) => (
                     <div key={line.id} className="border-b border-gray-300/50 pb-3 mb-4 last:border-0 last:mb-0">
                       <div className="script-line text-gray-800 font-semibold" style={{ fontSize: `${fontSize}px`, lineHeight: lineSpacing }}>
                         {line.speaker && <span>{line.speaker}：</span>}
@@ -726,20 +866,9 @@ export default function DubbingStudioApp() {
                           return (
                             <TokenElement
                               key={tidx}
-                              onClick={() => {
-                                if (t.hasKanji) {
-                                  setEditingToken({
-                                    lineId: line.id,
-                                    tokenIndex: tidx,
-                                    tokenEndIndex: tidx,
-                                    surface: t.surface,
-                                    currentRuby: t.ruby || '',
-                                    alternatives: t.alternatives || (t.ruby ? [t.ruby] : [])
-                                  });
-                                  setCustomRubyInput(t.ruby || '');
-                                }
-                              }}
-                              className={t.hasKanji ? 'cursor-pointer hover:bg-blue-200/60 rounded transition-colors group relative' : ''}
+                              id={t.hasKanji ? `ruby-token-${line.id}-${tidx}` : undefined}
+                              onClick={() => { if (!isAnnotating) openTokenEditor(line.id, tidx); }}
+                              className={t.hasKanji ? `cursor-pointer hover:bg-blue-200/60 rounded transition-colors group relative ${t.needsReview ? 'decoration-amber-600 underline decoration-dotted underline-offset-4' : ''}` : ''}
                               tabIndex={t.hasKanji ? 0 : undefined}
                               role={t.hasKanji ? 'button' : undefined}
                               onKeyDown={(event) => {
@@ -748,7 +877,7 @@ export default function DubbingStudioApp() {
                                   event.currentTarget.click();
                                 }
                               }}
-                              title={t.hasKanji ? '点击切换备选读音或自定义修改' : undefined}
+                              title={t.hasKanji ? `${t.annotationSuppressed ? '主动不注音' : t.readingSource === 'source' ? '源文件注音' : t.readingSource === 'manual' ? '人工校对' : t.readingSource === 'glossary' ? '专名词典' : '自动注音'}${t.needsReview ? '；待复核' : ''}，点击修改` : undefined}
                             >
                               {t.surface}
                               {t.ruby && (
@@ -773,9 +902,9 @@ export default function DubbingStudioApp() {
                 <p className="text-sm text-gray-600">导出以「{docTitle}」命名的 Word (.docx)、SRT 字幕与 TXT 文本</p>
               </div>
               <div className="flex flex-wrap items-center gap-3">
-                <button onClick={() => handleExport('txt')} className={`${neuButton} px-4 py-2.5 text-sm`}>导出 TXT</button>
-                <button onClick={() => handleExport('srt')} className={`${neuButton} px-4 py-2.5 text-sm`}>导出 SRT</button>
-                <button onClick={() => handleExport('docx')} className={`${neuButton} text-blue-600 font-semibold px-6 py-2.5 text-sm`}>导出 Word (.docx)</button>
+                <button disabled={isExporting || isKuromojiLoading || isAnnotating || !!annotationError || !correctionsReady} onClick={() => handleExport('txt')} className={`${neuButton} px-4 py-2.5 text-sm`}>导出 TXT</button>
+                <button disabled={isExporting || isKuromojiLoading || isAnnotating || !!annotationError || !correctionsReady} onClick={() => handleExport('srt')} className={`${neuButton} px-4 py-2.5 text-sm`}>导出 SRT</button>
+                <button disabled={isExporting || isKuromojiLoading || isAnnotating || !!annotationError || !correctionsReady} onClick={() => handleExport('docx')} className={`${neuButton} text-blue-600 font-semibold px-6 py-2.5 text-sm`}>导出 Word (.docx)</button>
               </div>
             </div>
           </section>
@@ -874,6 +1003,7 @@ export default function DubbingStudioApp() {
                         <div className="truncate">
                           <p className="font-medium text-sm text-gray-800 truncate">{file.name}</p>
                           <p className="text-xs text-gray-500">{(file.size / 1024).toFixed(1)} KB {file.lineCount ? `• ${file.lineCount} 行` : ''}</p>
+                          {file.error && <p role="alert" className="text-xs text-red-600 whitespace-normal">{file.error}</p>}
                         </div>
                       </div>
 
@@ -903,7 +1033,7 @@ export default function DubbingStudioApp() {
                 <div className="pt-4 flex justify-end">
                   <button
                     onClick={processBatchQueue}
-                    disabled={isBatchProcessing}
+                    disabled={isBatchProcessing || isKuromojiLoading || !correctionsReady}
                     className={`${isBatchProcessing ? neuButtonActive : neuButton} text-blue-600 px-8 py-3 text-sm font-semibold flex items-center gap-2`}
                   >
                     {isBatchProcessing ? (
@@ -922,6 +1052,9 @@ export default function DubbingStudioApp() {
         )}
       </div>
 
+      <GlossaryModal isOpen={isGlossaryOpen} onClose={() => setIsGlossaryOpen(false)} entries={database.glossary}
+        onChange={glossary => { setEditingToken(null); setDatabase(previous => ({ ...previous, glossary })); }} />
+
       {/* Dependency Diagnostic Modal */}
       <Modal
         isOpen={isDepModalOpen}
@@ -930,7 +1063,7 @@ export default function DubbingStudioApp() {
       >
         <div className="space-y-4">
           <p className="text-xs text-gray-500">
-            诊断分词核心、词典与原生 Word Ruby 导出组件状态
+            检查当前实际使用的离线词典和校对记录存储状态
           </p>
 
           <div className="space-y-3">
@@ -946,6 +1079,7 @@ export default function DubbingStudioApp() {
                       <span className="w-2 h-2 rounded-full bg-green-500"></span> 正常
                     </span>
                   )}
+                  {dep.status === 'error' && <span className="text-xs font-bold text-red-600">异常</span>}
                   {dep.status === 'repairing' && (
                     <span className="text-[11px] font-bold text-blue-500 flex items-center gap-1 animate-pulse">
                       检查中...
@@ -959,6 +1093,7 @@ export default function DubbingStudioApp() {
           <div className="pt-2 flex justify-between items-center">
             <button
               onClick={runDependencyRepair}
+              disabled={isKuromojiLoading}
               className={`${neuButton} px-4 py-2 text-xs font-semibold`}
             >
               🔄 重新检查
@@ -977,7 +1112,7 @@ export default function DubbingStudioApp() {
       <Modal
         isOpen={isExportModalOpen}
         onClose={() => !isExporting && setIsExportModalOpen(false)}
-        title="📄 正在导出台本"
+        title={exportOutcome === 'processing' ? '正在导出台本' : exportOutcome === 'cancelled' ? '已取消保存' : exportOutcome === 'error' ? '导出失败' : exportOutcome === 'download' ? '已发起下载' : '导出完成'}
       >
         <div className="space-y-6 py-4">
           <div className="flex items-center justify-between text-xs font-semibold text-gray-700">
@@ -992,11 +1127,12 @@ export default function DubbingStudioApp() {
             />
           </div>
 
-          <p className="text-xs text-center text-gray-500">
-            {exportProgress < 50 && '正在计算多音字前后文并注音...'}
-            {exportProgress >= 50 && exportProgress < 80 && `正在生成原生 ${exportFormat.toUpperCase()} 结构...`}
-            {exportProgress >= 80 && exportProgress < 100 && '正在调用系统保存文件...'}
-            {exportProgress === 100 && '🎉 文件导出完成！'}
+          <p role={exportOutcome === 'error' ? 'alert' : 'status'} className="text-xs text-center text-gray-700">
+            {exportOutcome === 'processing' && (exportProgress < 80 ? `正在生成 ${exportFormat.toUpperCase()} 文件...` : '请选择保存位置并等待写入完成...')}
+            {exportOutcome === 'saved' && '文件已保存。'}
+            {exportOutcome === 'download' && '已交给浏览器下载，请在下载列表中确认结果。'}
+            {exportOutcome === 'cancelled' && '已取消保存，可以关闭后重新导出。'}
+            {exportOutcome === 'error' && `导出失败：${exportError}`}
           </p>
 
           <div className="flex justify-end pt-2">
@@ -1018,7 +1154,7 @@ export default function DubbingStudioApp() {
         title="✅ 批量处理完成"
       >
         <div className="space-y-5">
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 gap-3">
             <div className="p-4 bg-[#e0e5ec] rounded-xl shadow-[inset_3px_3px_6px_#b8bcc2,inset_-3px_-3px_6px_#ffffff] text-center">
               <div className="text-2xl font-bold text-gray-800">{batchDoneResults.total}</div>
               <div className="text-xs text-gray-500 mt-1">总文件数</div>
@@ -1030,6 +1166,10 @@ export default function DubbingStudioApp() {
             <div className="p-4 bg-[#e0e5ec] rounded-xl shadow-[inset_3px_3px_6px_#b8bcc2,inset_-3px_-3px_6px_#ffffff] text-center">
               <div className="text-2xl font-bold text-red-500">{batchDoneResults.failed}</div>
               <div className="text-xs text-gray-500 mt-1">失败</div>
+            </div>
+            <div className="p-4 text-center">
+              <div className="text-2xl font-bold text-gray-600">{batchDoneResults.cancelled}</div>
+              <div className="text-xs text-gray-500 mt-1">取消保存</div>
             </div>
           </div>
 
@@ -1049,7 +1189,7 @@ export default function DubbingStudioApp() {
 
           <div className="p-3 bg-[#e0e5ec] rounded-xl shadow-[inset_2px_2px_4px_#b8bcc2,inset_-2px_-2px_4px_#ffffff]">
             <p className="text-xs font-medium text-gray-700 text-center">
-              📁 文件已成功保存至您选择的存储位置！
+              已完成 {batchDoneResults.success} 个文件的保存或下载请求；浏览器下载请在下载列表中确认。
             </p>
           </div>
 
@@ -1083,6 +1223,24 @@ export default function DubbingStudioApp() {
               </div>
             </div>
 
+            {(() => {
+              const line = annotatedLines.find(l => l.id === editingToken.lineId);
+              if (!line) return null;
+              const start = line.tokens.slice(0, editingToken.tokenIndex).reduce((sum, t) => sum + t.surface.length, 0);
+              const before = line.cleanText.slice(Math.max(0, start - 24), start);
+              const after = line.cleanText.slice(start + editingToken.surface.length, start + editingToken.surface.length + 24);
+              return (
+                <div className="text-xs text-gray-700 bg-[#e0e5ec] p-3 rounded-xl shadow-[inset_2px_2px_4px_#b8bcc2,inset_-2px_-2px_4px_#ffffff] leading-relaxed">
+                  <span className="text-gray-500 font-medium mr-1">所在短句：</span>
+                  <span>{before}</span>
+                  <span className="bg-yellow-200/90 text-blue-900 font-bold px-1.5 py-0.5 rounded mx-0.5 shadow-sm border border-yellow-300">
+                    {editingToken.surface}
+                  </span>
+                  <span>{after}</span>
+                </div>
+              );
+            })()}
+
             <div>
               <div className="text-xs font-semibold text-gray-700 mb-2">标注范围（词组共享一组居中注音）：</div>
               <div className="flex items-center gap-3">
@@ -1105,7 +1263,7 @@ export default function DubbingStudioApp() {
                   className={`${neuButton} px-3 py-2 text-xs disabled:opacity-40`}
                 >缩小范围</button>
               </div>
-              <p className="text-xs text-gray-500 mt-2">例如选择「二」后向右扩展至「二人」，输入「ふたり」并保存。修改会按当前台本标题记住，仅应用于相同原文行。</p>
+              <p className="text-xs text-gray-500 mt-2">例如选择「二」后向右扩展至「二人」，输入「ふたり」并保存。修改按台本 ID 保存，改标题不会丢失；仅应用于相同原文行。</p>
               <div lang="ja" className="script-line text-center py-4 text-2xl text-gray-800">
                 <ruby>{editingToken.surface}<rt style={{ fontSize: `${rubyFontSize}px` }}>{customRubyInput || '\u00a0'}</rt></ruby>
               </div>
@@ -1130,6 +1288,10 @@ export default function DubbingStudioApp() {
             )}
 
             <div>
+              <label className="mb-3 flex items-center gap-2 text-sm">
+                <input type="checkbox" checked={correctionScope === 'glossary'} onChange={event => setCorrectionScope(event.target.checked ? 'glossary' : 'occurrence')} />
+                加入专名词典，应用于所有台本的同名文字
+              </label>
               <label className="block text-xs font-semibold text-gray-700 mb-2">
                 自定义注音 (平假名/片假名/罗马音)：
               </label>
@@ -1140,8 +1302,13 @@ export default function DubbingStudioApp() {
                 placeholder="输入该语境下的准确假名..."
                 className={`${neuInput} w-full px-4 py-2 text-sm`}
                 autoFocus
+                onCompositionStart={() => { rubyCompositionRef.current = true; }}
+                onCompositionEnd={() => { rubyCompositionRef.current = false; }}
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter') saveTokenRuby();
+                  if (e.key === 'Enter' && !rubyCompositionRef.current && !e.nativeEvent.isComposing && e.nativeEvent.keyCode !== 229) {
+                    e.preventDefault();
+                    saveTokenRuby();
+                  }
                 }}
               />
             </div>
@@ -1169,10 +1336,69 @@ export default function DubbingStudioApp() {
                 >
                   保存修改
                 </button>
+                <button
+                  type="button"
+                  onClick={saveAndOpenNextReview}
+                  disabled={isAdvancingReview}
+                  className={`${neuButton} text-blue-700 px-4 py-2 text-xs font-semibold`}
+                >
+                  保存并下一处
+                </button>
               </div>
             </div>
           </div>
         )}
+      </Modal>
+
+      {/* Modal for viewing and deleting learned readings */}
+      <Modal
+        isOpen={isLearnedModalOpen}
+        onClose={() => setIsLearnedModalOpen(false)}
+        title="📚 本台本语境已学读音"
+      >
+        <div className="space-y-4">
+          <p className="text-xs text-gray-500">
+            在复核时确认的读音会自动学习所在短句语境。同一台本中处于相同前后文的词语将自动应用，无需重复复核。
+          </p>
+          {learnedReadings.length === 0 ? (
+            <div className="text-center py-6 text-gray-400 text-sm">暂无已学语境记录</div>
+          ) : (
+            <div className="max-h-[300px] overflow-y-auto space-y-2">
+              {learnedReadings.map((item, idx) => (
+                <div key={idx} className="flex items-center justify-between p-3 bg-[#e0e5ec] rounded-xl shadow-[inset_2px_2px_4px_#b8bcc2,inset_-2px_-2px_4px_#ffffff] text-xs">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-gray-800 text-sm">{item.surface}</span>
+                      <span className="font-semibold text-blue-600">→ {item.reading}</span>
+                      <span className="text-[10px] text-gray-400">({item.type})</span>
+                    </div>
+                    <div className="text-gray-500">
+                      语境：<span>{item.before ? `...${item.before}` : ''}</span>
+                      <strong className="text-gray-700">[{item.surface}]</strong>
+                      <span>{item.after ? `${item.after}...` : ''}</span>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setDatabase(prev => deleteLearnedReading(prev, documentId, idx))}
+                    className="text-red-500 hover:text-red-700 underline text-xs ml-3 flex-shrink-0"
+                  >
+                    删除
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+          <div className="flex justify-end pt-2">
+            <button
+              type="button"
+              onClick={() => setIsLearnedModalOpen(false)}
+              className={`${neuButton} px-5 py-2 text-xs font-semibold`}
+            >
+              关闭
+            </button>
+          </div>
+        </div>
       </Modal>
     </main>
   );

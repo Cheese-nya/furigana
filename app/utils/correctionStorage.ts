@@ -1,41 +1,53 @@
-import { validateRubyOverrides, type RubyOverride } from './rubyOverrides';
+import { emptyDatabase, migrateDatabase, type CorrectionDatabaseV2 } from './correctionDatabase';
 
-export type CorrectionLibrary = Record<string, RubyOverride[]>;
-const STORAGE_KEY = 'furigana-corrections-v1';
+const STORAGE_KEY = 'furigana-corrections-v2';
+const LEGACY_KEY = 'furigana-corrections-v1';
 
 interface CorrectionApi {
-  load_corrections(): Promise<unknown>;
-  save_corrections(data: CorrectionLibrary): Promise<{ success: boolean; error?: string }>;
+  load_correction_database(): Promise<unknown>;
+  save_correction_database(data: CorrectionDatabaseV2): Promise<{ success: boolean; error?: string }>;
 }
 
 function nativeApi(): CorrectionApi | undefined {
   return (window as Window & { pywebview?: { api?: CorrectionApi } }).pywebview?.api;
 }
 
-function validateLibrary(value: unknown): CorrectionLibrary {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
-  return Object.fromEntries(Object.entries(value).map(([key, entries]) => [key, validateRubyOverrides(entries)]));
-}
-
 async function readyApi(): Promise<CorrectionApi | undefined> {
   if (new URLSearchParams(window.location.search).get('desktop') === '1' && !nativeApi()) {
     await new Promise<void>(resolve => window.addEventListener('pywebviewready', () => resolve(), { once: true }));
   }
-  return nativeApi();
+  const api = nativeApi();
+  if (api && (!api.load_correction_database || !api.save_correction_database)) throw new Error('请更新桌面程序以使用新版校对存储');
+  return api;
 }
 
-export async function loadCorrections(): Promise<CorrectionLibrary> {
+export async function loadCorrections(): Promise<CorrectionDatabaseV2> {
   const api = await readyApi();
-  if (api?.load_corrections) return validateLibrary(await api.load_corrections());
-  return validateLibrary(JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}'));
+  if (api) return migrateDatabase(await api.load_correction_database());
+  const current = localStorage.getItem(STORAGE_KEY);
+  if (current !== null) return migrateDatabase(JSON.parse(current));
+  const legacy = localStorage.getItem(LEGACY_KEY);
+  const database = legacy === null ? emptyDatabase() : migrateDatabase(JSON.parse(legacy));
+  // Do not touch v1. Only write a validated migration to a separate key.
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(database));
+  return database;
 }
 
-export async function saveCorrections(data: CorrectionLibrary): Promise<void> {
-  const api = await readyApi();
-  if (api?.save_corrections) {
-    const result = await api.save_corrections(data);
-    if (!result.success) throw new Error(result.error || 'Failed to save corrections');
-  } else {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-  }
+let saveQueue: Promise<void> = Promise.resolve();
+export function saveCorrections(data: CorrectionDatabaseV2): Promise<void> {
+  let snapshot: CorrectionDatabaseV2;
+  try { snapshot = migrateDatabase(data); }
+  catch (error) { return Promise.reject(error); }
+  const save = async () => {
+    const api = await readyApi();
+    if (api) {
+      const result = await api.save_correction_database(snapshot);
+      if (!result.success) throw new Error(result.error || '校对记录保存失败');
+    } else {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(snapshot));
+    }
+  };
+  const pending = saveQueue.then(save, save);
+  saveQueue = pending.catch(() => {});
+  return pending;
 }

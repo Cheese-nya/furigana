@@ -19,7 +19,7 @@ export interface KuromojiToken {
 let tokenizer: { tokenize(text: string): KuromojiToken[] } | null = null;
 let initPromise: Promise<void> | null = null;
 
-export const initKuromoji = async (): Promise<void> => {
+export const initKuromoji = async (dictionaryPath?: string): Promise<void> => {
   if (tokenizer) return;
   if (initPromise) return initPromise;
 
@@ -42,7 +42,16 @@ export const initKuromoji = async (): Promise<void> => {
        }
     }
 
-    kuromoji.builder({ dicPath: dictPath }).build((err, _tokenizer) => {
+    let settled = false;
+    const timeout = setTimeout(() => {
+      settled = true;
+      initPromise = null;
+      reject(new Error('离线词典加载超时，请重试'));
+    }, 15000);
+    kuromoji.builder({ dicPath: dictionaryPath || dictPath }).build((err, _tokenizer) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeout);
       if (err) {
         console.error('Kuromoji initialization failed:', err);
         initPromise = null;

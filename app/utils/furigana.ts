@@ -10,11 +10,17 @@ import { findCounterCompound } from './counterReadings';
 
 export type RubyType = 'hiragana' | 'katakana' | 'romaji';
 
+export type ReadingSource = 'automatic' | 'glossary' | 'learned' | 'source' | 'manual';
+
 export interface Token {
   surface: string;
   ruby?: string;
   hasKanji: boolean;
-  alternatives?: string[]; // Optional alternative readings for interactive correction
+  alternatives?: string[];
+  readingSource?: ReadingSource;
+  needsReview?: boolean;
+  annotationSuppressed?: boolean;
+  word?: { surface: string; reading: string; alternatives: string[]; offset: number; context?: string };
 }
 
 export interface ScriptLine {
@@ -156,16 +162,45 @@ const ROMAJI_MAP: Record<string, string> = {
   'わ': 'wa', 'を': 'o', 'ん': 'n',
   'が': 'ga', 'ぎ': 'gi', 'ぐ': 'gu', 'げ': 'ge', 'ご': 'go',
   'ざ': 'za', 'じ': 'ji', 'ず': 'zu', 'ぜ': 'ze', 'ぞ': 'zo',
-  'だ': 'da', 'ぢ': 'di', 'づ': 'du', 'で': 'de', 'ど': 'do',
+  'だ': 'da', 'ぢ': 'ji', 'づ': 'zu', 'で': 'de', 'ど': 'do',
   'ば': 'ba', 'び': 'bi', 'ぶ': 'bu', 'べ': 'be', 'ぼ': 'bo',
   'ぱ': 'pa', 'ぴ': 'pi', 'ぷ': 'pu', 'ぺ': 'pe', 'ぽ': 'po',
-  'っ': 'tsu', 'ゃ': 'ya', 'ゅ': 'yu', 'ょ': 'yo', 'ー': '-'
+  'ぁ': 'a', 'ぃ': 'i', 'ぅ': 'u', 'ぇ': 'e', 'ぉ': 'o', 'ゔ': 'vu',
+  'っ': 'tsu', 'ゃ': 'ya', 'ゅ': 'yu', 'ょ': 'yo'
 };
 
-export function kanaToRomaji(hiraText: string): string {
+const ROMAJI_PAIRS: Record<string, string> = {
+  'きゃ': 'kya', 'きゅ': 'kyu', 'きょ': 'kyo', 'ぎゃ': 'gya', 'ぎゅ': 'gyu', 'ぎょ': 'gyo',
+  'しゃ': 'sha', 'しゅ': 'shu', 'しょ': 'sho', 'じゃ': 'ja', 'じゅ': 'ju', 'じょ': 'jo',
+  'ちゃ': 'cha', 'ちゅ': 'chu', 'ちょ': 'cho', 'ぢゃ': 'ja', 'ぢゅ': 'ju', 'ぢょ': 'jo',
+  'にゃ': 'nya', 'にゅ': 'nyu', 'にょ': 'nyo', 'ひゃ': 'hya', 'ひゅ': 'hyu', 'ひょ': 'hyo',
+  'びゃ': 'bya', 'びゅ': 'byu', 'びょ': 'byo', 'ぴゃ': 'pya', 'ぴゅ': 'pyu', 'ぴょ': 'pyo',
+  'みゃ': 'mya', 'みゅ': 'myu', 'みょ': 'myo', 'りゃ': 'rya', 'りゅ': 'ryu', 'りょ': 'ryo',
+  'ふぁ': 'fa', 'ふぃ': 'fi', 'ふぇ': 'fe', 'ふぉ': 'fo', 'ふゅ': 'fyu',
+  'てぃ': 'ti', 'でぃ': 'di', 'とぅ': 'tu', 'どぅ': 'du', 'てゅ': 'tyu', 'でゅ': 'dyu',
+  'しぇ': 'she', 'じぇ': 'je', 'ちぇ': 'che', 'いぇ': 'ye',
+  'うぃ': 'wi', 'うぇ': 'we', 'うぉ': 'wo', 'ゔぁ': 'va', 'ゔぃ': 'vi', 'ゔぇ': 've', 'ゔぉ': 'vo',
+};
+
+/** Hepburn consonants, with kana-spelled vowels (kyou / gakkou, no macrons). */
+export function kanaToRomaji(kanaText: string): string {
+  const text = katakanaToHiragana(kanaText.normalize('NFC'));
+  const syllableAt = (index: number) => ROMAJI_PAIRS[text.slice(index, index + 2)] || ROMAJI_MAP[text[index]] || text[index] || '';
   let res = '';
-  for (const char of hiraText) {
-    res += ROMAJI_MAP[char] || char;
+  for (let i = 0; i < text.length; i++) {
+    const char = text[i];
+    if (char === 'っ') {
+      const next = syllableAt(i + 1);
+      res += next.startsWith('ch') ? 't' : /^[bcdfghjklmpqrstvwxyz]/.test(next) ? next[0] : 'xtsu';
+    } else if (char === 'ん') {
+      res += /^[aeiouy]/.test(syllableAt(i + 1)) ? "n'" : 'n';
+    } else if (char === 'ー') {
+      res += /[aeiou]$/.test(res) ? res.slice(-1) : '-';
+    } else {
+      const pair = ROMAJI_PAIRS[text.slice(i, i + 2)];
+      res += pair || ROMAJI_MAP[char] || char;
+      if (pair) i++;
+    }
   }
   return res;
 }
@@ -194,8 +229,19 @@ export function parseCompoundToTokens(
   alternatives?: string[]
 ): Token[] {
   if (!KANJI_REGEX.test(phrase) || !reading) {
-    return [{ surface: phrase, hasKanji: KANJI_REGEX.test(phrase) }];
+    return [{ surface: phrase, hasKanji: KANJI_REGEX.test(phrase), needsReview: KANJI_REGEX.test(phrase) }];
   }
+  const choices = [...new Set([reading, ...(alternatives || [])].map(value => formatRuby(value.normalize('NFKC').trim(), rubyType)).filter(Boolean))];
+  const withWord = (tokens: Token[]): Token[] => {
+    let offset = 0;
+    return tokens.map(token => {
+      const result: Token = { ...token, needsReview: token.hasKanji && choices.length > 1,
+        ...(token.alternatives ? { alternatives: [...new Set(token.alternatives)] } : {}),
+        word: { surface: phrase, reading: formatRuby(reading, rubyType), alternatives: choices, offset } };
+      offset += token.surface.length;
+      return result;
+    });
+  };
   // Align the actual kana in the word, rather than guessing individual kanji readings.
   // Keep adjacent kanji together (二人/ふたり); split only at unambiguous okurigana.
   const parts = phrase.match(/[\u4E00-\u9FFF\u3400-\u4DBF]+|[^\u4E00-\u9FFF\u3400-\u4DBF]+/gu) || [phrase];
@@ -218,13 +264,14 @@ export function parseCompoundToTokens(
     const nextLiteral = parts[index + 1];
     for (let end = offset + 1; end <= hira.length; end++) {
       if (nextLiteral ? !hira.startsWith(katakanaToHiragana(nextLiteral), end) : end !== hira.length) continue;
-      align(index + 1, end, [...result, { surface, ruby: formatRuby(hira.slice(offset, end), rubyType), hasKanji: true }]);
+      align(index + 1, end, [...result, { surface, ruby: formatRuby(hira.slice(offset, end), rubyType), hasKanji: true,
+        readingSource: 'automatic', needsReview: Boolean(alternatives?.length) }]);
     }
   };
   align(0, 0, []);
   if (solutions.length !== 1) {
-    return [{ surface: phrase, ruby: formatRuby(hira, rubyType), hasKanji: true,
-      alternatives: alternatives?.map(value => formatRuby(value, rubyType)) }];
+    return withWord([{ surface: phrase, ruby: formatRuby(hira, rubyType), hasKanji: true,
+      alternatives: alternatives?.map(value => formatRuby(value, rubyType)), readingSource: 'automatic' }]);
   }
   const tokens = solutions[0];
   if (alternatives && tokens.filter(token => token.hasKanji).length === 1) {
@@ -236,7 +283,7 @@ export function parseCompoundToTokens(
       .filter(value => value.startsWith(prefix) && value.endsWith(suffix))
       .map(value => formatRuby(value.slice(prefix.length, suffix ? -suffix.length : undefined), rubyType));
   }
-  return tokens;
+  return withWord(tokens);
 }
 
 /**
@@ -261,21 +308,21 @@ export function disambiguateToken(
     const foodKeywords = /味|料理|食べ|辛い物|塩|ラーメン|甘い|カレー|辛口|唐辛子|麻婆|激辛|舌|酒|スープ|飯|鍋|うどん|肉|野菜|わさび|唐揚げ/;
     const painKeywords = /日々|思い|経験|現実|練習|別れ|人生|仕事|悲しい|泣く|耐える|苦しい|胸が|失恋|孤独|切ない|苦痛/;
 
-    let localContext = '';
-    for (let j = Math.max(0, i - 3); j <= Math.min(allTokens.length - 1, i + 3); j++) {
-      if (j !== i && allTokens[j]) localContext += allTokens[j].surface_form;
-    }
-
-    if (foodKeywords.test(localContext) || foodKeywords.test(fullSentence)) {
-      reading = 'からい';
-      alternatives = ['からい', 'つらい'];
-    } else if (painKeywords.test(localContext) || painKeywords.test(fullSentence)) {
-      reading = 'つらい';
-      alternatives = ['つらい', 'からい'];
-    } else {
-      // Keep the dictionary's contextual choice when keyword rules add no evidence.
-      alternatives = [reading, reading === 'つらい' ? 'からい' : 'つらい'];
-    }
+    // Restrict evidence to this clause. A food word in another clause must not
+    // override a separate occurrence describing emotional pain.
+    const boundary = (token: KuromojiToken) => /[、。，,.!?！？;；]/u.test(token.surface_form) ||
+      (token.pos_detail_1 === '接続助詞' && /^(が|けど|けれど|けれども|のに|ても|でも)$/.test(token.surface_form));
+    let start = i;
+    let end = i + 1;
+    while (start > 0 && !boundary(allTokens[start - 1])) start--;
+    while (end < allTokens.length && !boundary(allTokens[end])) end++;
+    const context = allTokens.slice(start, end).filter((_, index) => start + index !== i).map(token => token.surface_form).join('');
+    const food = foodKeywords.test(context);
+    const pain = painKeywords.test(context);
+    if (food && !pain) reading = 'からい';
+    if (pain && !food) reading = 'つらい';
+    // Conflicting or absent evidence keeps the dictionary reading and both choices.
+    alternatives = [reading, reading === 'つらい' ? 'からい' : 'つらい'];
   }
 
   // 2. 何 (なん vs なに)
@@ -322,16 +369,12 @@ export function disambiguateToken(
   else if (surface === '風') {
     const prevSurface = prevToken ? prevToken.surface_form : '';
     const nextSurface = nextToken ? nextToken.surface_form : '';
-    const isFuuPrefix = /^(こんな|そんな|あんな|どんな|この|その|あの|和|洋|欧|現代|昔|南国)$/.test(prevSurface);
-    const isFuuSuffix = /^(に|だ|です|な|の)$/.test(nextSurface);
-
-    if (isFuuPrefix || isFuuSuffix) {
-      reading = 'ふう';
-      alternatives = ['ふう', 'かぜ'];
-    } else {
-      reading = 'かぜ';
-      alternatives = ['かぜ', 'ふう'];
-    }
+    const manner = /^(こんな|そんな|あんな|どんな)$/.test(prevSurface) && /^(に|な|だ|です|の)$/.test(nextSurface);
+    const styleSuffix = kt.pos_detail_1 === '接尾' && /^(和|洋|欧|現代|昔|南国)$/.test(prevSurface);
+    if (manner || styleSuffix) reading = 'ふう';
+    // この/その/あの and ordinary particles also occur with literal wind.
+    reading = reading || 'かぜ';
+    alternatives = [reading, reading === 'ふう' ? 'かぜ' : 'ふう'];
   }
 
   // 5. 方 (かた vs ほう)
@@ -440,13 +483,15 @@ export function annotateLine(
       const kt = kuromojiTokens[i];
       const counterCompound = findCounterCompound(kuromojiTokens, i);
       if (counterCompound) {
-        tokens.push(...parseCompoundToTokens(counterCompound.surface, counterCompound.reading, rubyType));
+        tokens.push(...parseCompoundToTokens(counterCompound.surface, counterCompound.reading, rubyType)
+          .map(token => ({ ...token, readingSource: 'automatic' as const, needsReview: false })));
         i += counterCompound.length - 1;
         continue;
       }
       const personCompound = findPersonCompound(kuromojiTokens, i);
       if (personCompound) {
-        tokens.push(...parseCompoundToTokens(personCompound.surface, personCompound.reading, rubyType));
+        tokens.push(...parseCompoundToTokens(personCompound.surface, personCompound.reading, rubyType)
+          .map(token => ({ ...token, readingSource: 'automatic' as const, needsReview: false })));
         i += personCompound.length - 1;
         continue;
       }
@@ -470,7 +515,7 @@ export function annotateLine(
         const subTokens = parseCompoundToTokens(kt.surface_form, reading, rubyType, alternatives);
         tokens.push(...subTokens);
       } else {
-        tokens.push({ surface: kt.surface_form, hasKanji: true });
+        tokens.push({ surface: kt.surface_form, hasKanji: true, needsReview: true });
       }
     }
   } else {
@@ -556,9 +601,9 @@ export function annotateLine(
           } else if (rubyType === 'romaji') {
             reading = kanaToRomaji(reading);
           }
-          tokens.push({ surface: char, ruby: reading, hasKanji: true, ...(alternatives ? { alternatives } : {}) });
+          tokens.push({ surface: char, ruby: reading, hasKanji: true, readingSource: 'automatic', needsReview: Boolean(alternatives?.length), ...(alternatives ? { alternatives } : {}) });
         } else {
-          tokens.push({ surface: char, hasKanji: true });
+          tokens.push({ surface: char, hasKanji: true, needsReview: true });
         }
       } else {
         currentWord += char;
@@ -574,7 +619,14 @@ export function annotateLine(
     id: Math.random().toString(36).substring(2, 9),
     rawText: rawLine,
     cleanText: content,
-    tokens,
+    tokens: tokens.map(token => {
+      if (token.hasKanji && !token.ruby) return { ...token, needsReview: true };
+      if (!token.word && token.alternatives) {
+        const alternatives = [...new Set([token.ruby || '', ...token.alternatives].map(value => formatRuby(value, rubyType)).filter(Boolean))];
+        return { ...token, alternatives, needsReview: alternatives.length > 1 };
+      }
+      return token;
+    }),
   };
 }
 
