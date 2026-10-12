@@ -4,10 +4,10 @@
 
   # 🎌 Furigana Dubbing Studio (假名标注工具)
 
-  **基于新拟物派 (Neumorphism) 设计系统的高精度日语上下文假名注音、动态台本标题与多格式配音台本导出系统**
+  **基于 Clean / Shadcn 设计系统的高精度日语上下文假名注音、动态台本标题与多格式配音台本导出系统**
 
   [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-  [![Version](https://img.shields.io/badge/Version-v1.0.1-emerald.svg)](RELEASE_NOTES.md)
+  [![Version](https://img.shields.io/badge/Version-v1.1.0-emerald.svg)](RELEASE_NOTES.md)
   [![Next.js](https://img.shields.io/badge/Framework-Next.js_16-black?logo=next.js)](https://nextjs.org/)
   [![TailwindCSS](https://img.shields.io/badge/Style-Tailwind_v4-38bdf8?logo=tailwindcss)](https://tailwindcss.com/)
   [![Python](https://img.shields.io/badge/Desktop-PyWebView_&_PyInstaller-3776ab?logo=python)](https://python.org/)
@@ -20,7 +20,7 @@
 
 **Furigana Dubbing Studio** 是一款专为声优配音、日语学习者、字幕组与台本编辑设计的现代化日语假名注音与台本导出工具。
 
-本工具采用精致的 **新拟物派 (Neumorphism)** 视觉设计，通过极性双重光影（亮/暗）打造凸起与凹陷的柔和立体触感。内核配备**前后文多音字消歧形态素引擎**与**原生 Word Ruby 排版生成器**，提供极速流畅的在线编辑、动态台本命名、交互式校对与一键批量导出体验。
+本工具采用现代专业的 **Clean / Shadcn** 视觉设计系统，兼具清晰的高对比层级、微阴影质感与丝滑交互反馈。内核配备**前后文多音字消歧形态素引擎**与**原生 Word Ruby 排版生成器**，提供极速流畅的在线编辑、动态台本命名、交互式校对与一键批量导出体验。
 
 ---
 
@@ -29,7 +29,7 @@
 - 🎯 **离线词典与上下文读音规则**
   - 网页及 PyWebView 桌面版使用本地 Kuromoji 词典，结合 `辛い`、`何`、`風`、`行っ` 等上下文规则。歧义、人名、古语仍需要人工校对。
   - **词组与送假名对齐**：保留连续汉字的整体读音，例如 `二人(ふたり)`、`大人(おとな)`；按词中的假名对齐 `取り戻し` 等送假名，不再猜测每个汉字的音节分配。
-  - **Word 导入保真**：保留带注音的汉字正文，优先使用原文件读音；兼容标准及旧版段落级 Ruby。
+  - **Word 导入仿真**：保留带注音的汉字正文，优先使用原文件读音；兼容标准及旧版段落级 Ruby。
 
 - 📝 **智能动态台本标题联动**
   - **自适应文件名**：导入 `.txt` / `.srt` / `.docx` 文本时，系统自动识别原文件名（如《歪な鳥籠》），导出 Word 时顶部一级大标题自动命名为对应的台本名称。
@@ -66,13 +66,11 @@
 
 ## 🎨 设计系统 (Design System)
 
-本项目严格遵循 **Neumorphism (新拟物派)** 规范：
-- **同色系底色**：基于统一柔和浅灰 `#e0e5ec`，无任何高对比度纯白/纯黑色块。
-- **双重极性阴影**：
-  - 凸起元素（卡片/按钮）：`shadow-[6px_6px_12px_#b8bcc2,-6px_-6px_12px_#ffffff]`
-  - 沉降/内凹元素（输入框/激活态）：`shadow-[inset_4px_4px_8px_#b8bcc2,inset_-4px_-4px_8px_#ffffff]`
-- **真实物理反馈**：按钮默认立体凸起，按压时触发下陷，松开平滑回弹。
-- **零显性边框**：摒弃生硬边框线条，纯靠自然光影重塑空间层次。
+本项目遵循 **Clean / Shadcn** 现代设计系统规范：
+- **中性优雅色盘**：基于现代 Slate/Zinc 灰度层级，告别刺眼对比与陈旧拟物，保证长文阅读与长时间配音校对的视觉舒适度。
+- **清晰层级与边框系统**：采用细微精密边框（`border-slate-200/80`）与微层次投影（`shadow-sm / shadow-md`）勾勒卡片结构，视觉层级分明。
+- **现代化交互反馈**：按钮与操作项具备平滑过渡动画（`transition-all duration-150`）、悬浮微凸升与精准的 Active 按压反馈。
+- **无障碍与可读性优化**：假名注音展示区采用柔和背景与高对比度文字排版，支持大字号与多音字来源色彩高亮标记。
 
 ---
 
@@ -139,9 +137,9 @@ node tools/audit-scripts.mjs "台本目录" audit.json
 ```text
 furigana/
 ├── app/
-│   ├── components/       # 新拟物核心组件 (Sidebar, Modal, Dropdown 等)
+│   ├── components/       # 现代 UI 核心组件 (Sidebar, Modal, GlossaryModal 等)
 │   ├── utils/            # 假名分词消歧、Word 原生 Ruby 导出器等
-│   ├── globals.css       # 核心 Design System CSS 变量与阴影 Token
+│   ├── globals.css       # 核心 Design System CSS 变量与设计规范 Token
 │   ├── layout.tsx        # 根布局容器
 │   └── page.tsx          # 假名配音台本主业务界面
 ├── public/               # 静态资源 (Logo, 词典文件, 打赏二维码)
