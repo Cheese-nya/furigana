@@ -6,6 +6,10 @@
 
   面向日语学习者的离线振假名（ルビ）注音与排版工具。解决多音字误读、量词音变、熟字训拆裂与 Word 排版错位问题。
 
+  <p>
+    <b>简体中文</b> • <a href="README_EN.md">English</a>
+  </p>
+
   [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
   [![Version](https://img.shields.io/badge/Version-v1.1.0-emerald.svg)](RELEASE_NOTES.md)
   [![Next.js](https://img.shields.io/badge/Next.js-16-black?logo=next.js)](https://nextjs.org/)
