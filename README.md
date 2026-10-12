@@ -1,171 +1,144 @@
 <div align="center">
 
-  <img src="public/logo.png" alt="Furigana Dubbing Studio Logo" width="120" height="120" style="border-radius: 24px;" />
+  <img src="public/logo.png" alt="Furigana Dubbing Studio Logo" width="100" height="100" style="border-radius: 20px;" />
 
-  # 🎌 Furigana Dubbing Studio (假名标注工具)
+  # Furigana Dubbing Studio
 
-  **基于 Clean / Shadcn 设计系统的高精度日语上下文假名注音、动态台本标题与多格式配音台本导出系统**
+  面向日语学习者的离线振假名（ルビ）注音与排版工具。解决多音字误读、量词音变、熟字训拆裂与 Word 排版错位问题。
 
   [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
   [![Version](https://img.shields.io/badge/Version-v1.1.0-emerald.svg)](RELEASE_NOTES.md)
-  [![Next.js](https://img.shields.io/badge/Framework-Next.js_16-black?logo=next.js)](https://nextjs.org/)
-  [![TailwindCSS](https://img.shields.io/badge/Style-Tailwind_v4-38bdf8?logo=tailwindcss)](https://tailwindcss.com/)
-  [![Python](https://img.shields.io/badge/Desktop-PyWebView_&_PyInstaller-3776ab?logo=python)](https://python.org/)
+  [![Next.js](https://img.shields.io/badge/Next.js-16-black?logo=next.js)](https://nextjs.org/)
+  [![TailwindCSS](https://img.shields.io/badge/Tailwind-v4-38bdf8?logo=tailwindcss)](https://tailwindcss.com/)
+  [![Desktop](https://img.shields.io/badge/Desktop-Windows_EXE-3776ab?logo=windows)](https://github.com/Cheese-nya/furigana)
 
 </div>
 
 ---
 
-## 📖 项目简介 (Introduction)
+## 解决的问题
 
-**Furigana Dubbing Studio** 是一款专为声优配音、日语学习者、字幕组与台本编辑设计的现代化日语假名注音与台本导出工具。
+常规假名注音工具直接查词典，常出现以下错误：
 
-本工具采用现代专业的 **Clean / Shadcn** 视觉设计系统，兼具清晰的高对比层级、微阴影质感与丝滑交互反馈。内核配备**前后文多音字消歧形态素引擎**与**原生 Word Ruby 排版生成器**，提供极速流畅的在线编辑、动态台本命名、交互式校对与一键批量导出体验。
+| 场景 | 常见错误 | 本工具处理 |
+| :--- | :--- | :--- |
+| **多音字** | `辛い` 读音混淆（辣 vs 痛苦） | 结合前后文助词自动区分 `からい` 与 `つらい`；`何`（なに/なん）、`風`（かぜ/ふう）同理 |
+| **量词变音** | `一発`、`一本` 读成 いちはつ、いちほん | 内置数词量词音变规则，正确输出 `いっぱつ`、`いっぽん`、`三分(さんぷん)` 等促音与半浊音 |
+| **熟字训** | `二人` 被拆成 `二(に)人(にん)` | 识别整体词组，注为 `二人(ふたり)`、`大人(おとな)`；动词送假名精确对齐 |
+| **打印排版** | 导出到 Word 后假名掉落或变成括号 | 输出标准 Word `<w:ruby>` 结构，假名居中在汉字上方，字号与行距可调 |
 
----
-
-## ✨ 核心特性 (Features)
-
-- 🎯 **离线词典与上下文读音规则**
-  - 网页及 PyWebView 桌面版使用本地 Kuromoji 词典，结合 `辛い`、`何`、`風`、`行っ` 等上下文规则。歧义、人名、古语仍需要人工校对。
-  - **词组与送假名对齐**：保留连续汉字的整体读音，例如 `二人(ふたり)`、`大人(おとな)`；按词中的假名对齐 `取り戻し` 等送假名，不再猜测每个汉字的音节分配。
-  - **Word 导入仿真**：保留带注音的汉字正文，优先使用原文件读音；兼容标准及旧版段落级 Ruby。
-
-- 📝 **智能动态台本标题联动**
-  - **自适应文件名**：导入 `.txt` / `.srt` / `.docx` 文本时，系统自动识别原文件名（如《歪な鳥籠》），导出 Word 时顶部一级大标题自动命名为对应的台本名称。
-  - **实时修改**：编辑区顶部常驻台本标题输入框与快速导入按钮，方便随时自定义。
-
-- ⚡ **纯粹极速、零网络依赖**
-  - 去除繁琐的网络外部翻译 API 与配置门槛，全部注音与消歧逻辑均在本地毫秒级完成。
-  - 界面排版专注纯净，无多余副行干扰，离线断网环境下依然稳定高效。
-
-- ✏️ **交互式点击读音校对**
-  - 在实时排版预览区，直接点击汉字即可弹出校对浮窗，选择候选读音或输入自定义读音。
-  - **词组整体注音**：例如点击「二」，使用「向右扩展」选中「二人」，输入「ふたり」后保存。假名会居中显示在整个词组上方，Word 导出保留该标注。
-  - **稳定台本身份**：校对按持久化台本 ID、完整原文行和字符范围保存，修改标题不会丢失。重新导入和批量处理按正文 SHA-256 指纹找回记录；同名但正文不同的台本分别保存，正文完全一致的文件复用校对。已改动的原文行需要重新检查。
-  - **专名词典与语境学习**：
-    - 支持人名、地名和作品专名的增删改、搜索、JSON 导入导出；校对时可选择加入词典，跨台本复用。按原文精确匹配、长词优先。
-    - **语境智能学习**：确认多音字读音后自动提取短句前后文特征存入台本记录；同一台本处于相同语境的同形词自动套用，无需重复复核，并可在「已学语境」中管理与删除。
-    - 优先级顺序：人工精确校对 > Word 原注音 > 语境已学读音 > 专名词典 > 自动消歧引擎。
-  - **连续复核与短句对照**：校对弹窗直观显示目标词所在的完整短句并突出高亮；预览区展示读音来源（自动 / 专名 / 语境学习 / 源文件 / 人工确认）；歧义和缺失读音支持「保存并下一处」连续定位。主动清除的注音不计入缺失读音。
-  - 浏览器版使用 `furigana-corrections-v2` localStorage；Windows 桌面版写入 `%LOCALAPPDATA%\\FuriganaDubbingStudio\\corrections-v2.json`。旧版 v1 键和 `corrections.json` 原样保留；历史标题记录在首次匹配原文时绑定台本 ID。平假名与片假名校对可随模式转换；直接输入的罗马音按原样保留。
-  - **异步注音**：Kuromoji 和规则在本地 Web Worker 中运行，每 50 行更新进度；继续输入会取消旧预览任务，注音模式切换复用基础读音。Worker 不可用时显式显示分块兼容模式。长台本每页预览 200 行，导出使用完整结果。
-
-- 📄 **全格式专业配音台本导出**
-  - **Word (`.docx`)**：完美兼容 Microsoft Word 原生 `<w:ruby>` 振假名结构（假名位于汉字正上方），正文字号、假名字号、行间距自由调节。
-  - **字幕 (`.srt`)**：导入保留字幕序号、时间轴和多行分组；导出采用括号注音。修改正文时，只有行数仍与原分组一致才保留时间轴；其他情况生成每行固定间隔的时间轴。
-  - **纯文本 (`.txt`)**：干净整洁的标注纯文本。
-
-- 📁 **批量文件处理中心**
-  - 支持拖拽多文件同时导入，自动化并行队列注音，一键批量生成导出。
-
-- 💻 **独立原生桌面程序**
-  - 提供单文件绿色版 `FuriganaDubbingStudio.exe`，免安装任何环境，双击即用。
+100% 本地运行，离线可用，不上传任何文本。
 
 ---
 
-## 🎨 设计系统 (Design System)
+## 界面预览
 
-本项目遵循 **Clean / Shadcn** 现代设计系统规范：
-- **中性优雅色盘**：基于现代 Slate/Zinc 灰度层级，告别刺眼对比与陈旧拟物，保证长文阅读与长时间配音校对的视觉舒适度。
-- **清晰层级与边框系统**：采用细微精密边框（`border-slate-200/80`）与微层次投影（`shadow-sm / shadow-md`）勾勒卡片结构，视觉层级分明。
-- **现代化交互反馈**：按钮与操作项具备平滑过渡动画（`transition-all duration-150`）、悬浮微凸升与精准的 Active 按压反馈。
-- **无障碍与可读性优化**：假名注音展示区采用柔和背景与高对比度文字排版，支持大字号与多音字来源色彩高亮标记。
+### 主工作台
+左侧输入原文，右侧实时显示注音排版。支持平假名、片假名、罗马音切换与长文分页。
+
+<p align="center">
+  <img src="docs/images/workbench-preview.png" alt="工作台" width="850" />
+</p>
+
+### 点击校对与词组整体注音
+点击汉字弹出候选读音与所在短句。支持向右扩展圈选词组（如将「二」扩展为「二人」并注「ふたり」）。确认后的读音会自动学习到当前台本相同语境中。
+
+<p align="center">
+  <img src="docs/images/reading-correction.png" alt="校对浮窗" width="850" />
+</p>
+
+### 专名词典
+管理角色名、地名等特殊读音。长词匹配优先，支持 JSON 导入导出。
+
+<p align="center">
+  <img src="docs/images/glossary-manager.png" alt="专名词典" width="850" />
+</p>
+
+### 批量处理
+支持批量导入 `.txt`、`.srt`、`.docx`，按文件名自动提取标题并并行注音导出。
+
+<p align="center">
+  <img src="docs/images/batch-processing.png" alt="批量处理" width="850" />
+</p>
 
 ---
 
-## 🛠️ 技术栈 (Tech Stack)
+## 功能清单
 
-* **前端框架**：[Next.js 16](https://nextjs.org/) + [React 19](https://react.dev/)
-* **样式系统**：[Tailwind CSS v4](https://tailwindcss.com/)
-* **分词注音**：Kuromoji（网页与 PyWebView 桌面版）；独立旧 Python 界面使用 Fugashi + UniDic Lite
-* **Word 导入与导出**：JSZip + 原生 DOMParser 保留原注音；[docx](https://docx.js.org/) 生成标准 Word Ruby
-* **桌面端内核**：[Python 3](https://python.org/) + [PyWebView](https://pywebview.flowrl.com/) + [PyInstaller](https://pyinstaller.org/)
+- **上下文形态素引擎**：基于本地 Kuromoji，集成多音字消除规则与量词音变表。
+- **三种注音视角**：平假名（初学）、片假名（进阶）、罗马音（拼读辅助）。
+- **Web Worker 异步处理**：后台分词计算，大段文本输入不卡顿；实时进度显示与防抖中断。
+- **交互式校对**：
+  - 点击汉字直接修改，展示前后文短句对照。
+  - 支持向右扩展词组整体标注。
+  - 语境记忆：同篇文本内相同语境的词自动套用校对结果。
+  - 优先级：人工校对 > 原文自带注音 > 语境记忆 > 专名词典 > 自动分词。
+- **多格式导入与导出**：
+  - **Word (`.docx`)**：原生 `<w:ruby>` 上标排版，支持导入已带注音的 Word 文档。
+  - **字幕 (`.srt`)**：保留时间轴与分段，导出带注音字幕。
+  - **纯文本 (`.txt`)**：干净的纯文本标注。
+- **数据持久化**：基于文本内容 SHA-256 指纹索引，修改标题不丢失校对记录。
 
 ---
 
-## 🚀 快速上手 (Quick Start)
+## 快速上手
 
-### 1. 克隆仓库
+### 依赖与启动
 
 ```bash
 git clone https://github.com/Cheese-nya/furigana.git
 cd furigana
-```
-
-### 2. 安装依赖
-
-```bash
 npm install
-```
-
-### 3. 本地开发调试
-
-```bash
 npm run dev
 ```
-打开浏览器访问 [http://localhost:3000](http://localhost:3000)。
 
-### 4. 静态导出与打包 Windows EXE
+浏览器打开 `http://localhost:3000`。
 
-在 Windows 构建机上安装 Node.js、Python 3 和桌面打包依赖：
-```bash
-npm ci
-pip install pywebview pyinstaller
-npm run package:exe
-```
-该命令构建 `out/` 并将页面、词典一起打包，生成根目录下的 **`FuriganaDubbingStudio.exe`**。此桌面版无需 Fugashi、Sudachi 或 UniDic；这些依赖仅用于独立旧 Python 界面或可选对照评估。Windows 使用 PyWebView 的 WebView2 渲染环境。
-
-离线注音、导入与导出不调用外部服务。校对记录保存于用户数据目录，重新打包程序不会覆盖。Linux 环境只能验证网页产物与桌面桥接逻辑，Windows EXE 需要在 Windows 上构建并验证。
-
-### 5. 验证与真实台本评估
+### 运行测试
 
 ```bash
 npm test
-python -m unittest discover -s tests -p "test_*.py"
-node tools/audit-scripts.mjs "台本目录" audit.json
 ```
 
-评估工具只读原台本，检查正文完整性并对比文件已有注音。详细结果和可选 Sudachi／MeCab 对照流程见 [离线引擎评估报告](docs/offline-engine-evaluation.md)。
+### 打包 Windows 单文件 EXE
 
-新版存储格式、迁移边界及 Worker 验证流程见 [校对存储与异步注音说明](docs/correction-database-and-worker.md)。浏览器回归脚本 `tools/check-browser.mjs` 使用可选 Playwright，验证生产静态产物中的词典加载、数据迁移、词典复用、任务取消和降级；不会把测试依赖打包进桌面程序。
+在 Windows 环境下执行：
+
+```bash
+pip install pywebview pyinstaller
+npm run package:exe
+```
+
+在根目录生成绿色单文件 `FuriganaDubbingStudio.exe`。
 
 ---
 
-## 📁 目录结构 (Project Structure)
+## 技术栈
+
+- **前端**：Next.js 16 + React 19 + Tailwind CSS v4
+- **分词引擎**：Kuromoji.js（Web Worker 离线运行）
+- **文档处理**：docx、JSZip、xmldom
+- **桌面包装**：PyWebView (WebView2) + PyInstaller
+
+---
+
+## 目录结构
 
 ```text
 furigana/
 ├── app/
-│   ├── components/       # 现代 UI 核心组件 (Sidebar, Modal, GlossaryModal 等)
-│   ├── utils/            # 假名分词消歧、Word 原生 Ruby 导出器等
-│   ├── globals.css       # 核心 Design System CSS 变量与设计规范 Token
-│   ├── layout.tsx        # 根布局容器
-│   └── page.tsx          # 假名配音台本主业务界面
-├── public/               # 静态资源 (Logo, 词典文件, 打赏二维码)
-├── app_icon.ico          # Windows 原生多分辨率应用程序图标
-├── desktop_runner.py     # PyWebView 桌面端启动核心
-├── exporter.py           # Python 端多格式导出脚本
-├── furigana_engine.py    # Python 端形态素与消歧引擎
-├── tools/                # 只读真实台本评估与可选引擎对照
-├── RELEASE_NOTES.md      # 版本更新发布说明
-├── LICENSE               # MIT 开源协议
-└── README.md             # 仓库说明文档
+│   ├── components/      # UI 组件（Sidebar, Modal, GlossaryModal 等）
+│   ├── utils/           # 分词引擎、消歧规则、Word/SRT 导入导出
+│   ├── workers/         # 独立 Web Worker
+│   └── page.tsx         # 核心交互页面
+├── docs/images/         # 界面截图与说明文档
+├── public/dict/         # 离线分词词典数据
+├── tests/               # 自动化单元测试
+└── desktop_runner.py    # 桌面版桥接入口
 ```
 
 ---
 
-## ☕ 支持与打赏 (Sponsor)
+## 开源协议
 
-如果您觉得这个工具有所帮助，欢迎为作者集齐芝士碎片 🧀！
-
-<div align="center">
-  <img src="public/reward_qrcode.png" alt="Reward QR Code" width="220" />
-  <p><b>チーズ@beimisama</b></p>
-</div>
-
----
-
-## 📄 开源协议 (License)
-
-本项目基于 [MIT License](LICENSE) 协议开源。
+本项目基于 [MIT](LICENSE) 协议开源。
