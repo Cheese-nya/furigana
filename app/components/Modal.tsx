@@ -86,26 +86,26 @@ export const Modal: React.FC<ModalProps> = ({
     >
       {/* Overlay Backdrop */}
       <div
-        className="fixed inset-0 bg-gray-600/30 backdrop-blur-xs transition-opacity duration-200"
+        className="fixed inset-0 bg-zinc-950/40 backdrop-blur-xs transition-opacity duration-200"
         onClick={onClose}
         aria-hidden="true"
       />
 
-      {/* Modal Content - Neumorphic Convex Card */}
+      {/* Modal Content - Clean Shadcn Card */}
       <div
         ref={modalRef}
         tabIndex={-1}
-        className={`relative w-full ${maxWidthClasses[maxWidth]} bg-[#e0e5ec] rounded-2xl shadow-[12px_12px_24px_#b8bcc2,-12px_-12px_24px_#ffffff] flex flex-col transform transition-all duration-200 outline-none p-6 md:p-8`}
+        className={`relative w-full ${maxWidthClasses[maxWidth]} bg-white rounded-2xl border border-zinc-200 shadow-xl flex flex-col transform transition-all duration-200 outline-none p-6 sm:p-7`}
       >
         {/* Header */}
-        <div className="flex items-center justify-between pb-6">
-          <h2 id={titleId} className="text-2xl font-semibold text-gray-800">
+        <div className="flex items-center justify-between pb-5 border-b border-zinc-100 mb-5">
+          <h2 id={titleId} className="text-xl font-semibold text-zinc-900 tracking-tight">
             {title}
           </h2>
           <button
             onClick={onClose}
             aria-label="关闭"
-            className="w-9 h-9 rounded-xl bg-[#e0e5ec] shadow-[4px_4px_8px_#b8bcc2,-4px_-4px_8px_#ffffff] hover:shadow-[2px_2px_4px_#b8bcc2,-2px_-2px_4px_#ffffff] active:shadow-[inset_2px_2px_4px_#b8bcc2,inset_-2px_-2px_4px_#ffffff] flex items-center justify-center text-gray-600 transition-all duration-200"
+            className="w-8 h-8 rounded-lg text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 flex items-center justify-center transition-colors"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -114,13 +114,13 @@ export const Modal: React.FC<ModalProps> = ({
         </div>
 
         {/* Body */}
-        <div className="overflow-y-auto max-h-[calc(100vh-200px)] text-gray-600">
+        <div className="overflow-y-auto max-h-[calc(100vh-200px)] text-zinc-600">
           {children}
         </div>
 
         {/* Footer */}
         {footer && (
-          <div className="pt-6 flex justify-end gap-3">
+          <div className="pt-5 mt-5 border-t border-zinc-100 flex justify-end gap-3">
             {footer}
           </div>
         )}

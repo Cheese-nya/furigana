@@ -7,40 +7,38 @@
 
 @layer base {
   body {
-    background-color: #e0e5ec;
-    color: #4a5568;
+    background-color: #f8fafc;
+    color: #09090b;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
     min-height: 100vh;
     overflow-x: hidden;
   }
 }
 
-/* Neumorphic Scrollbar */
+/* Modern Minimal Scrollbar */
 ::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
+  width: 6px;
+  height: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: #e0e5ec;
-  box-shadow: inset 2px 2px 5px #b8bcc2, inset -2px -2px 5px #ffffff;
+  background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: #e0e5ec;
-  border-radius: 5px;
-  box-shadow: 2px 2px 5px #b8bcc2, -2px -2px 5px #ffffff;
+  background: #d4d4d8;
+  border-radius: 9999px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  box-shadow: 1px 1px 3px #b8bcc2, -1px -1px 3px #ffffff;
+  background: #a1a1aa;
 }
 
 * {
   scrollbar-width: thin;
-  scrollbar-color: #b8bcc2 #e0e5ec;
+  scrollbar-color: #d4d4d8 transparent;
 }
 
 /* Keep Japanese prose in inline flow so token boundaries add no spaces. */
 .script-line {
-  font-family: "Yu Gothic", "Noto Sans JP", "Meiryo", sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, "Yu Gothic", "Noto Sans JP", "Hiragino Kaku Gothic ProN", "Meiryo", sans-serif;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   min-height: 1lh;
@@ -54,11 +52,10 @@
 .script-line rt {
   text-align: center;
   line-height: 1;
+  font-family: -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  color: #2563eb;
+  font-weight: 600;
+  user-select: none;
 }
 
-/* Ruby Reading alignment */
-rt {
-  font-family: -apple-system, system-ui, sans-serif;
-  color: #3182ce;
-  font-weight: 600;
-}
+

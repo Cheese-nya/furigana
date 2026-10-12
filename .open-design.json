@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "designSystem": {
+    "slug": "shadcn",
+    "path": "design-systems/shadcn"
+  },
+  "skill": {
+    "slug": "web-prototype",
+    "path": "design-templates/web-prototype",
+    "kind": "design-template",
+    "mode": "prototype"
+  },
+  "boundAt": "2026-10-12T10:47:00Z"
+}

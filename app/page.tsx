@@ -521,12 +521,12 @@ export default function DubbingStudioApp() {
     setIsBatchDoneModalOpen(true);
   };
 
-  // Neumorphism Utility Style Classes
-  const neuCard = "bg-[#e0e5ec] rounded-2xl shadow-[8px_8px_16px_#b8bcc2,-8px_-8px_16px_#ffffff]";
-  const neuButton = "bg-[#e0e5ec] rounded-xl shadow-[6px_6px_12px_#b8bcc2,-6px_-6px_12px_#ffffff] hover:shadow-[4px_4px_8px_#b8bcc2,-4px_-4px_8px_#ffffff] active:shadow-[inset_4px_4px_8px_#b8bcc2,inset_-4px_-4px_8px_#ffffff] transition-all duration-200 text-gray-700 font-medium";
-  const neuButtonActive = "bg-[#e0e5ec] rounded-xl shadow-[inset_4px_4px_8px_#b8bcc2,inset_-4px_-4px_8px_#ffffff] text-blue-600 font-semibold transition-all duration-200";
-  const neuInput = "bg-[#e0e5ec] rounded-xl shadow-[inset_4px_4px_8px_#b8bcc2,inset_-4px_-4px_8px_#ffffff] focus:shadow-[inset_6px_6px_12px_#b8bcc2,inset_-6px_-6px_12px_#ffffff] focus:outline-none placeholder:text-gray-400 transition-shadow duration-200 text-gray-800";
-  const neuBadge = "px-3 py-1 bg-[#e0e5ec] rounded-lg shadow-[inset_2px_2px_4px_#b8bcc2,inset_-2px_-2px_4px_#ffffff] text-xs font-semibold text-gray-600";
+  // Shadcn Minimal Utility Style Classes
+  const neuCard = "bg-white rounded-xl border border-zinc-200/80 shadow-xs";
+  const neuButton = "bg-white border border-zinc-200 rounded-lg text-zinc-700 hover:bg-zinc-50 hover:text-zinc-950 active:bg-zinc-100 shadow-xs transition-colors font-medium";
+  const neuButtonActive = "bg-zinc-900 border border-zinc-900 text-white rounded-lg shadow-xs font-medium transition-colors";
+  const neuInput = "bg-white border border-zinc-200 rounded-lg text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-900 placeholder:text-zinc-400 shadow-xs transition-all";
+  const neuBadge = "px-2.5 py-0.5 bg-zinc-100 border border-zinc-200/80 rounded-full text-xs font-medium text-zinc-600";
 
   // Sidebar navigation items
   const sidebarItems = [
@@ -566,7 +566,7 @@ export default function DubbingStudioApp() {
   ];
 
   return (
-    <main className="relative min-h-screen bg-[#e0e5ec] text-gray-700 pb-12">
+    <main className="relative min-h-screen bg-zinc-50/60 text-zinc-900 pb-12">
       {/* Sidebar Component */}
       <Sidebar
         isOpen={isSidebarOpen}
@@ -575,23 +575,23 @@ export default function DubbingStudioApp() {
         title="假名标注工具"
       />
 
-      <div className="min-h-screen flex flex-col max-w-7xl mx-auto px-4 md:px-6 pt-6">
+      <div className="min-h-screen flex flex-col max-w-7xl mx-auto px-4 md:px-6 pt-5">
         {/* Navbar */}
-        <nav className={`${neuCard} px-6 py-4 flex items-center justify-between mb-8`}>
+        <nav className={`${neuCard} px-5 py-3.5 flex items-center justify-between mb-6`}>
           <div className="flex items-center gap-4">
             <button
               onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-              className={`${neuButton} px-3 py-2 flex items-center justify-center`}
+              className={`${neuButton} px-2.5 py-2 flex items-center justify-center`}
               aria-label="打开侧边栏"
             >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+              <svg className="w-4.5 h-4.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
               </svg>
             </button>
 
             <div className="flex items-center gap-3">
-              <img src="./logo.png" alt="Logo" className="w-8 h-8 rounded-xl shadow-[4px_4px_8px_#b8bcc2,-4px_-4px_8px_#ffffff] object-cover" />
-              <span className="font-bold text-xl md:text-2xl tracking-tight text-gray-800">
+              <img src="./logo.png" alt="Logo" className="w-8 h-8 rounded-lg border border-zinc-200/80 object-cover" />
+              <span className="font-semibold text-lg md:text-xl tracking-tight text-zinc-900">
                 Furigana Dubbing Studio
               </span>
               <span className={neuBadge}>
@@ -600,16 +600,16 @@ export default function DubbingStudioApp() {
             </div>
           </div>
 
-          <div className="hidden md:flex items-center gap-4">
+          <div className="hidden md:flex items-center gap-2">
             <button
               onClick={() => setActiveTab('editor')}
-              className={`${activeTab === 'editor' ? neuButtonActive : neuButton} px-4 py-2 text-sm`}
+              className={`${activeTab === 'editor' ? neuButtonActive : neuButton} px-3.5 py-1.5 text-xs`}
             >
               📝 台本编辑器
             </button>
             <button
               onClick={() => setActiveTab('batch_files')}
-              className={`${activeTab === 'batch_files' ? neuButtonActive : neuButton} px-4 py-2 text-sm`}
+              className={`${activeTab === 'batch_files' ? neuButtonActive : neuButton} px-3.5 py-1.5 text-xs`}
             >
               📁 批量处理中心
             </button>
@@ -618,30 +618,30 @@ export default function DubbingStudioApp() {
 
         {/* PAGE VIEW 1: EDITOR PAGE */}
         {activeTab === 'editor' && (
-          <section className="flex-1 flex flex-col gap-8">
+          <section className="flex-1 flex flex-col gap-6">
             {/* Banner Section */}
-            <div className={`${neuCard} p-8 md:p-12 flex flex-col items-center justify-center text-center`}>
-              <h1 className="font-bold text-3xl md:text-4xl lg:text-5xl tracking-tight mb-4 text-gray-800">
+            <div className={`${neuCard} p-6 md:p-8 flex flex-col items-center justify-center text-center`}>
+              <h1 className="font-semibold text-2xl md:text-3xl tracking-tight mb-2 text-zinc-900">
                 日语假名配音台本处理系统
               </h1>
-              <p className="text-sm md:text-base max-w-xl text-gray-600 bg-[#e0e5ec] px-4 py-2 rounded-xl shadow-[inset_2px_2px_4px_#b8bcc2,inset_-2px_-2px_4px_#ffffff]">
-                Neumorphism Edition • 默认小四字体 (16px) • 高精度前后文消歧注音
+              <p className="text-xs md:text-sm text-zinc-500 max-w-xl">
+                专业高信息密度工作台 • 默认小四字体 (16px) • 高精度前后文消歧注音
               </p>
             </div>
 
-            {/* Options Bar - Simplified Clean Logic without AI / Translation toggles */}
-            <div className={`${neuCard} p-6 flex flex-wrap items-center justify-between gap-6`}>
-              <div className="flex flex-col sm:flex-row gap-4 sm:items-center">
-                <span className="font-semibold text-sm text-gray-800">注音模式:</span>
-                <button type="button" disabled={!correctionsReady} className={`${neuButton} px-3 py-2 text-xs disabled:opacity-50`} onClick={() => { advanceControllerRef.current?.abort(); setIsGlossaryOpen(true); }}>
+            {/* Options Bar */}
+            <div className={`${neuCard} p-4 md:p-5 flex flex-wrap items-center justify-between gap-4`}>
+              <div className="flex flex-col sm:flex-row gap-3 sm:items-center">
+                <span className="font-medium text-xs text-zinc-600">注音模式:</span>
+                <button type="button" disabled={!correctionsReady} className={`${neuButton} px-3 py-1.5 text-xs disabled:opacity-50`} onClick={() => { advanceControllerRef.current?.abort(); setIsGlossaryOpen(true); }}>
                   专名词典 ({glossaryEntries.length})
                 </button>
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-1.5">
                   {(['hiragana', 'katakana', 'romaji'] as const).map(type => (
                     <button
                       key={type}
                       onClick={() => { setEditingToken(null); setRubyType(type); }}
-                      className={`${rubyType === type ? neuButtonActive : neuButton} px-3.5 py-2 text-xs`}
+                      className={`${rubyType === type ? neuButtonActive : neuButton} px-3 py-1.5 text-xs`}
                     >
                       {type === 'hiragana' ? '平假名' : type === 'katakana' ? '片假名' : '罗马音'}
                     </button>
@@ -649,67 +649,67 @@ export default function DubbingStudioApp() {
                 </div>
               </div>
 
-              <div className="flex flex-wrap items-center gap-6">
+              <div className="flex flex-wrap items-center gap-3">
                 <details className="relative">
-                  <summary className="cursor-pointer list-none rounded-lg px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-white/40">排版设置</summary>
-                  <div className="absolute right-0 top-full z-10 mt-2 grid min-w-64 gap-4 rounded-lg bg-[#e0e5ec] p-4 shadow-[6px_6px_12px_#b8bcc2,-6px_-6px_12px_#ffffff]">
-                <div className="flex items-center gap-3">
-                  <span className="font-semibold text-sm text-gray-800">正文字号:</span>
-                  <div className="flex items-center bg-[#e0e5ec] rounded-xl shadow-[inset_2px_2px_4px_#b8bcc2,inset_-2px_-2px_4px_#ffffff] p-1">
+                  <summary className="cursor-pointer list-none rounded-lg px-3 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-100 transition-colors">排版设置 ▾</summary>
+                  <div className="absolute right-0 top-full z-10 mt-2 grid min-w-64 gap-3.5 rounded-xl border border-zinc-200 bg-white p-4 shadow-lg">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="font-medium text-xs text-zinc-700">正文字号:</span>
+                  <div className="flex items-center border border-zinc-200 rounded-lg overflow-hidden bg-zinc-50/50">
                     <button
                       onClick={() => setFontSize(Math.max(12, fontSize - 2))}
-                      className="px-2.5 py-1 font-bold text-gray-600 hover:text-gray-900"
+                      className="px-2.5 py-1 text-xs font-semibold text-zinc-600 hover:bg-zinc-100 transition-colors"
                     >
                       -
                     </button>
-                    <span className="px-3 py-1 font-semibold text-xs text-center text-gray-800 min-w-[50px]">
+                    <span className="px-2.5 py-1 font-medium text-xs text-center text-zinc-900 min-w-[48px]">
                       {fontSize}px
                     </span>
                     <button
                       onClick={() => setFontSize(Math.min(28, fontSize + 2))}
-                      className="px-2.5 py-1 font-bold text-gray-600 hover:text-gray-900"
+                      className="px-2.5 py-1 text-xs font-semibold text-zinc-600 hover:bg-zinc-100 transition-colors"
                     >
                       +
                     </button>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-3">
-                  <span className="font-semibold text-sm text-gray-800">假名字号:</span>
-                  <div className="flex items-center bg-[#e0e5ec] rounded-xl shadow-[inset_2px_2px_4px_#b8bcc2,inset_-2px_-2px_4px_#ffffff] p-1">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="font-medium text-xs text-zinc-700">假名字号:</span>
+                  <div className="flex items-center border border-zinc-200 rounded-lg overflow-hidden bg-zinc-50/50">
                     <button
                       onClick={() => setRubyFontSize(Math.max(8, rubyFontSize - 1))}
-                      className="px-2.5 py-1 font-bold text-gray-600 hover:text-gray-900"
+                      className="px-2.5 py-1 text-xs font-semibold text-zinc-600 hover:bg-zinc-100 transition-colors"
                     >
                       -
                     </button>
-                    <span className="px-3 py-1 font-semibold text-xs text-center text-gray-800 min-w-[50px]">
+                    <span className="px-2.5 py-1 font-medium text-xs text-center text-zinc-900 min-w-[48px]">
                       {rubyFontSize}px
                     </span>
                     <button
                       onClick={() => setRubyFontSize(Math.min(18, rubyFontSize + 1))}
-                      className="px-2.5 py-1 font-bold text-gray-600 hover:text-gray-900"
+                      className="px-2.5 py-1 text-xs font-semibold text-zinc-600 hover:bg-zinc-100 transition-colors"
                     >
                       +
                     </button>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-3">
-                  <span className="font-semibold text-sm text-gray-800">行间距:</span>
-                  <div className="flex items-center bg-[#e0e5ec] rounded-xl shadow-[inset_2px_2px_4px_#b8bcc2,inset_-2px_-2px_4px_#ffffff] p-1">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="font-medium text-xs text-zinc-700">行间距:</span>
+                  <div className="flex items-center border border-zinc-200 rounded-lg overflow-hidden bg-zinc-50/50">
                     <button
                       onClick={() => setLineSpacing(Number(Math.max(1.2, lineSpacing - 0.2).toFixed(1)))}
-                      className="px-2.5 py-1 font-bold text-gray-600 hover:text-gray-900"
+                      className="px-2.5 py-1 text-xs font-semibold text-zinc-600 hover:bg-zinc-100 transition-colors"
                     >
                       -
                     </button>
-                    <span className="px-3 py-1 font-semibold text-xs text-center text-gray-800 min-w-[50px]">
+                    <span className="px-2.5 py-1 font-medium text-xs text-center text-zinc-900 min-w-[48px]">
                       {lineSpacing}x
                     </span>
                     <button
                       onClick={() => setLineSpacing(Number(Math.min(3.0, lineSpacing + 0.2).toFixed(1)))}
-                      className="px-2.5 py-1 font-bold text-gray-600 hover:text-gray-900"
+                      className="px-2.5 py-1 text-xs font-semibold text-zinc-600 hover:bg-zinc-100 transition-colors"
                     >
                       +
                     </button>
@@ -719,27 +719,27 @@ export default function DubbingStudioApp() {
                   </div>
                 </details>
                 <div className="flex items-center gap-2">
-                  <span className={`text-xs ${dictionaryStatus === 'degraded' ? 'text-amber-800 bg-amber-100' : 'text-emerald-700 bg-emerald-100/90'} px-3 py-1.5 rounded-xl font-medium shadow-[inset_1px_1px_2px_#a7f3d0,inset_-1px_-1px_2px_#ffffff] flex items-center gap-1`}>
+                  <span className={`text-xs ${dictionaryStatus === 'degraded' ? 'text-amber-700 bg-amber-50 border-amber-200' : 'text-emerald-700 bg-emerald-50 border-emerald-200'} px-2.5 py-1 rounded-full font-medium border flex items-center gap-1`}>
                     {dictionaryLabel}
                   </span>
                 </div>
               </div>
             </div>
 
-            {dictionaryStatus === 'degraded' && <p role="alert" className="text-sm text-amber-800">
+            {dictionaryStatus === 'degraded' && <p role="alert" className="text-xs font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-3">
               离线词典加载失败，当前基础词表可能漏注或误注。请重新加载词典后检查读音。
-              <button type="button" onClick={runDependencyRepair} className="ml-2 underline">重新加载</button>
+              <button type="button" onClick={runDependencyRepair} className="ml-2 underline font-semibold">重新加载</button>
             </p>}
-            {isImporting && <p role="status" className="text-sm">正在读取台本…</p>}
-            {importError && <p role="alert" className="text-sm text-red-600">{importError}</p>}
+            {isImporting && <p role="status" className="text-xs text-zinc-500">正在读取台本…</p>}
+            {importError && <p role="alert" className="text-xs font-medium text-red-600 bg-red-50 border border-red-200 rounded-lg p-3">{importError}</p>}
 
             {/* Workspace Dual Pane */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* Left: Input Text Editor */}
-              <div className={`${neuCard} flex flex-col p-6`}>
-                <div className="pb-4 flex flex-wrap items-center justify-between gap-3 border-b border-gray-300/40 mb-3">
+              <div className={`${neuCard} flex flex-col p-5`}>
+                <div className="pb-3 flex flex-wrap items-center justify-between gap-3 border-b border-zinc-100 mb-3">
                   <div className="flex items-center gap-2 flex-1 min-w-[220px]">
-                    <span className="font-semibold text-sm text-gray-800 flex-shrink-0">
+                    <span className="font-medium text-xs text-zinc-700 flex-shrink-0">
                       📝 台本标题:
                     </span>
                     <input
@@ -748,7 +748,7 @@ export default function DubbingStudioApp() {
                       disabled={!correctionsReady || isImporting}
                       onChange={(e) => setDocTitle(e.target.value)}
                       placeholder="输入台本标题（用于 Word 导出标题）"
-                      className={`${neuInput} px-3 py-1 text-sm font-semibold text-gray-800 w-full max-w-[280px]`}
+                      className={`${neuInput} px-3 py-1.5 text-xs font-medium text-zinc-900 w-full max-w-[280px]`}
                     />
                   </div>
                   <div className="flex items-center gap-2">
@@ -762,7 +762,7 @@ export default function DubbingStudioApp() {
                     <button
                       disabled={!correctionsReady || isImporting}
                       onClick={() => editorFileInputRef.current?.click()}
-                      className={`${neuButton} px-3.5 py-1.5 text-xs font-semibold text-blue-700 flex items-center gap-1`}
+                      className={`${neuButton} px-3 py-1.5 text-xs font-medium text-blue-700 flex items-center gap-1`}
                       title="导入 .txt, .srt 或 .docx 文件，将自动将标题设置为文件名"
                     >
                       📂 导入文本
@@ -781,7 +781,7 @@ export default function DubbingStudioApp() {
                         setSrtCues([]);
                         setDocTitle('日语假名配音台本');
                       }}
-                      className={`${neuButton} px-3 py-1.5 text-xs text-gray-600`}
+                      className={`${neuButton} px-3 py-1.5 text-xs text-zinc-600`}
                     >
                       清空
                     </button>
@@ -792,20 +792,20 @@ export default function DubbingStudioApp() {
                   disabled={!correctionsReady || isImporting}
                   onChange={(e) => { setEditingToken(null); setRawText(e.target.value); }}
                   placeholder="请输入日语台本或点击上方「导入文本」..."
-                  className={`${neuInput} w-full h-[min(58vh,680px)] min-h-[280px] p-4 resize-y`}
+                  className={`${neuInput} w-full h-[min(58vh,680px)] min-h-[280px] p-4 resize-y leading-relaxed`}
                   style={{ fontSize: `${fontSize}px`, lineHeight: lineSpacing }}
                 />
               </div>
 
               {/* Right: Live Preview */}
-              <div className={`${neuCard} flex flex-col p-6`}>
-                <div className="pb-4 flex items-center justify-between border-b border-gray-300/40 mb-3">
-                  <div className="flex items-center gap-3">
-                    <h3 className="font-semibold text-lg text-gray-800">
-                      👀 实时假名注音与排版预览
+              <div className={`${neuCard} flex flex-col p-5`}>
+                <div className="pb-3 flex items-center justify-between border-b border-zinc-100 mb-3">
+                  <div className="flex items-center gap-2.5">
+                    <h3 className="font-semibold text-sm text-zinc-900 flex items-center gap-1.5">
+                      <span>👀</span> 实时假名注音与排版预览
                     </h3>
                     {isKuromojiLoading && (
-                      <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded-full shadow-[inset_1px_1px_2px_#d1d5db,inset_-1px_-1px_2px_#ffffff] flex items-center gap-1">
+                      <span className="text-xs bg-amber-50 text-amber-700 border border-amber-200 px-2 py-0.5 rounded-full flex items-center gap-1">
                         <svg className="animate-spin h-3 w-3" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
                         加载词典...
                       </span>
@@ -815,51 +815,51 @@ export default function DubbingStudioApp() {
                     {annotatedLines.length} 行
                   </span>
                 </div>
-                <p className="text-xs text-gray-500 mb-2">点击汉字修改读音；可扩展标注范围，设置词组整体注音。已有 Word 注音会保留。</p>
-                <div role="status" aria-live="polite" className="mb-3 text-xs text-gray-700">
+                <p className="text-xs text-zinc-500 mb-2">点击汉字修改读音；可扩展标注范围，设置词组整体注音。已有 Word 注音会保留。</p>
+                <div role="status" aria-live="polite" className="mb-2.5 text-xs text-zinc-600">
                   {isAnnotating ? `正在注音 ${annotationProgress}% · 已完成 ${annotatedLines.length} 行` : '注音已完成，可校对和导出'}
                   {engine.mode === 'fallback' && ' · 当前使用分块兼容模式'}
                   {isAnnotating && <progress aria-label="注音进度" className="mt-1 w-full" value={annotationProgress} max={100} />}
                 </div>
-                {annotationError && <p role="alert" className="mb-3 text-sm text-red-700">注音失败：{annotationError}</p>}
-                {reviewError && <p role="alert" className="mb-3 text-sm text-red-700">{reviewError}</p>}
-                <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-gray-600 mb-3">
+                {annotationError && <p role="alert" className="mb-2.5 text-xs font-medium text-red-600 bg-red-50 border border-red-200 rounded-lg p-2.5">注音失败：{annotationError}</p>}
+                {reviewError && <p role="alert" className="mb-2.5 text-xs font-medium text-red-600 bg-red-50 border border-red-200 rounded-lg p-2.5">{reviewError}</p>}
+                <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-zinc-500 mb-3 pb-2 border-b border-zinc-100">
                   <div className="flex flex-wrap gap-x-3 gap-y-1" aria-label="注音来源统计">
                     <span>自动 {annotatedLines.flatMap(line => line.tokens).filter(token => token.hasKanji && token.readingSource === 'automatic').length}</span>
                     <span>专名词典 {annotatedLines.flatMap(line => line.tokens).filter(token => token.hasKanji && token.readingSource === 'glossary').length}</span>
                     <span>语境学习 {annotatedLines.flatMap(line => line.tokens).filter(token => token.hasKanji && token.readingSource === 'learned').length}</span>
                     <span>源文件 {annotatedLines.flatMap(line => line.tokens).filter(token => token.hasKanji && token.readingSource === 'source').length}</span>
                     <span>人工确认 {annotatedLines.flatMap(line => line.tokens).filter(token => token.hasKanji && token.readingSource === 'manual').length}</span>
-                    <button type="button" disabled={!reviewCount || isAnnotating} onClick={jumpToNextReview} className="font-semibold text-amber-800 underline disabled:opacity-50">
+                    <button type="button" disabled={!reviewCount || isAnnotating} onClick={jumpToNextReview} className="font-semibold text-amber-700 hover:text-amber-800 underline underline-offset-2 disabled:opacity-50">
                       待复核 {reviewCount} · 下一处
                     </button>
                   </div>
                   <div className="flex items-center gap-3">
                     {!correctionsReady && <span>正在读取校对记录...</span>}
                     {learnedReadings.length > 0 && (
-                      <button type="button" className="underline text-blue-700" onClick={() => setIsLearnedModalOpen(true)}>
+                      <button type="button" className="underline text-blue-700 hover:text-blue-800" onClick={() => setIsLearnedModalOpen(true)}>
                         已学语境 ({learnedReadings.length})
                       </button>
                     )}
-                    {documentCorrections.length > 0 && <button type="button" className="underline" onClick={() => {
+                    {documentCorrections.length > 0 && <button type="button" className="underline text-zinc-600 hover:text-zinc-900" onClick={() => {
                       setDatabase(previous => setScriptOverrides(previous, documentId, []));
                       setEditingToken(null);
                     }}>重置此台本校对</button>}
                   </div>
                 </div>
-                {correctionError && <p role="alert" className="text-xs text-red-600 mb-3">{correctionError}</p>}
-                {missingReadings > 0 && <p className="text-xs text-amber-800 mb-3">{missingReadings} 处汉字缺少读音，可点击补充。</p>}
-                {annotatedLines.some(line => line.tokens.some(token => token.annotationSuppressed)) && <p className="text-xs text-gray-600 mb-3">包含人工选择不注音的文字，不计入缺失读音。</p>}
-                {annotatedLines.length > 200 && <div className="mb-3 flex items-center justify-between gap-3 text-xs">
+                {correctionError && <p role="alert" className="text-xs font-medium text-red-600 bg-red-50 border border-red-200 rounded-lg p-2.5 mb-3">{correctionError}</p>}
+                {missingReadings > 0 && <p className="text-xs font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-2.5 mb-3">{missingReadings} 处汉字缺少读音，可点击补充。</p>}
+                {annotatedLines.some(line => line.tokens.some(token => token.annotationSuppressed)) && <p className="text-xs text-zinc-500 mb-3">包含人工选择不注音的文字，不计入缺失读音。</p>}
+                {annotatedLines.length > 200 && <div className="mb-3 flex items-center justify-between gap-3 text-xs text-zinc-600">
                   <button type="button" disabled={previewStart === 0} className="underline disabled:opacity-40" onClick={() => setPreviewPage(Math.max(0, previewStart / 200 - 1))}>上一页</button>
                   <span>预览第 {previewStart + 1}–{Math.min(previewStart + 200, annotatedLines.length)} 行，共 {annotatedLines.length} 行</span>
                   <button type="button" disabled={previewStart + 200 >= annotatedLines.length} className="underline disabled:opacity-40" onClick={() => setPreviewPage(previewStart / 200 + 1)}>下一页</button>
                 </div>}
-                <div lang="ja" className={`${neuInput} w-full h-[min(58vh,680px)] min-h-[280px] p-6 overflow-y-auto`}>
+                <div lang="ja" className={`${neuInput} w-full h-[min(58vh,680px)] min-h-[280px] p-5 overflow-y-auto`}>
                   {annotatedLines.slice(previewStart, previewStart + 200).map((line) => (
-                    <div key={line.id} className="border-b border-gray-300/50 pb-3 mb-4 last:border-0 last:mb-0">
-                      <div className="script-line text-gray-800 font-semibold" style={{ fontSize: `${fontSize}px`, lineHeight: lineSpacing }}>
-                        {line.speaker && <span>{line.speaker}：</span>}
+                    <div key={line.id} className="border-b border-zinc-100 pb-2.5 mb-3 last:border-0 last:mb-0">
+                      <div className="script-line text-zinc-900 font-medium" style={{ fontSize: `${fontSize}px`, lineHeight: lineSpacing }}>
+                        {line.speaker && <span className="text-zinc-500 mr-1">{line.speaker}：</span>}
                         {line.tokens.length === 0 && <br />}
                         {line.tokens.map((t, tidx) => {
                           const TokenElement = t.ruby ? 'ruby' : 'span';
@@ -868,7 +868,7 @@ export default function DubbingStudioApp() {
                               key={tidx}
                               id={t.hasKanji ? `ruby-token-${line.id}-${tidx}` : undefined}
                               onClick={() => { if (!isAnnotating) openTokenEditor(line.id, tidx); }}
-                              className={t.hasKanji ? `cursor-pointer hover:bg-blue-200/60 rounded transition-colors group relative ${t.needsReview ? 'decoration-amber-600 underline decoration-dotted underline-offset-4' : ''}` : ''}
+                              className={t.hasKanji ? `cursor-pointer hover:bg-blue-50 hover:text-blue-900 rounded-sm px-0.5 transition-colors group relative ${t.needsReview ? 'decoration-amber-500 underline decoration-dotted underline-offset-4' : ''}` : ''}
                               tabIndex={t.hasKanji ? 0 : undefined}
                               role={t.hasKanji ? 'button' : undefined}
                               onKeyDown={(event) => {
@@ -881,7 +881,7 @@ export default function DubbingStudioApp() {
                             >
                               {t.surface}
                               {t.ruby && (
-                                <rt className="text-blue-600 select-none group-hover:text-blue-800 font-bold" style={{ fontSize: `${rubyFontSize}px` }}>
+                                <rt className="text-blue-600 select-none group-hover:text-blue-700 font-semibold" style={{ fontSize: `${rubyFontSize}px` }}>
                                   {t.ruby}
                                 </rt>
                               )}
@@ -896,15 +896,15 @@ export default function DubbingStudioApp() {
             </div>
 
             {/* Quick Export Bar */}
-            <div className={`${neuCard} p-6 flex flex-col md:flex-row items-center justify-between gap-6`}>
+            <div className={`${neuCard} p-5 flex flex-col md:flex-row items-center justify-between gap-4`}>
               <div>
-                <h4 className="font-semibold text-lg text-gray-800 mb-1">单文件导出</h4>
-                <p className="text-sm text-gray-600">导出以「{docTitle}」命名的 Word (.docx)、SRT 字幕与 TXT 文本</p>
+                <h4 className="font-semibold text-sm text-zinc-900 mb-0.5">单文件导出</h4>
+                <p className="text-xs text-zinc-500">导出以「{docTitle}」命名的 Word (.docx)、SRT 字幕与 TXT 文本</p>
               </div>
-              <div className="flex flex-wrap items-center gap-3">
-                <button disabled={isExporting || isKuromojiLoading || isAnnotating || !!annotationError || !correctionsReady} onClick={() => handleExport('txt')} className={`${neuButton} px-4 py-2.5 text-sm`}>导出 TXT</button>
-                <button disabled={isExporting || isKuromojiLoading || isAnnotating || !!annotationError || !correctionsReady} onClick={() => handleExport('srt')} className={`${neuButton} px-4 py-2.5 text-sm`}>导出 SRT</button>
-                <button disabled={isExporting || isKuromojiLoading || isAnnotating || !!annotationError || !correctionsReady} onClick={() => handleExport('docx')} className={`${neuButton} text-blue-600 font-semibold px-6 py-2.5 text-sm`}>导出 Word (.docx)</button>
+              <div className="flex flex-wrap items-center gap-2.5">
+                <button disabled={isExporting || isKuromojiLoading || isAnnotating || !!annotationError || !correctionsReady} onClick={() => handleExport('txt')} className={`${neuButton} px-3.5 py-2 text-xs`}>导出 TXT</button>
+                <button disabled={isExporting || isKuromojiLoading || isAnnotating || !!annotationError || !correctionsReady} onClick={() => handleExport('srt')} className={`${neuButton} px-3.5 py-2 text-xs`}>导出 SRT</button>
+                <button disabled={isExporting || isKuromojiLoading || isAnnotating || !!annotationError || !correctionsReady} onClick={() => handleExport('docx')} className="rounded-lg bg-zinc-900 px-4 py-2 text-xs font-medium text-white hover:bg-zinc-800 disabled:opacity-50 transition-colors shadow-xs">导出 Word (.docx)</button>
               </div>
             </div>
           </section>
@@ -912,29 +912,29 @@ export default function DubbingStudioApp() {
 
         {/* PAGE VIEW 2: DEDICATED BATCH FILE PROCESSING PAGE */}
         {activeTab === 'batch_files' && (
-          <section className="flex-1 flex flex-col gap-8">
+          <section className="flex-1 flex flex-col gap-6">
             {/* Header Card */}
-            <div className={`${neuCard} p-8 md:p-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-6`}>
-              <div className="space-y-3 max-w-2xl">
+            <div className={`${neuCard} p-6 md:p-8 flex flex-col md:flex-row items-start md:items-center justify-between gap-6`}>
+              <div className="space-y-2.5 max-w-2xl">
                 <span className={neuBadge}>
                   📁 批量文件处理
                 </span>
-                <h2 className="font-bold text-2xl md:text-3xl lg:text-4xl text-gray-800 tracking-tight">
+                <h2 className="font-semibold text-xl md:text-2xl text-zinc-900 tracking-tight">
                   台本批量注音与导出
                 </h2>
-                <p className="text-sm md:text-base text-gray-600">
+                <p className="text-xs md:text-sm text-zinc-500 leading-relaxed">
                   拖拽或选择多个台本文件（支持 .txt, .srt, .docx），系统将根据各自文件名自动生成 Word 标题并注音导出。
                 </p>
               </div>
 
               <div className="flex flex-col gap-2">
-                <span className="font-semibold text-sm text-gray-800">目标导出格式：</span>
-                <div className="flex items-center gap-2">
+                <span className="font-medium text-xs text-zinc-700">目标导出格式：</span>
+                <div className="flex items-center gap-1.5">
                   {(['docx', 'srt', 'txt'] as const).map(fmt => (
                     <button
                       key={fmt}
                       onClick={() => setBatchTargetFormat(fmt)}
-                      className={`${batchTargetFormat === fmt ? neuButtonActive : neuButton} px-4 py-2 text-xs uppercase`}
+                      className={`${batchTargetFormat === fmt ? neuButtonActive : neuButton} px-3.5 py-1.5 text-xs uppercase`}
                     >
                       .{fmt}
                     </button>
@@ -947,16 +947,16 @@ export default function DubbingStudioApp() {
             <div
               onDragOver={(e) => e.preventDefault()}
               onDrop={handleDrop}
-              className={`${neuCard} border-2 border-dashed border-gray-300/80 p-12 text-center flex flex-col items-center justify-center gap-4 transition-all duration-200`}
+              className={`${neuCard} border-2 border-dashed border-zinc-200/90 hover:border-zinc-300 bg-zinc-50/30 p-10 text-center flex flex-col items-center justify-center gap-3.5 transition-colors`}
             >
-              <div className="w-16 h-16 rounded-2xl bg-[#e0e5ec] shadow-[inset_4px_4px_8px_#b8bcc2,inset_-4px_-4px_8px_#ffffff] flex items-center justify-center text-gray-500">
-                <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="w-12 h-12 rounded-xl bg-white border border-zinc-200 flex items-center justify-center text-zinc-500 shadow-xs">
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                 </svg>
               </div>
               <div>
-                <p className="font-semibold text-base text-gray-800">将台本文件拖拽至此处，或点击下方按钮选择</p>
-                <p className="text-xs text-gray-500 mt-1">支持格式：.txt / .srt / .docx（批量注音时以原文件名作为 Word 标题）</p>
+                <p className="font-medium text-sm text-zinc-900">将台本文件拖拽至此处，或点击下方按钮选择</p>
+                <p className="text-xs text-zinc-500 mt-1">支持格式：.txt / .srt / .docx（批量注音时以原文件名作为 Word 标题）</p>
               </div>
               <input
                 type="file"
@@ -968,7 +968,7 @@ export default function DubbingStudioApp() {
               />
               <button
                 onClick={() => fileInputRef.current?.click()}
-                className={`${neuButton} px-6 py-2.5 text-sm font-semibold text-blue-600 mt-2`}
+                className={`${neuButton} px-5 py-2 text-xs font-medium text-zinc-800 mt-1`}
               >
                 选择文件...
               </button>
@@ -976,38 +976,38 @@ export default function DubbingStudioApp() {
 
             {/* File List & Progress Cards */}
             {batchFiles.length > 0 && (
-              <div className={`${neuCard} p-6 flex flex-col gap-4`}>
-                <div className="flex items-center justify-between pb-2 border-b border-gray-300/50">
-                  <span className="font-semibold text-sm text-gray-800">
+              <div className={`${neuCard} p-5 flex flex-col gap-4`}>
+                <div className="flex items-center justify-between pb-2.5 border-b border-zinc-100">
+                  <span className="font-semibold text-xs text-zinc-800">
                     待处理队列 ({batchFiles.length} 个文件)
                   </span>
                   <button
                     onClick={clearBatchFiles}
                     disabled={isBatchProcessing}
-                    className={`${neuButton} px-3 py-1 text-xs text-red-500 hover:text-red-700`}
+                    className="text-xs text-red-600 hover:text-red-700 font-medium transition-colors"
                   >
                     清空列表
                   </button>
                 </div>
 
-                <div className="space-y-3 max-h-[350px] overflow-y-auto pr-2">
+                <div className="space-y-2 max-h-[350px] overflow-y-auto pr-1">
                   {batchFiles.map(file => (
                     <div
                       key={file.id}
-                      className="p-4 bg-[#e0e5ec] rounded-xl shadow-[inset_2px_2px_4px_#b8bcc2,inset_-2px_-2px_4px_#ffffff] flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                      className="p-3 bg-zinc-50/70 border border-zinc-200/70 rounded-lg flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs"
                     >
                       <div className="flex items-center gap-3 overflow-hidden">
-                        <div className="w-8 h-8 rounded-lg bg-[#e0e5ec] shadow-[2px_2px_4px_#b8bcc2,-2px_-2px_4px_#ffffff] flex items-center justify-center flex-shrink-0 text-xs font-bold text-gray-600 uppercase">
+                        <div className="w-7 h-7 rounded bg-white border border-zinc-200 flex items-center justify-center flex-shrink-0 text-[10px] font-bold text-zinc-600 uppercase">
                           {file.name.split('.').pop()}
                         </div>
                         <div className="truncate">
-                          <p className="font-medium text-sm text-gray-800 truncate">{file.name}</p>
-                          <p className="text-xs text-gray-500">{(file.size / 1024).toFixed(1)} KB {file.lineCount ? `• ${file.lineCount} 行` : ''}</p>
+                          <p className="font-medium text-xs text-zinc-900 truncate">{file.name}</p>
+                          <p className="text-[11px] text-zinc-500">{(file.size / 1024).toFixed(1)} KB {file.lineCount ? `• ${file.lineCount} 行` : ''}</p>
                           {file.error && <p role="alert" className="text-xs text-red-600 whitespace-normal">{file.error}</p>}
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-3 flex-shrink-0">
+                      <div className="flex items-center gap-2.5 flex-shrink-0">
                         {file.status === 'pending' && <span className={neuBadge}>等待中</span>}
                         {file.status === 'processing' && (
                           <span className="text-xs text-blue-600 font-semibold flex items-center gap-1.5">
@@ -1015,13 +1015,13 @@ export default function DubbingStudioApp() {
                             注音处理中
                           </span>
                         )}
-                        {file.status === 'done' && <span className="text-xs text-green-600 font-bold">✓ 已成功</span>}
-                        {file.status === 'error' && <span className="text-xs text-red-500 font-bold">✕ 失败</span>}
+                        {file.status === 'done' && <span className="text-xs text-emerald-600 font-semibold">✓ 已成功</span>}
+                        {file.status === 'error' && <span className="text-xs text-red-500 font-semibold">✕ 失败</span>}
 
                         <button
                           onClick={() => removeBatchFile(file.id)}
                           disabled={isBatchProcessing}
-                          className="w-7 h-7 rounded-lg bg-[#e0e5ec] shadow-[2px_2px_4px_#b8bcc2,-2px_-2px_4px_#ffffff] hover:shadow-[1px_1px_2px_#b8bcc2,-1px_-1px_2px_#ffffff] flex items-center justify-center text-gray-500 hover:text-red-500 text-xs"
+                          className="w-6 h-6 rounded text-zinc-400 hover:text-red-600 hover:bg-zinc-100 flex items-center justify-center text-xs transition-colors"
                         >
                           ✕
                         </button>
@@ -1030,15 +1030,15 @@ export default function DubbingStudioApp() {
                   ))}
                 </div>
 
-                <div className="pt-4 flex justify-end">
+                <div className="pt-3 border-t border-zinc-100 flex justify-end">
                   <button
                     onClick={processBatchQueue}
                     disabled={isBatchProcessing || isKuromojiLoading || !correctionsReady}
-                    className={`${isBatchProcessing ? neuButtonActive : neuButton} text-blue-600 px-8 py-3 text-sm font-semibold flex items-center gap-2`}
+                    className="rounded-lg bg-zinc-900 px-6 py-2.5 text-xs font-medium text-white hover:bg-zinc-800 disabled:opacity-50 flex items-center gap-2 transition-colors shadow-xs"
                   >
                     {isBatchProcessing ? (
                       <>
-                        <svg className="animate-spin h-4 w-4 text-blue-600" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+                        <svg className="animate-spin h-3.5 w-3.5 text-white" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
                         正在处理队列...
                       </>
                     ) : (
@@ -1062,26 +1062,26 @@ export default function DubbingStudioApp() {
         title="🛠️ 本地核心组件诊断"
       >
         <div className="space-y-4">
-          <p className="text-xs text-gray-500">
+          <p className="text-xs text-zinc-500">
             检查当前实际使用的离线词典和校对记录存储状态
           </p>
 
-          <div className="space-y-3">
+          <div className="space-y-2.5">
             {deps.map((dep, idx) => (
-              <div key={idx} className="p-3 bg-[#e0e5ec] rounded-xl shadow-[inset_2px_2px_4px_#b8bcc2,inset_-2px_-2px_4px_#ffffff] flex items-center justify-between">
+              <div key={idx} className="p-3 bg-zinc-50/80 border border-zinc-200/80 rounded-lg flex items-center justify-between">
                 <div>
-                  <div className="font-semibold text-xs text-gray-800">{dep.name}</div>
-                  <div className="text-[10px] text-gray-500">{dep.desc}</div>
+                  <div className="font-medium text-xs text-zinc-900">{dep.name}</div>
+                  <div className="text-[11px] text-zinc-500">{dep.desc}</div>
                 </div>
                 <div className="flex items-center gap-2">
                   {dep.status === 'ready' && (
-                    <span className="text-[11px] font-bold text-green-600 flex items-center gap-1">
-                      <span className="w-2 h-2 rounded-full bg-green-500"></span> 正常
+                    <span className="text-xs font-semibold text-emerald-600 flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> 正常
                     </span>
                   )}
-                  {dep.status === 'error' && <span className="text-xs font-bold text-red-600">异常</span>}
+                  {dep.status === 'error' && <span className="text-xs font-semibold text-red-600">异常</span>}
                   {dep.status === 'repairing' && (
-                    <span className="text-[11px] font-bold text-blue-500 flex items-center gap-1 animate-pulse">
+                    <span className="text-xs font-semibold text-blue-600 flex items-center gap-1 animate-pulse">
                       检查中...
                     </span>
                   )}
@@ -1094,13 +1094,13 @@ export default function DubbingStudioApp() {
             <button
               onClick={runDependencyRepair}
               disabled={isKuromojiLoading}
-              className={`${neuButton} px-4 py-2 text-xs font-semibold`}
+              className={`${neuButton} px-3.5 py-1.5 text-xs`}
             >
               🔄 重新检查
             </button>
             <button
               onClick={() => setIsDepModalOpen(false)}
-              className={`${neuButton} text-blue-600 px-6 py-2 text-xs font-semibold`}
+              className="rounded-lg bg-zinc-900 px-5 py-1.5 text-xs font-medium text-white hover:bg-zinc-800 transition-colors shadow-xs"
             >
               完成
             </button>
@@ -1114,20 +1114,20 @@ export default function DubbingStudioApp() {
         onClose={() => !isExporting && setIsExportModalOpen(false)}
         title={exportOutcome === 'processing' ? '正在导出台本' : exportOutcome === 'cancelled' ? '已取消保存' : exportOutcome === 'error' ? '导出失败' : exportOutcome === 'download' ? '已发起下载' : '导出完成'}
       >
-        <div className="space-y-6 py-4">
-          <div className="flex items-center justify-between text-xs font-semibold text-gray-700">
+        <div className="space-y-5 py-2">
+          <div className="flex items-center justify-between text-xs font-medium text-zinc-700">
             <span>生成进度 ({exportFormat.toUpperCase()})</span>
             <span>{exportProgress}%</span>
           </div>
 
-          <div className="w-full h-3 bg-[#e0e5ec] rounded-full shadow-[inset_2px_2px_4px_#b8bcc2,inset_-2px_-2px_4px_#ffffff] overflow-hidden p-0.5">
+          <div className="w-full h-2 bg-zinc-100 border border-zinc-200 rounded-full overflow-hidden">
             <div
-              className="h-full bg-blue-500 rounded-full transition-all duration-300 shadow-[0_0_8px_rgba(59,130,246,0.5)]"
+              className="h-full bg-zinc-900 rounded-full transition-all duration-300"
               style={{ width: `${exportProgress}%` }}
             />
           </div>
 
-          <p role={exportOutcome === 'error' ? 'alert' : 'status'} className="text-xs text-center text-gray-700">
+          <p role={exportOutcome === 'error' ? 'alert' : 'status'} className="text-xs text-center text-zinc-600">
             {exportOutcome === 'processing' && (exportProgress < 80 ? `正在生成 ${exportFormat.toUpperCase()} 文件...` : '请选择保存位置并等待写入完成...')}
             {exportOutcome === 'saved' && '文件已保存。'}
             {exportOutcome === 'download' && '已交给浏览器下载，请在下载列表中确认结果。'}
@@ -1135,11 +1135,11 @@ export default function DubbingStudioApp() {
             {exportOutcome === 'error' && `导出失败：${exportError}`}
           </p>
 
-          <div className="flex justify-end pt-2">
+          <div className="flex justify-end pt-1">
             <button
               disabled={isExporting}
               onClick={() => setIsExportModalOpen(false)}
-              className={`${isExporting ? 'opacity-50 cursor-not-allowed ' + neuButton : neuButton + ' text-blue-600'} px-6 py-2 text-xs font-semibold`}
+              className="rounded-lg bg-zinc-900 px-5 py-2 text-xs font-medium text-white hover:bg-zinc-800 disabled:opacity-50 transition-colors shadow-xs"
             >
               {isExporting ? '处理中...' : '完成'}
             </button>
@@ -1153,50 +1153,50 @@ export default function DubbingStudioApp() {
         onClose={() => setIsBatchDoneModalOpen(false)}
         title="✅ 批量处理完成"
       >
-        <div className="space-y-5">
-          <div className="grid grid-cols-2 gap-3">
-            <div className="p-4 bg-[#e0e5ec] rounded-xl shadow-[inset_3px_3px_6px_#b8bcc2,inset_-3px_-3px_6px_#ffffff] text-center">
-              <div className="text-2xl font-bold text-gray-800">{batchDoneResults.total}</div>
-              <div className="text-xs text-gray-500 mt-1">总文件数</div>
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-2.5">
+            <div className="p-3.5 bg-zinc-50 border border-zinc-200/80 rounded-lg text-center">
+              <div className="text-2xl font-bold text-zinc-900">{batchDoneResults.total}</div>
+              <div className="text-[11px] text-zinc-500 mt-0.5">总文件数</div>
             </div>
-            <div className="p-4 bg-[#e0e5ec] rounded-xl shadow-[inset_3px_3px_6px_#b8bcc2,inset_-3px_-3px_6px_#ffffff] text-center">
-              <div className="text-2xl font-bold text-green-600">{batchDoneResults.success}</div>
-              <div className="text-xs text-gray-500 mt-1">成功导出</div>
+            <div className="p-3.5 bg-zinc-50 border border-zinc-200/80 rounded-lg text-center">
+              <div className="text-2xl font-bold text-emerald-600">{batchDoneResults.success}</div>
+              <div className="text-[11px] text-zinc-500 mt-0.5">成功导出</div>
             </div>
-            <div className="p-4 bg-[#e0e5ec] rounded-xl shadow-[inset_3px_3px_6px_#b8bcc2,inset_-3px_-3px_6px_#ffffff] text-center">
-              <div className="text-2xl font-bold text-red-500">{batchDoneResults.failed}</div>
-              <div className="text-xs text-gray-500 mt-1">失败</div>
+            <div className="p-3.5 bg-zinc-50 border border-zinc-200/80 rounded-lg text-center">
+              <div className="text-2xl font-bold text-red-600">{batchDoneResults.failed}</div>
+              <div className="text-[11px] text-zinc-500 mt-0.5">失败</div>
             </div>
-            <div className="p-4 text-center">
-              <div className="text-2xl font-bold text-gray-600">{batchDoneResults.cancelled}</div>
-              <div className="text-xs text-gray-500 mt-1">取消保存</div>
+            <div className="p-3.5 bg-zinc-50 border border-zinc-200/80 rounded-lg text-center">
+              <div className="text-2xl font-bold text-zinc-500">{batchDoneResults.cancelled}</div>
+              <div className="text-[11px] text-zinc-500 mt-0.5">取消保存</div>
             </div>
           </div>
 
           {batchDoneResults.filenames.length > 0 && (
             <div>
-              <h4 className="text-xs font-semibold text-gray-700 mb-2">已导出文件：</h4>
-              <div className="max-h-[160px] overflow-y-auto space-y-1.5">
+              <h4 className="text-xs font-medium text-zinc-700 mb-1.5">已导出文件：</h4>
+              <div className="max-h-[160px] overflow-y-auto space-y-1">
                 {batchDoneResults.filenames.map((name, idx) => (
-                  <div key={idx} className="flex items-center gap-2 px-3 py-2 bg-[#e0e5ec] rounded-lg shadow-[2px_2px_4px_#b8bcc2,-2px_-2px_4px_#ffffff]">
-                    <span className="text-green-500 text-sm">✓</span>
-                    <span className="text-xs text-gray-700 truncate">{name}</span>
+                  <div key={idx} className="flex items-center gap-2 px-2.5 py-1.5 bg-zinc-50 border border-zinc-200/70 rounded-md">
+                    <span className="text-emerald-600 text-xs font-bold">✓</span>
+                    <span className="text-xs text-zinc-800 truncate">{name}</span>
                   </div>
                 ))}
               </div>
             </div>
           )}
 
-          <div className="p-3 bg-[#e0e5ec] rounded-xl shadow-[inset_2px_2px_4px_#b8bcc2,inset_-2px_-2px_4px_#ffffff]">
-            <p className="text-xs font-medium text-gray-700 text-center">
+          <div className="p-2.5 bg-zinc-50 border border-zinc-200/80 rounded-lg">
+            <p className="text-xs font-medium text-zinc-600 text-center">
               已完成 {batchDoneResults.success} 个文件的保存或下载请求；浏览器下载请在下载列表中确认。
             </p>
           </div>
 
-          <div className="flex justify-end pt-2">
+          <div className="flex justify-end pt-1">
             <button
               onClick={() => setIsBatchDoneModalOpen(false)}
-              className={`${neuButton} px-8 py-2.5 text-sm font-bold text-blue-600`}
+              className="rounded-lg bg-zinc-900 px-6 py-2 text-xs font-medium text-white hover:bg-zinc-800 transition-colors shadow-xs"
             >
               确定
             </button>
@@ -1208,18 +1208,18 @@ export default function DubbingStudioApp() {
       <Modal
         isOpen={!!editingToken}
         onClose={() => setEditingToken(null)}
-        title="✏️ 假名标注与多音字校对"
+        title="✏️ 假标注与多音字校对"
       >
         {editingToken && (
-          <div className="space-y-5">
-            <div className="flex items-center justify-between bg-[#e0e5ec] p-4 rounded-xl shadow-[inset_2px_2px_4px_#b8bcc2,inset_-2px_-2px_4px_#ffffff]">
+          <div className="space-y-4">
+            <div className="flex items-center justify-between bg-zinc-50/80 border border-zinc-200/80 p-3.5 rounded-xl">
               <div>
-                <div className="text-xs text-gray-500 mb-1">当前标注文字</div>
-                <div className="text-2xl font-bold text-gray-800">{editingToken.surface}</div>
+                <div className="text-[11px] text-zinc-500 mb-0.5">当前标注文字</div>
+                <div className="text-2xl font-bold text-zinc-900">{editingToken.surface}</div>
               </div>
               <div className="text-right">
-                <div className="text-xs text-gray-500 mb-1">当前注音</div>
-                <div className="text-xl font-bold text-blue-600">{editingToken.currentRuby || '(无注音)'}</div>
+                <div className="text-[11px] text-zinc-500 mb-0.5">当前注音</div>
+                <div className="text-lg font-bold text-blue-600">{editingToken.currentRuby || '(无注音)'}</div>
               </div>
             </div>
 
@@ -1230,10 +1230,10 @@ export default function DubbingStudioApp() {
               const before = line.cleanText.slice(Math.max(0, start - 24), start);
               const after = line.cleanText.slice(start + editingToken.surface.length, start + editingToken.surface.length + 24);
               return (
-                <div className="text-xs text-gray-700 bg-[#e0e5ec] p-3 rounded-xl shadow-[inset_2px_2px_4px_#b8bcc2,inset_-2px_-2px_4px_#ffffff] leading-relaxed">
-                  <span className="text-gray-500 font-medium mr-1">所在短句：</span>
+                <div className="text-xs text-zinc-600 bg-zinc-50/70 border border-zinc-200/80 p-3 rounded-lg leading-relaxed">
+                  <span className="text-zinc-500 font-medium mr-1">所在短句：</span>
                   <span>{before}</span>
-                  <span className="bg-yellow-200/90 text-blue-900 font-bold px-1.5 py-0.5 rounded mx-0.5 shadow-sm border border-yellow-300">
+                  <span className="bg-amber-100 text-zinc-900 font-bold px-1.5 py-0.5 rounded mx-0.5 border border-amber-200">
                     {editingToken.surface}
                   </span>
                   <span>{after}</span>
@@ -1242,43 +1242,43 @@ export default function DubbingStudioApp() {
             })()}
 
             <div>
-              <div className="text-xs font-semibold text-gray-700 mb-2">标注范围（词组共享一组居中注音）：</div>
-              <div className="flex items-center gap-3">
+              <div className="text-xs font-medium text-zinc-700 mb-1.5">标注范围（词组共享一组居中注音）：</div>
+              <div className="flex items-center gap-2">
                 <button
                   type="button"
                   disabled={editingToken.tokenIndex === 0}
                   onClick={() => resizeRubyRange(editingToken.tokenIndex - 1, editingToken.tokenEndIndex)}
-                  className={`${neuButton} px-3 py-2 text-xs disabled:opacity-40`}
+                  className={`${neuButton} px-3 py-1.5 text-xs disabled:opacity-40`}
                 >向左扩展</button>
                 <button
                   type="button"
                   disabled={editingToken.tokenEndIndex >= (annotatedLines.find(line => line.id === editingToken.lineId)?.tokens.length || 0) - 1}
                   onClick={() => resizeRubyRange(editingToken.tokenIndex, editingToken.tokenEndIndex + 1)}
-                  className={`${neuButton} px-3 py-2 text-xs disabled:opacity-40`}
+                  className={`${neuButton} px-3 py-1.5 text-xs disabled:opacity-40`}
                 >向右扩展</button>
                 <button
                   type="button"
                   disabled={editingToken.tokenIndex === editingToken.tokenEndIndex}
                   onClick={() => resizeRubyRange(editingToken.tokenIndex, editingToken.tokenEndIndex - 1)}
-                  className={`${neuButton} px-3 py-2 text-xs disabled:opacity-40`}
+                  className={`${neuButton} px-3 py-1.5 text-xs disabled:opacity-40`}
                 >缩小范围</button>
               </div>
-              <p className="text-xs text-gray-500 mt-2">例如选择「二」后向右扩展至「二人」，输入「ふたり」并保存。修改按台本 ID 保存，改标题不会丢失；仅应用于相同原文行。</p>
-              <div lang="ja" className="script-line text-center py-4 text-2xl text-gray-800">
+              <p className="text-[11px] text-zinc-500 mt-1.5">例如选择「二」后向右扩展至「二人」，输入「ふたり」并保存。修改按台本 ID 保存，改标题不会丢失；仅应用于相同原文行。</p>
+              <div lang="ja" className="script-line text-center py-3 text-2xl text-zinc-900">
                 <ruby>{editingToken.surface}<rt style={{ fontSize: `${rubyFontSize}px` }}>{customRubyInput || '\u00a0'}</rt></ruby>
               </div>
             </div>
 
             {editingToken.alternatives && editingToken.alternatives.length > 0 && (
               <div>
-                <div className="text-xs font-semibold text-gray-700 mb-2">💡 前后文常见候选读音（点击直接套用）：</div>
-                <div className="flex flex-wrap gap-2">
+                <div className="text-xs font-medium text-zinc-700 mb-1.5">💡 前后文常见候选读音（点击直接套用）：</div>
+                <div className="flex flex-wrap gap-1.5">
                   {editingToken.alternatives.map((alt, aidx) => (
                     <button
                       key={aidx}
                       type="button"
                       onClick={() => setCustomRubyInput(alt)}
-                      className={`${customRubyInput === alt ? neuButtonActive : neuButton} px-3 py-1.5 text-xs font-medium`}
+                      className={`${customRubyInput === alt ? neuButtonActive : neuButton} px-3 py-1 text-xs`}
                     >
                       {alt}
                     </button>
@@ -1288,11 +1288,11 @@ export default function DubbingStudioApp() {
             )}
 
             <div>
-              <label className="mb-3 flex items-center gap-2 text-sm">
-                <input type="checkbox" checked={correctionScope === 'glossary'} onChange={event => setCorrectionScope(event.target.checked ? 'glossary' : 'occurrence')} />
+              <label className="mb-2.5 flex items-center gap-2 text-xs font-medium text-zinc-800 cursor-pointer">
+                <input type="checkbox" className="rounded border-zinc-300 text-zinc-900 focus:ring-zinc-900/10" checked={correctionScope === 'glossary'} onChange={event => setCorrectionScope(event.target.checked ? 'glossary' : 'occurrence')} />
                 加入专名词典，应用于所有台本的同名文字
               </label>
-              <label className="block text-xs font-semibold text-gray-700 mb-2">
+              <label className="block text-xs font-medium text-zinc-700 mb-1">
                 自定义注音 (平假名/片假名/罗马音)：
               </label>
               <input
@@ -1300,7 +1300,7 @@ export default function DubbingStudioApp() {
                 value={customRubyInput}
                 onChange={(e) => setCustomRubyInput(e.target.value)}
                 placeholder="输入该语境下的准确假名..."
-                className={`${neuInput} w-full px-4 py-2 text-sm`}
+                className={`${neuInput} w-full px-3 py-2 text-sm`}
                 autoFocus
                 onCompositionStart={() => { rubyCompositionRef.current = true; }}
                 onCompositionEnd={() => { rubyCompositionRef.current = false; }}
@@ -1313,26 +1313,26 @@ export default function DubbingStudioApp() {
               />
             </div>
 
-            <div className="flex items-center justify-between pt-2">
+            <div className="flex items-center justify-between pt-2 border-t border-zinc-100">
               <button
                 type="button"
                 onClick={removeTokenRuby}
-                className="text-xs text-red-500 hover:text-red-700 underline font-medium"
+                className="text-xs text-red-600 hover:text-red-700 underline font-medium"
               >
                 清除所选文字注音
               </button>
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2">
                 <button
                   type="button"
                   onClick={() => setEditingToken(null)}
-                  className={`${neuButton} px-4 py-2 text-xs`}
+                  className={`${neuButton} px-3.5 py-1.5 text-xs`}
                 >
                   取消
                 </button>
                 <button
                   type="button"
                   onClick={saveTokenRuby}
-                  className={`${neuButton} text-blue-600 px-5 py-2 text-xs font-semibold`}
+                  className="rounded-lg border border-zinc-200 bg-white px-3.5 py-1.5 text-xs font-medium text-zinc-900 hover:bg-zinc-50 shadow-xs transition-colors"
                 >
                   保存修改
                 </button>
@@ -1340,7 +1340,7 @@ export default function DubbingStudioApp() {
                   type="button"
                   onClick={saveAndOpenNextReview}
                   disabled={isAdvancingReview}
-                  className={`${neuButton} text-blue-700 px-4 py-2 text-xs font-semibold`}
+                  className="rounded-lg bg-zinc-900 px-4 py-1.5 text-xs font-medium text-white hover:bg-zinc-800 disabled:opacity-50 shadow-xs transition-colors"
                 >
                   保存并下一处
                 </button>
@@ -1357,31 +1357,31 @@ export default function DubbingStudioApp() {
         title="📚 本台本语境已学读音"
       >
         <div className="space-y-4">
-          <p className="text-xs text-gray-500">
+          <p className="text-xs text-zinc-500 leading-relaxed">
             在复核时确认的读音会自动学习所在短句语境。同一台本中处于相同前后文的词语将自动应用，无需重复复核。
           </p>
           {learnedReadings.length === 0 ? (
-            <div className="text-center py-6 text-gray-400 text-sm">暂无已学语境记录</div>
+            <div className="text-center py-6 text-zinc-400 text-xs">暂无已学语境记录</div>
           ) : (
             <div className="max-h-[300px] overflow-y-auto space-y-2">
               {learnedReadings.map((item, idx) => (
-                <div key={idx} className="flex items-center justify-between p-3 bg-[#e0e5ec] rounded-xl shadow-[inset_2px_2px_4px_#b8bcc2,inset_-2px_-2px_4px_#ffffff] text-xs">
-                  <div className="space-y-1">
+                <div key={idx} className="flex items-center justify-between p-3 bg-zinc-50/70 border border-zinc-200/80 rounded-lg text-xs">
+                  <div className="space-y-0.5">
                     <div className="flex items-center gap-2">
-                      <span className="font-bold text-gray-800 text-sm">{item.surface}</span>
-                      <span className="font-semibold text-blue-600">→ {item.reading}</span>
-                      <span className="text-[10px] text-gray-400">({item.type})</span>
+                      <span className="font-semibold text-zinc-900 text-sm">{item.surface}</span>
+                      <span className="font-medium text-blue-600">→ {item.reading}</span>
+                      <span className="text-[10px] text-zinc-400">({item.type})</span>
                     </div>
-                    <div className="text-gray-500">
+                    <div className="text-zinc-500 text-[11px]">
                       语境：<span>{item.before ? `...${item.before}` : ''}</span>
-                      <strong className="text-gray-700">[{item.surface}]</strong>
+                      <strong className="text-zinc-800 font-semibold">[{item.surface}]</strong>
                       <span>{item.after ? `${item.after}...` : ''}</span>
                     </div>
                   </div>
                   <button
                     type="button"
                     onClick={() => setDatabase(prev => deleteLearnedReading(prev, documentId, idx))}
-                    className="text-red-500 hover:text-red-700 underline text-xs ml-3 flex-shrink-0"
+                    className="text-red-600 hover:text-red-700 underline text-xs ml-3 flex-shrink-0"
                   >
                     删除
                   </button>
@@ -1389,11 +1389,11 @@ export default function DubbingStudioApp() {
               ))}
             </div>
           )}
-          <div className="flex justify-end pt-2">
+          <div className="flex justify-end pt-1 border-t border-zinc-100">
             <button
               type="button"
               onClick={() => setIsLearnedModalOpen(false)}
-              className={`${neuButton} px-5 py-2 text-xs font-semibold`}
+              className="rounded-lg bg-zinc-900 px-5 py-1.5 text-xs font-medium text-white hover:bg-zinc-800 transition-colors shadow-xs"
             >
               关闭
             </button>
