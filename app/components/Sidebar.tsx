@@ -1,7 +1,6 @@
-'use client';
-
 import React, { useState } from 'react';
 import { Modal } from './Modal';
+import type { Locale, Translations } from '../utils/i18n';
 
 interface SidebarItem {
   label: string;
@@ -16,13 +15,19 @@ interface SidebarProps {
   isOpen: boolean;
   onToggle: () => void;
   title?: string;
+  locale: Locale;
+  onLocaleChange: (locale: Locale) => void;
+  t: Translations;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
   items,
   isOpen,
   onToggle,
-  title = '假名标注工具'
+  title = '假名标注工具',
+  locale,
+  onLocaleChange,
+  t,
 }) => {
   const [isRewardModalOpen, setIsRewardModalOpen] = useState(false);
 
@@ -85,8 +90,40 @@ export const Sidebar: React.FC<SidebarProps> = ({
             ))}
           </div>
 
-          {/* Footer Section with Reward Button & Twitter Author info */}
+          {/* Footer Section with Language Selector, Reward Button & Twitter Author info */}
           <div className="p-4 flex flex-col gap-3.5 border-t border-zinc-100">
+            {/* Language Switcher */}
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[11px] font-medium text-zinc-500 flex items-center justify-between">
+                <span>{t.languageLabel}</span>
+                <span className="text-[10px] text-zinc-400 font-mono">🌐</span>
+              </label>
+              <div className="grid grid-cols-2 gap-1.5 p-1 bg-zinc-100 rounded-lg border border-zinc-200/80">
+                <button
+                  type="button"
+                  onClick={() => onLocaleChange('zh-CN')}
+                  className={`py-1 text-xs font-medium rounded-md transition-all ${
+                    locale === 'zh-CN'
+                      ? 'bg-white text-zinc-900 shadow-xs font-semibold'
+                      : 'text-zinc-600 hover:text-zinc-900'
+                  }`}
+                >
+                  简体中文
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onLocaleChange('en')}
+                  className={`py-1 text-xs font-medium rounded-md transition-all ${
+                    locale === 'en'
+                      ? 'bg-white text-zinc-900 shadow-xs font-semibold'
+                      : 'text-zinc-600 hover:text-zinc-900'
+                  }`}
+                >
+                  English
+                </button>
+              </div>
+            </div>
+
             {/* Donate / Reward Button */}
             <button
               onClick={() => setIsRewardModalOpen(true)}
@@ -97,7 +134,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 alt="Cheese Logo"
                 className="w-4 h-4 rounded-sm object-cover"
               />
-              <span>打赏作者</span>
+              <span>{t.donateAuthor}</span>
             </button>
 
             {/* Author Handle with Twitter Icon & Version */}
@@ -109,7 +146,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 <span>チーズ@beimisama</span>
               </div>
               <div className="text-[11px] font-medium text-zinc-500 bg-zinc-100 border border-zinc-200/80 px-2.5 py-0.5 rounded-full">
-                Furigana V1.0.1
+                Furigana V1.1.0
               </div>
             </div>
           </div>
@@ -120,7 +157,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       <Modal
         isOpen={isRewardModalOpen}
         onClose={() => setIsRewardModalOpen(false)}
-        title="🧀 支持作者"
+        title={t.supportAuthorTitle}
       >
         <div className="flex flex-col items-center justify-center py-2 space-y-4">
           <div className="p-3 bg-zinc-50 border border-zinc-200 rounded-xl">
@@ -131,7 +168,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             />
           </div>
           <p className="text-xs text-zinc-500 font-medium tracking-wide">
-            为作者集齐芝士碎片
+            {t.supportAuthorDesc}
           </p>
         </div>
       </Modal>

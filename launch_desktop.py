@@ -21,7 +21,7 @@ def launch_standalone_window():
     try:
         import webview
         webview.create_window(
-            title='Furigana Dubbing Studio — Apple Liquid Glass',
+            title='Furigana Dubbing Studio',
             url='http://localhost:3000',
             width=1280,
             height=830,

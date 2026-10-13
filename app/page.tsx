@@ -1,9 +1,21 @@
 'use client';
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Modal } from './components/Modal';
 import { Sidebar } from './components/Sidebar';
 import { GlossaryModal } from './components/GlossaryModal';
+import { DependencyModal } from './components/DependencyModal';
+import { ExportProgressModal } from './components/ExportProgressModal';
+import { BatchDoneModal } from './components/BatchDoneModal';
+import { LearnedReadingsModal } from './components/LearnedReadingsModal';
+import { RubyCorrectionModal, type EditingTokenState } from './components/RubyCorrectionModal';
+import { BatchProcessingPanel, type BatchFileItem } from './components/BatchProcessingPanel';
+import {
+  neuCard,
+  neuButton,
+  neuButtonActive,
+  neuInput,
+  neuBadge,
+} from './components/uiTokens';
 import type { ScriptLine } from './utils/furigana';
 import { useFuriganaWorker } from './hooks/useFuriganaWorker';
 import { generateSRT, parseSRT, type SrtCue } from './utils/srt';
@@ -15,20 +27,30 @@ import { emptyDatabase, fingerprintText, resolveScript, updateScript, setScriptO
 import { selectReviewWord, makeLearnedReading } from './utils/review';
 import { buildDocxBlob } from './utils/docxExporter';
 import { saveBlob } from './utils/fileSave';
-
-interface BatchFileItem {
-  id: string;
-  file: File;
-  name: string;
-  size: number;
-  status: 'pending' | 'processing' | 'done' | 'error';
-  progress: number;
-  lineCount?: number;
-  content?: string;
-  error?: string;
-}
+import { translations, type Locale } from './utils/i18n';
 
 export default function DubbingStudioApp() {
+  // Locale State
+  const [locale, setLocale] = useState<Locale>('zh-CN');
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('furigana_locale') as Locale | null;
+      if (saved === 'zh-CN' || saved === 'en') {
+        setLocale(saved);
+      }
+    } catch {}
+  }, []);
+
+  const handleLocaleChange = (newLocale: Locale) => {
+    setLocale(newLocale);
+    try {
+      localStorage.setItem('furigana_locale', newLocale);
+    } catch {}
+  };
+
+  const t = translations[locale];
+
   // Navigation & UI states
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isDepModalOpen, setIsDepModalOpen] = useState(false);
@@ -103,14 +125,7 @@ export default function DubbingStudioApp() {
   const editorFileInputRef = useRef<HTMLInputElement>(null);
 
   // Interactive Click-to-Edit Ruby State
-  const [editingToken, setEditingToken] = useState<{
-    lineId: string;
-    tokenIndex: number;
-    tokenEndIndex: number;
-    surface: string;
-    currentRuby: string;
-    alternatives: string[];
-  } | null>(null);
+  const [editingToken, setEditingToken] = useState<EditingTokenState | null>(null);
   const reviewCursorRef = useRef(0);
   const [previewPage, setPreviewPage] = useState(0);
   const previewStart = Math.min(previewPage * 200, Math.max(0, Math.floor((annotatedLines.length - 1) / 200) * 200));
@@ -232,11 +247,11 @@ export default function DubbingStudioApp() {
     setCustomRubyInput(reading);
   };
 
-  const dictionaryLabel = dictionaryStatus === 'loading' ? '正在加载离线词典' :
-    dictionaryStatus === 'ready' ? '离线词典与上下文规则已启用' : '词典加载失败，正在使用基础词表';
+  const dictionaryLabel = dictionaryStatus === 'loading' ? t.dictLoading :
+    dictionaryStatus === 'ready' ? t.dictReady : t.dictDegraded;
   const deps = [
-    { name: 'Kuromoji 离线词典', status: dictionaryStatus === 'loading' ? 'repairing' : dictionaryStatus === 'ready' ? 'ready' : 'error', desc: dictionaryError || dictionaryLabel },
-    { name: '校对记录存储', status: correctionError ? 'error' : correctionsReady ? 'ready' : 'repairing', desc: correctionError || (correctionsReady ? '校对记录已读取；修改后自动保存' : '正在读取校对记录') },
+    { name: `Kuromoji ${locale === 'zh-CN' ? '离线词典' : 'Offline Lexicon'}`, status: dictionaryStatus === 'loading' ? 'repairing' : dictionaryStatus === 'ready' ? 'ready' : 'error', desc: dictionaryError || dictionaryLabel },
+    { name: locale === 'zh-CN' ? '校对记录存储' : 'Correction Storage', status: correctionError ? 'error' : correctionsReady ? 'ready' : 'repairing', desc: correctionError || (correctionsReady ? (locale === 'zh-CN' ? '校对记录已读取；修改后自动保存' : 'Corrections loaded; automatically saved on edit') : t.readingRecordsLoading) },
   ];
 
   useEffect(() => {
@@ -521,17 +536,10 @@ export default function DubbingStudioApp() {
     setIsBatchDoneModalOpen(true);
   };
 
-  // Shadcn Minimal Utility Style Classes
-  const neuCard = "bg-white rounded-xl border border-zinc-200/80 shadow-xs";
-  const neuButton = "bg-white border border-zinc-200 rounded-lg text-zinc-700 hover:bg-zinc-50 hover:text-zinc-950 active:bg-zinc-100 shadow-xs transition-colors font-medium";
-  const neuButtonActive = "bg-zinc-900 border border-zinc-900 text-white rounded-lg shadow-xs font-medium transition-colors";
-  const neuInput = "bg-white border border-zinc-200 rounded-lg text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-900 placeholder:text-zinc-400 shadow-xs transition-all";
-  const neuBadge = "px-2.5 py-0.5 bg-zinc-100 border border-zinc-200/80 rounded-full text-xs font-medium text-zinc-600";
-
   // Sidebar navigation items
   const sidebarItems = [
     {
-      label: '台本在线编辑器',
+      label: t.sidebarEditor,
       href: '#editor',
       active: activeTab === 'editor',
       onClick: () => setActiveTab('editor'),
@@ -542,7 +550,7 @@ export default function DubbingStudioApp() {
       ),
     },
     {
-      label: '批量文件处理中心',
+      label: t.sidebarBatch,
       href: '#batch',
       active: activeTab === 'batch_files',
       onClick: () => setActiveTab('batch_files'),
@@ -553,7 +561,7 @@ export default function DubbingStudioApp() {
       ),
     },
     {
-      label: '依赖诊断与修复',
+      label: t.sidebarDeps,
       href: '#deps',
       active: false,
       onClick: () => setIsDepModalOpen(true),
@@ -572,7 +580,10 @@ export default function DubbingStudioApp() {
         isOpen={isSidebarOpen}
         onToggle={() => setIsSidebarOpen(!isSidebarOpen)}
         items={sidebarItems}
-        title="假名标注工具"
+        title={t.sidebarTitle}
+        locale={locale}
+        onLocaleChange={handleLocaleChange}
+        t={t}
       />
 
       <div className="min-h-screen flex flex-col max-w-7xl mx-auto px-4 md:px-6 pt-5">
@@ -582,7 +593,7 @@ export default function DubbingStudioApp() {
             <button
               onClick={() => setIsSidebarOpen(!isSidebarOpen)}
               className={`${neuButton} px-2.5 py-2 flex items-center justify-center`}
-              aria-label="打开侧边栏"
+              aria-label={t.openSidebar}
             >
               <svg className="w-4.5 h-4.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
@@ -595,7 +606,7 @@ export default function DubbingStudioApp() {
                 Furigana Dubbing Studio
               </span>
               <span className={neuBadge}>
-                台本模式
+                {t.scriptMode}
               </span>
             </div>
           </div>
@@ -605,13 +616,13 @@ export default function DubbingStudioApp() {
               onClick={() => setActiveTab('editor')}
               className={`${activeTab === 'editor' ? neuButtonActive : neuButton} px-3.5 py-1.5 text-xs`}
             >
-              📝 台本编辑器
+              {t.editorTab}
             </button>
             <button
               onClick={() => setActiveTab('batch_files')}
               className={`${activeTab === 'batch_files' ? neuButtonActive : neuButton} px-3.5 py-1.5 text-xs`}
             >
-              📁 批量处理中心
+              {t.batchTab}
             </button>
           </div>
         </nav>
@@ -622,19 +633,19 @@ export default function DubbingStudioApp() {
             {/* Banner Section */}
             <div className={`${neuCard} p-6 md:p-8 flex flex-col items-center justify-center text-center`}>
               <h1 className="font-semibold text-2xl md:text-3xl tracking-tight mb-2 text-zinc-900">
-                日语假名配音台本处理系统
+                {t.bannerTitle}
               </h1>
               <p className="text-xs md:text-sm text-zinc-500 max-w-xl">
-                专业高信息密度工作台 • 默认小四字体 (16px) • 高精度前后文消歧注音
+                {t.bannerSubtitle}
               </p>
             </div>
 
             {/* Options Bar */}
             <div className={`${neuCard} p-4 md:p-5 flex flex-wrap items-center justify-between gap-4`}>
               <div className="flex flex-col sm:flex-row gap-3 sm:items-center">
-                <span className="font-medium text-xs text-zinc-600">注音模式:</span>
+                <span className="font-medium text-xs text-zinc-600">{t.rubyModeLabel}</span>
                 <button type="button" disabled={!correctionsReady} className={`${neuButton} px-3 py-1.5 text-xs disabled:opacity-50`} onClick={() => { advanceControllerRef.current?.abort(); setIsGlossaryOpen(true); }}>
-                  专名词典 ({glossaryEntries.length})
+                  {t.properNounGlossary} ({glossaryEntries.length})
                 </button>
                 <div className="flex items-center gap-1.5">
                   {(['hiragana', 'katakana', 'romaji'] as const).map(type => (
@@ -643,7 +654,7 @@ export default function DubbingStudioApp() {
                       onClick={() => { setEditingToken(null); setRubyType(type); }}
                       className={`${rubyType === type ? neuButtonActive : neuButton} px-3 py-1.5 text-xs`}
                     >
-                      {type === 'hiragana' ? '平假名' : type === 'katakana' ? '片假名' : '罗马音'}
+                      {type === 'hiragana' ? t.hiragana : type === 'katakana' ? t.katakana : t.romaji}
                     </button>
                   ))}
                 </div>
@@ -651,10 +662,10 @@ export default function DubbingStudioApp() {
 
               <div className="flex flex-wrap items-center gap-3">
                 <details className="relative">
-                  <summary className="cursor-pointer list-none rounded-lg px-3 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-100 transition-colors">排版设置 ▾</summary>
+                  <summary className="cursor-pointer list-none rounded-lg px-3 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-100 transition-colors">{t.typographySettings}</summary>
                   <div className="absolute right-0 top-full z-10 mt-2 grid min-w-64 gap-3.5 rounded-xl border border-zinc-200 bg-white p-4 shadow-lg">
                 <div className="flex items-center justify-between gap-3">
-                  <span className="font-medium text-xs text-zinc-700">正文字号:</span>
+                  <span className="font-medium text-xs text-zinc-700">{t.bodyFontSize}</span>
                   <div className="flex items-center border border-zinc-200 rounded-lg overflow-hidden bg-zinc-50/50">
                     <button
                       onClick={() => setFontSize(Math.max(12, fontSize - 2))}
@@ -675,7 +686,7 @@ export default function DubbingStudioApp() {
                 </div>
 
                 <div className="flex items-center justify-between gap-3">
-                  <span className="font-medium text-xs text-zinc-700">假名字号:</span>
+                  <span className="font-medium text-xs text-zinc-700">{t.rubyFontSize}</span>
                   <div className="flex items-center border border-zinc-200 rounded-lg overflow-hidden bg-zinc-50/50">
                     <button
                       onClick={() => setRubyFontSize(Math.max(8, rubyFontSize - 1))}
@@ -696,7 +707,7 @@ export default function DubbingStudioApp() {
                 </div>
 
                 <div className="flex items-center justify-between gap-3">
-                  <span className="font-medium text-xs text-zinc-700">行间距:</span>
+                  <span className="font-medium text-xs text-zinc-700">{t.lineSpacing}</span>
                   <div className="flex items-center border border-zinc-200 rounded-lg overflow-hidden bg-zinc-50/50">
                     <button
                       onClick={() => setLineSpacing(Number(Math.max(1.2, lineSpacing - 0.2).toFixed(1)))}
@@ -727,10 +738,10 @@ export default function DubbingStudioApp() {
             </div>
 
             {dictionaryStatus === 'degraded' && <p role="alert" className="text-xs font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-3">
-              离线词典加载失败，当前基础词表可能漏注或误注。请重新加载词典后检查读音。
-              <button type="button" onClick={runDependencyRepair} className="ml-2 underline font-semibold">重新加载</button>
+              {t.dictErrorAlert}
+              <button type="button" onClick={runDependencyRepair} className="ml-2 underline font-semibold">{t.reloadDict}</button>
             </p>}
-            {isImporting && <p role="status" className="text-xs text-zinc-500">正在读取台本…</p>}
+            {isImporting && <p role="status" className="text-xs text-zinc-500">{t.readingScriptProgress}</p>}
             {importError && <p role="alert" className="text-xs font-medium text-red-600 bg-red-50 border border-red-200 rounded-lg p-3">{importError}</p>}
 
             {/* Workspace Dual Pane */}
@@ -740,14 +751,14 @@ export default function DubbingStudioApp() {
                 <div className="pb-3 flex flex-wrap items-center justify-between gap-3 border-b border-zinc-100 mb-3">
                   <div className="flex items-center gap-2 flex-1 min-w-[220px]">
                     <span className="font-medium text-xs text-zinc-700 flex-shrink-0">
-                      📝 台本标题:
+                      {t.scriptTitleLabel}
                     </span>
                     <input
                       type="text"
                       value={docTitle}
                       disabled={!correctionsReady || isImporting}
                       onChange={(e) => setDocTitle(e.target.value)}
-                      placeholder="输入台本标题（用于 Word 导出标题）"
+                      placeholder={t.scriptTitlePlaceholder}
                       className={`${neuInput} px-3 py-1.5 text-xs font-medium text-zinc-900 w-full max-w-[280px]`}
                     />
                   </div>
@@ -763,9 +774,9 @@ export default function DubbingStudioApp() {
                       disabled={!correctionsReady || isImporting}
                       onClick={() => editorFileInputRef.current?.click()}
                       className={`${neuButton} px-3 py-1.5 text-xs font-medium text-blue-700 flex items-center gap-1`}
-                      title="导入 .txt, .srt 或 .docx 文件，将自动将标题设置为文件名"
+                      title={t.importTextTitle}
                     >
-                      📂 导入文本
+                      {t.importTextButton}
                     </button>
                     <button
                       disabled={!correctionsReady || isImporting}
@@ -773,17 +784,17 @@ export default function DubbingStudioApp() {
                         const id = `script:${crypto.randomUUID()}`;
                         const fingerprint = await fingerprintText('');
                         setDatabase(previous => ({ ...previous, scripts: { ...previous.scripts,
-                          [id]: { scriptId: id, title: '日语假名配音台本', fingerprints: [fingerprint], updatedAt: Date.now(), overrides: [], learned: [] } } }));
+                          [id]: { scriptId: id, title: '脚本台本', fingerprints: [fingerprint], updatedAt: Date.now(), overrides: [], learned: [] } } }));
                         setDocumentId(id);
                         setEditingToken(null);
                         setRawText('');
                         setSourceOverrides([]);
                         setSrtCues([]);
-                        setDocTitle('日语假名配音台本');
+                        setDocTitle(locale === 'zh-CN' ? '日语假名配音台本' : 'Japanese Furigana Script');
                       }}
                       className={`${neuButton} px-3 py-1.5 text-xs text-zinc-600`}
                     >
-                      清空
+                      {t.clearButton}
                     </button>
                   </div>
                 </div>
@@ -791,7 +802,7 @@ export default function DubbingStudioApp() {
                   value={rawText}
                   disabled={!correctionsReady || isImporting}
                   onChange={(e) => { setEditingToken(null); setRawText(e.target.value); }}
-                  placeholder="请输入日语台本或点击上方「导入文本」..."
+                  placeholder={t.inputPlaceholder}
                   className={`${neuInput} w-full h-[min(58vh,680px)] min-h-[280px] p-4 resize-y leading-relaxed`}
                   style={{ fontSize: `${fontSize}px`, lineHeight: lineSpacing }}
                 />
@@ -802,58 +813,58 @@ export default function DubbingStudioApp() {
                 <div className="pb-3 flex items-center justify-between border-b border-zinc-100 mb-3">
                   <div className="flex items-center gap-2.5">
                     <h3 className="font-semibold text-sm text-zinc-900 flex items-center gap-1.5">
-                      <span>👀</span> 实时假名注音与排版预览
+                      <span>👀</span> {t.previewTitle}
                     </h3>
                     {isKuromojiLoading && (
                       <span className="text-xs bg-amber-50 text-amber-700 border border-amber-200 px-2 py-0.5 rounded-full flex items-center gap-1">
                         <svg className="animate-spin h-3 w-3" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
-                        加载词典...
+                        {t.dictLoading}
                       </span>
                     )}
                   </div>
                   <span className={neuBadge}>
-                    {annotatedLines.length} 行
+                    {annotatedLines.length} {t.linesCount}
                   </span>
                 </div>
-                <p className="text-xs text-zinc-500 mb-2">点击汉字修改读音；可扩展标注范围，设置词组整体注音。已有 Word 注音会保留。</p>
+                <p className="text-xs text-zinc-500 mb-2">{t.previewTip}</p>
                 <div role="status" aria-live="polite" className="mb-2.5 text-xs text-zinc-600">
-                  {isAnnotating ? `正在注音 ${annotationProgress}% · 已完成 ${annotatedLines.length} 行` : '注音已完成，可校对和导出'}
-                  {engine.mode === 'fallback' && ' · 当前使用分块兼容模式'}
-                  {isAnnotating && <progress aria-label="注音进度" className="mt-1 w-full" value={annotationProgress} max={100} />}
+                  {isAnnotating ? `${t.annotatingProgress} ${annotationProgress}% · ${annotatedLines.length} ${t.linesCount}` : t.annotationComplete}
+                  {engine.mode === 'fallback' && ` · ${t.fallbackModeNote}`}
+                  {isAnnotating && <progress aria-label="annotation-progress" className="mt-1 w-full" value={annotationProgress} max={100} />}
                 </div>
-                {annotationError && <p role="alert" className="mb-2.5 text-xs font-medium text-red-600 bg-red-50 border border-red-200 rounded-lg p-2.5">注音失败：{annotationError}</p>}
-                {reviewError && <p role="alert" className="mb-2.5 text-xs font-medium text-red-600 bg-red-50 border border-red-200 rounded-lg p-2.5">{reviewError}</p>}
+                {annotationError && <p role="alert" className="mb-2.5 text-xs font-medium text-red-600 bg-red-50 border border-red-200 rounded-lg p-2.5">{t.annotationFailed}{annotationError}</p>}
+                {reviewError && <p role="alert" className="mb-2.5 text-xs font-medium text-red-600 bg-red-50 border border-red-200 rounded-lg p-2.5">{t.reviewFailed}{reviewError}</p>}
                 <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-zinc-500 mb-3 pb-2 border-b border-zinc-100">
-                  <div className="flex flex-wrap gap-x-3 gap-y-1" aria-label="注音来源统计">
-                    <span>自动 {annotatedLines.flatMap(line => line.tokens).filter(token => token.hasKanji && token.readingSource === 'automatic').length}</span>
-                    <span>专名词典 {annotatedLines.flatMap(line => line.tokens).filter(token => token.hasKanji && token.readingSource === 'glossary').length}</span>
-                    <span>语境学习 {annotatedLines.flatMap(line => line.tokens).filter(token => token.hasKanji && token.readingSource === 'learned').length}</span>
-                    <span>源文件 {annotatedLines.flatMap(line => line.tokens).filter(token => token.hasKanji && token.readingSource === 'source').length}</span>
-                    <span>人工确认 {annotatedLines.flatMap(line => line.tokens).filter(token => token.hasKanji && token.readingSource === 'manual').length}</span>
+                  <div className="flex flex-wrap gap-x-3 gap-y-1" aria-label="annotation-stats">
+                    <span>{t.autoSource} {annotatedLines.flatMap(line => line.tokens).filter(token => token.hasKanji && token.readingSource === 'automatic').length}</span>
+                    <span>{t.glossarySource} {annotatedLines.flatMap(line => line.tokens).filter(token => token.hasKanji && token.readingSource === 'glossary').length}</span>
+                    <span>{t.learnedSource} {annotatedLines.flatMap(line => line.tokens).filter(token => token.hasKanji && token.readingSource === 'learned').length}</span>
+                    <span>{t.originalSource} {annotatedLines.flatMap(line => line.tokens).filter(token => token.hasKanji && token.readingSource === 'source').length}</span>
+                    <span>{t.manualSource} {annotatedLines.flatMap(line => line.tokens).filter(token => token.hasKanji && token.readingSource === 'manual').length}</span>
                     <button type="button" disabled={!reviewCount || isAnnotating} onClick={jumpToNextReview} className="font-semibold text-amber-700 hover:text-amber-800 underline underline-offset-2 disabled:opacity-50">
-                      待复核 {reviewCount} · 下一处
+                      {t.needsReviewBadge} {reviewCount} · {locale === 'zh-CN' ? '下一处' : 'Next'}
                     </button>
                   </div>
                   <div className="flex items-center gap-3">
-                    {!correctionsReady && <span>正在读取校对记录...</span>}
+                    {!correctionsReady && <span>{t.readingRecordsLoading}</span>}
                     {learnedReadings.length > 0 && (
                       <button type="button" className="underline text-blue-700 hover:text-blue-800" onClick={() => setIsLearnedModalOpen(true)}>
-                        已学语境 ({learnedReadings.length})
+                        {t.learnedContextsBadge} ({learnedReadings.length})
                       </button>
                     )}
                     {documentCorrections.length > 0 && <button type="button" className="underline text-zinc-600 hover:text-zinc-900" onClick={() => {
                       setDatabase(previous => setScriptOverrides(previous, documentId, []));
                       setEditingToken(null);
-                    }}>重置此台本校对</button>}
+                    }}>{t.resetScriptCorrections}</button>}
                   </div>
                 </div>
                 {correctionError && <p role="alert" className="text-xs font-medium text-red-600 bg-red-50 border border-red-200 rounded-lg p-2.5 mb-3">{correctionError}</p>}
-                {missingReadings > 0 && <p className="text-xs font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-2.5 mb-3">{missingReadings} 处汉字缺少读音，可点击补充。</p>}
-                {annotatedLines.some(line => line.tokens.some(token => token.annotationSuppressed)) && <p className="text-xs text-zinc-500 mb-3">包含人工选择不注音的文字，不计入缺失读音。</p>}
+                {missingReadings > 0 && <p className="text-xs font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-2.5 mb-3">{missingReadings} {t.missingReadingsAlert}</p>}
+                {annotatedLines.some(line => line.tokens.some(token => token.annotationSuppressed)) && <p className="text-xs text-zinc-500 mb-3">{t.suppressedReadingsNote}</p>}
                 {annotatedLines.length > 200 && <div className="mb-3 flex items-center justify-between gap-3 text-xs text-zinc-600">
-                  <button type="button" disabled={previewStart === 0} className="underline disabled:opacity-40" onClick={() => setPreviewPage(Math.max(0, previewStart / 200 - 1))}>上一页</button>
-                  <span>预览第 {previewStart + 1}–{Math.min(previewStart + 200, annotatedLines.length)} 行，共 {annotatedLines.length} 行</span>
-                  <button type="button" disabled={previewStart + 200 >= annotatedLines.length} className="underline disabled:opacity-40" onClick={() => setPreviewPage(previewStart / 200 + 1)}>下一页</button>
+                  <button type="button" disabled={previewStart === 0} className="underline disabled:opacity-40" onClick={() => setPreviewPage(Math.max(0, previewStart / 200 - 1))}>{t.prevPage}</button>
+                  <span>{t.previewPageInfo} {previewStart + 1}–{Math.min(previewStart + 200, annotatedLines.length)} {t.linesCount}，{locale === 'zh-CN' ? '共' : 'total'} {annotatedLines.length} {t.linesCount}</span>
+                  <button type="button" disabled={previewStart + 200 >= annotatedLines.length} className="underline disabled:opacity-40" onClick={() => setPreviewPage(previewStart / 200 + 1)}>{t.nextPage}</button>
                 </div>}
                 <div lang="ja" className={`${neuInput} w-full h-[min(58vh,680px)] min-h-[280px] p-5 overflow-y-auto`}>
                   {annotatedLines.slice(previewStart, previewStart + 200).map((line) => (
@@ -861,28 +872,28 @@ export default function DubbingStudioApp() {
                       <div className="script-line text-zinc-900 font-medium" style={{ fontSize: `${fontSize}px`, lineHeight: lineSpacing }}>
                         {line.speaker && <span className="text-zinc-500 mr-1">{line.speaker}：</span>}
                         {line.tokens.length === 0 && <br />}
-                        {line.tokens.map((t, tidx) => {
-                          const TokenElement = t.ruby ? 'ruby' : 'span';
+                        {line.tokens.map((tItem, tidx) => {
+                          const TokenElement = tItem.ruby ? 'ruby' : 'span';
                           return (
                             <TokenElement
                               key={tidx}
-                              id={t.hasKanji ? `ruby-token-${line.id}-${tidx}` : undefined}
+                              id={tItem.hasKanji ? `ruby-token-${line.id}-${tidx}` : undefined}
                               onClick={() => { if (!isAnnotating) openTokenEditor(line.id, tidx); }}
-                              className={t.hasKanji ? `cursor-pointer hover:bg-blue-50 hover:text-blue-900 rounded-sm px-0.5 transition-colors group relative ${t.needsReview ? 'decoration-amber-500 underline decoration-dotted underline-offset-4' : ''}` : ''}
-                              tabIndex={t.hasKanji ? 0 : undefined}
-                              role={t.hasKanji ? 'button' : undefined}
+                              className={tItem.hasKanji ? `cursor-pointer hover:bg-blue-50 hover:text-blue-900 rounded-sm px-0.5 transition-colors group relative ${tItem.needsReview ? 'decoration-amber-500 underline decoration-dotted underline-offset-4' : ''}` : ''}
+                              tabIndex={tItem.hasKanji ? 0 : undefined}
+                              role={tItem.hasKanji ? 'button' : undefined}
                               onKeyDown={(event) => {
-                                if (t.hasKanji && (event.key === 'Enter' || event.key === ' ')) {
+                                if (tItem.hasKanji && (event.key === 'Enter' || event.key === ' ')) {
                                   event.preventDefault();
                                   event.currentTarget.click();
                                 }
                               }}
-                              title={t.hasKanji ? `${t.annotationSuppressed ? '主动不注音' : t.readingSource === 'source' ? '源文件注音' : t.readingSource === 'manual' ? '人工校对' : t.readingSource === 'glossary' ? '专名词典' : '自动注音'}${t.needsReview ? '；待复核' : ''}，点击修改` : undefined}
+                              title={tItem.hasKanji ? `${tItem.annotationSuppressed ? (locale === 'zh-CN' ? '主动不注音' : 'No Ruby') : tItem.readingSource === 'source' ? t.originalSource : tItem.readingSource === 'manual' ? t.manualSource : tItem.readingSource === 'glossary' ? t.glossarySource : t.autoSource}${tItem.needsReview ? ` · ${t.needsReviewBadge}` : ''}` : undefined}
                             >
-                              {t.surface}
-                              {t.ruby && (
+                              {tItem.surface}
+                              {tItem.ruby && (
                                 <rt className="text-blue-600 select-none group-hover:text-blue-700 font-semibold" style={{ fontSize: `${rubyFontSize}px` }}>
-                                  {t.ruby}
+                                  {tItem.ruby}
                                 </rt>
                               )}
                             </TokenElement>
@@ -898,13 +909,13 @@ export default function DubbingStudioApp() {
             {/* Quick Export Bar */}
             <div className={`${neuCard} p-5 flex flex-col md:flex-row items-center justify-between gap-4`}>
               <div>
-                <h4 className="font-semibold text-sm text-zinc-900 mb-0.5">单文件导出</h4>
-                <p className="text-xs text-zinc-500">导出以「{docTitle}」命名的 Word (.docx)、SRT 字幕与 TXT 文本</p>
+                <h4 className="font-semibold text-sm text-zinc-900 mb-0.5">{t.singleExportTitle}</h4>
+                <p className="text-xs text-zinc-500">{t.singleExportDesc.replace('{title}', docTitle)}</p>
               </div>
               <div className="flex flex-wrap items-center gap-2.5">
-                <button disabled={isExporting || isKuromojiLoading || isAnnotating || !!annotationError || !correctionsReady} onClick={() => handleExport('txt')} className={`${neuButton} px-3.5 py-2 text-xs`}>导出 TXT</button>
-                <button disabled={isExporting || isKuromojiLoading || isAnnotating || !!annotationError || !correctionsReady} onClick={() => handleExport('srt')} className={`${neuButton} px-3.5 py-2 text-xs`}>导出 SRT</button>
-                <button disabled={isExporting || isKuromojiLoading || isAnnotating || !!annotationError || !correctionsReady} onClick={() => handleExport('docx')} className="rounded-lg bg-zinc-900 px-4 py-2 text-xs font-medium text-white hover:bg-zinc-800 disabled:opacity-50 transition-colors shadow-xs">导出 Word (.docx)</button>
+                <button disabled={isExporting || isKuromojiLoading || isAnnotating || !!annotationError || !correctionsReady} onClick={() => handleExport('txt')} className={`${neuButton} px-3.5 py-2 text-xs`}>{t.exportTxt}</button>
+                <button disabled={isExporting || isKuromojiLoading || isAnnotating || !!annotationError || !correctionsReady} onClick={() => handleExport('srt')} className={`${neuButton} px-3.5 py-2 text-xs`}>{t.exportSrt}</button>
+                <button disabled={isExporting || isKuromojiLoading || isAnnotating || !!annotationError || !correctionsReady} onClick={() => handleExport('docx')} className="rounded-lg bg-zinc-900 px-4 py-2 text-xs font-medium text-white hover:bg-zinc-800 disabled:opacity-50 transition-colors shadow-xs">{t.exportDocx}</button>
               </div>
             </div>
           </section>
@@ -912,494 +923,86 @@ export default function DubbingStudioApp() {
 
         {/* PAGE VIEW 2: DEDICATED BATCH FILE PROCESSING PAGE */}
         {activeTab === 'batch_files' && (
-          <section className="flex-1 flex flex-col gap-6">
-            {/* Header Card */}
-            <div className={`${neuCard} p-6 md:p-8 flex flex-col md:flex-row items-start md:items-center justify-between gap-6`}>
-              <div className="space-y-2.5 max-w-2xl">
-                <span className={neuBadge}>
-                  📁 批量文件处理
-                </span>
-                <h2 className="font-semibold text-xl md:text-2xl text-zinc-900 tracking-tight">
-                  台本批量注音与导出
-                </h2>
-                <p className="text-xs md:text-sm text-zinc-500 leading-relaxed">
-                  拖拽或选择多个台本文件（支持 .txt, .srt, .docx），系统将根据各自文件名自动生成 Word 标题并注音导出。
-                </p>
-              </div>
-
-              <div className="flex flex-col gap-2">
-                <span className="font-medium text-xs text-zinc-700">目标导出格式：</span>
-                <div className="flex items-center gap-1.5">
-                  {(['docx', 'srt', 'txt'] as const).map(fmt => (
-                    <button
-                      key={fmt}
-                      onClick={() => setBatchTargetFormat(fmt)}
-                      className={`${batchTargetFormat === fmt ? neuButtonActive : neuButton} px-3.5 py-1.5 text-xs uppercase`}
-                    >
-                      .{fmt}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            {/* Drag & Drop Area */}
-            <div
-              onDragOver={(e) => e.preventDefault()}
-              onDrop={handleDrop}
-              className={`${neuCard} border-2 border-dashed border-zinc-200/90 hover:border-zinc-300 bg-zinc-50/30 p-10 text-center flex flex-col items-center justify-center gap-3.5 transition-colors`}
-            >
-              <div className="w-12 h-12 rounded-xl bg-white border border-zinc-200 flex items-center justify-center text-zinc-500 shadow-xs">
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                </svg>
-              </div>
-              <div>
-                <p className="font-medium text-sm text-zinc-900">将台本文件拖拽至此处，或点击下方按钮选择</p>
-                <p className="text-xs text-zinc-500 mt-1">支持格式：.txt / .srt / .docx（批量注音时以原文件名作为 Word 标题）</p>
-              </div>
-              <input
-                type="file"
-                ref={fileInputRef}
-                onChange={handleFileSelect}
-                multiple
-                accept=".txt,.srt,.docx"
-                className="hidden"
-              />
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                className={`${neuButton} px-5 py-2 text-xs font-medium text-zinc-800 mt-1`}
-              >
-                选择文件...
-              </button>
-            </div>
-
-            {/* File List & Progress Cards */}
-            {batchFiles.length > 0 && (
-              <div className={`${neuCard} p-5 flex flex-col gap-4`}>
-                <div className="flex items-center justify-between pb-2.5 border-b border-zinc-100">
-                  <span className="font-semibold text-xs text-zinc-800">
-                    待处理队列 ({batchFiles.length} 个文件)
-                  </span>
-                  <button
-                    onClick={clearBatchFiles}
-                    disabled={isBatchProcessing}
-                    className="text-xs text-red-600 hover:text-red-700 font-medium transition-colors"
-                  >
-                    清空列表
-                  </button>
-                </div>
-
-                <div className="space-y-2 max-h-[350px] overflow-y-auto pr-1">
-                  {batchFiles.map(file => (
-                    <div
-                      key={file.id}
-                      className="p-3 bg-zinc-50/70 border border-zinc-200/70 rounded-lg flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs"
-                    >
-                      <div className="flex items-center gap-3 overflow-hidden">
-                        <div className="w-7 h-7 rounded bg-white border border-zinc-200 flex items-center justify-center flex-shrink-0 text-[10px] font-bold text-zinc-600 uppercase">
-                          {file.name.split('.').pop()}
-                        </div>
-                        <div className="truncate">
-                          <p className="font-medium text-xs text-zinc-900 truncate">{file.name}</p>
-                          <p className="text-[11px] text-zinc-500">{(file.size / 1024).toFixed(1)} KB {file.lineCount ? `• ${file.lineCount} 行` : ''}</p>
-                          {file.error && <p role="alert" className="text-xs text-red-600 whitespace-normal">{file.error}</p>}
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-2.5 flex-shrink-0">
-                        {file.status === 'pending' && <span className={neuBadge}>等待中</span>}
-                        {file.status === 'processing' && (
-                          <span className="text-xs text-blue-600 font-semibold flex items-center gap-1.5">
-                            <svg className="animate-spin h-3.5 w-3.5" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
-                            注音处理中
-                          </span>
-                        )}
-                        {file.status === 'done' && <span className="text-xs text-emerald-600 font-semibold">✓ 已成功</span>}
-                        {file.status === 'error' && <span className="text-xs text-red-500 font-semibold">✕ 失败</span>}
-
-                        <button
-                          onClick={() => removeBatchFile(file.id)}
-                          disabled={isBatchProcessing}
-                          className="w-6 h-6 rounded text-zinc-400 hover:text-red-600 hover:bg-zinc-100 flex items-center justify-center text-xs transition-colors"
-                        >
-                          ✕
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="pt-3 border-t border-zinc-100 flex justify-end">
-                  <button
-                    onClick={processBatchQueue}
-                    disabled={isBatchProcessing || isKuromojiLoading || !correctionsReady}
-                    className="rounded-lg bg-zinc-900 px-6 py-2.5 text-xs font-medium text-white hover:bg-zinc-800 disabled:opacity-50 flex items-center gap-2 transition-colors shadow-xs"
-                  >
-                    {isBatchProcessing ? (
-                      <>
-                        <svg className="animate-spin h-3.5 w-3.5 text-white" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
-                        正在处理队列...
-                      </>
-                    ) : (
-                      <>🚀 开始批量处理并自动保存</>
-                    )}
-                  </button>
-                </div>
-              </div>
-            )}
-          </section>
+          <BatchProcessingPanel
+            batchTargetFormat={batchTargetFormat}
+            setBatchTargetFormat={setBatchTargetFormat}
+            handleDrop={handleDrop}
+            handleFileSelect={handleFileSelect}
+            fileInputRef={fileInputRef}
+            batchFiles={batchFiles}
+            clearBatchFiles={clearBatchFiles}
+            removeBatchFile={removeBatchFile}
+            processBatchQueue={processBatchQueue}
+            isBatchProcessing={isBatchProcessing}
+            isKuromojiLoading={isKuromojiLoading}
+            correctionsReady={correctionsReady}
+            t={t}
+          />
         )}
       </div>
 
       <GlossaryModal isOpen={isGlossaryOpen} onClose={() => setIsGlossaryOpen(false)} entries={database.glossary}
-        onChange={glossary => { setEditingToken(null); setDatabase(previous => ({ ...previous, glossary })); }} />
+        onChange={glossary => { setEditingToken(null); setDatabase(previous => ({ ...previous, glossary })); }}
+        t={t}
+      />
 
       {/* Dependency Diagnostic Modal */}
-      <Modal
+      <DependencyModal
         isOpen={isDepModalOpen}
         onClose={() => setIsDepModalOpen(false)}
-        title="🛠️ 本地核心组件诊断"
-      >
-        <div className="space-y-4">
-          <p className="text-xs text-zinc-500">
-            检查当前实际使用的离线词典和校对记录存储状态
-          </p>
-
-          <div className="space-y-2.5">
-            {deps.map((dep, idx) => (
-              <div key={idx} className="p-3 bg-zinc-50/80 border border-zinc-200/80 rounded-lg flex items-center justify-between">
-                <div>
-                  <div className="font-medium text-xs text-zinc-900">{dep.name}</div>
-                  <div className="text-[11px] text-zinc-500">{dep.desc}</div>
-                </div>
-                <div className="flex items-center gap-2">
-                  {dep.status === 'ready' && (
-                    <span className="text-xs font-semibold text-emerald-600 flex items-center gap-1">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> 正常
-                    </span>
-                  )}
-                  {dep.status === 'error' && <span className="text-xs font-semibold text-red-600">异常</span>}
-                  {dep.status === 'repairing' && (
-                    <span className="text-xs font-semibold text-blue-600 flex items-center gap-1 animate-pulse">
-                      检查中...
-                    </span>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-
-          <div className="pt-2 flex justify-between items-center">
-            <button
-              onClick={runDependencyRepair}
-              disabled={isKuromojiLoading}
-              className={`${neuButton} px-3.5 py-1.5 text-xs`}
-            >
-              🔄 重新检查
-            </button>
-            <button
-              onClick={() => setIsDepModalOpen(false)}
-              className="rounded-lg bg-zinc-900 px-5 py-1.5 text-xs font-medium text-white hover:bg-zinc-800 transition-colors shadow-xs"
-            >
-              完成
-            </button>
-          </div>
-        </div>
-      </Modal>
+        deps={deps}
+        runDependencyRepair={runDependencyRepair}
+        isKuromojiLoading={isKuromojiLoading}
+        t={t}
+      />
 
       {/* Single Script Export Progress Modal */}
-      <Modal
+      <ExportProgressModal
         isOpen={isExportModalOpen}
-        onClose={() => !isExporting && setIsExportModalOpen(false)}
-        title={exportOutcome === 'processing' ? '正在导出台本' : exportOutcome === 'cancelled' ? '已取消保存' : exportOutcome === 'error' ? '导出失败' : exportOutcome === 'download' ? '已发起下载' : '导出完成'}
-      >
-        <div className="space-y-5 py-2">
-          <div className="flex items-center justify-between text-xs font-medium text-zinc-700">
-            <span>生成进度 ({exportFormat.toUpperCase()})</span>
-            <span>{exportProgress}%</span>
-          </div>
-
-          <div className="w-full h-2 bg-zinc-100 border border-zinc-200 rounded-full overflow-hidden">
-            <div
-              className="h-full bg-zinc-900 rounded-full transition-all duration-300"
-              style={{ width: `${exportProgress}%` }}
-            />
-          </div>
-
-          <p role={exportOutcome === 'error' ? 'alert' : 'status'} className="text-xs text-center text-zinc-600">
-            {exportOutcome === 'processing' && (exportProgress < 80 ? `正在生成 ${exportFormat.toUpperCase()} 文件...` : '请选择保存位置并等待写入完成...')}
-            {exportOutcome === 'saved' && '文件已保存。'}
-            {exportOutcome === 'download' && '已交给浏览器下载，请在下载列表中确认结果。'}
-            {exportOutcome === 'cancelled' && '已取消保存，可以关闭后重新导出。'}
-            {exportOutcome === 'error' && `导出失败：${exportError}`}
-          </p>
-
-          <div className="flex justify-end pt-1">
-            <button
-              disabled={isExporting}
-              onClick={() => setIsExportModalOpen(false)}
-              className="rounded-lg bg-zinc-900 px-5 py-2 text-xs font-medium text-white hover:bg-zinc-800 disabled:opacity-50 transition-colors shadow-xs"
-            >
-              {isExporting ? '处理中...' : '完成'}
-            </button>
-          </div>
-        </div>
-      </Modal>
+        onClose={() => setIsExportModalOpen(false)}
+        isExporting={isExporting}
+        exportFormat={exportFormat}
+        exportProgress={exportProgress}
+        exportOutcome={exportOutcome}
+        exportError={exportError}
+        t={t}
+      />
 
       {/* Batch Processing Completion Modal */}
-      <Modal
+      <BatchDoneModal
         isOpen={isBatchDoneModalOpen}
         onClose={() => setIsBatchDoneModalOpen(false)}
-        title="✅ 批量处理完成"
-      >
-        <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-2.5">
-            <div className="p-3.5 bg-zinc-50 border border-zinc-200/80 rounded-lg text-center">
-              <div className="text-2xl font-bold text-zinc-900">{batchDoneResults.total}</div>
-              <div className="text-[11px] text-zinc-500 mt-0.5">总文件数</div>
-            </div>
-            <div className="p-3.5 bg-zinc-50 border border-zinc-200/80 rounded-lg text-center">
-              <div className="text-2xl font-bold text-emerald-600">{batchDoneResults.success}</div>
-              <div className="text-[11px] text-zinc-500 mt-0.5">成功导出</div>
-            </div>
-            <div className="p-3.5 bg-zinc-50 border border-zinc-200/80 rounded-lg text-center">
-              <div className="text-2xl font-bold text-red-600">{batchDoneResults.failed}</div>
-              <div className="text-[11px] text-zinc-500 mt-0.5">失败</div>
-            </div>
-            <div className="p-3.5 bg-zinc-50 border border-zinc-200/80 rounded-lg text-center">
-              <div className="text-2xl font-bold text-zinc-500">{batchDoneResults.cancelled}</div>
-              <div className="text-[11px] text-zinc-500 mt-0.5">取消保存</div>
-            </div>
-          </div>
-
-          {batchDoneResults.filenames.length > 0 && (
-            <div>
-              <h4 className="text-xs font-medium text-zinc-700 mb-1.5">已导出文件：</h4>
-              <div className="max-h-[160px] overflow-y-auto space-y-1">
-                {batchDoneResults.filenames.map((name, idx) => (
-                  <div key={idx} className="flex items-center gap-2 px-2.5 py-1.5 bg-zinc-50 border border-zinc-200/70 rounded-md">
-                    <span className="text-emerald-600 text-xs font-bold">✓</span>
-                    <span className="text-xs text-zinc-800 truncate">{name}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          <div className="p-2.5 bg-zinc-50 border border-zinc-200/80 rounded-lg">
-            <p className="text-xs font-medium text-zinc-600 text-center">
-              已完成 {batchDoneResults.success} 个文件的保存或下载请求；浏览器下载请在下载列表中确认。
-            </p>
-          </div>
-
-          <div className="flex justify-end pt-1">
-            <button
-              onClick={() => setIsBatchDoneModalOpen(false)}
-              className="rounded-lg bg-zinc-900 px-6 py-2 text-xs font-medium text-white hover:bg-zinc-800 transition-colors shadow-xs"
-            >
-              确定
-            </button>
-          </div>
-        </div>
-      </Modal>
+        results={batchDoneResults}
+        t={t}
+      />
 
       {/* Interactive Modal for Editing / Disambiguating Ruby */}
-      <Modal
-        isOpen={!!editingToken}
+      <RubyCorrectionModal
+        editingToken={editingToken}
         onClose={() => setEditingToken(null)}
-        title="✏️ 假标注与多音字校对"
-      >
-        {editingToken && (
-          <div className="space-y-4">
-            <div className="flex items-center justify-between bg-zinc-50/80 border border-zinc-200/80 p-3.5 rounded-xl">
-              <div>
-                <div className="text-[11px] text-zinc-500 mb-0.5">当前标注文字</div>
-                <div className="text-2xl font-bold text-zinc-900">{editingToken.surface}</div>
-              </div>
-              <div className="text-right">
-                <div className="text-[11px] text-zinc-500 mb-0.5">当前注音</div>
-                <div className="text-lg font-bold text-blue-600">{editingToken.currentRuby || '(无注音)'}</div>
-              </div>
-            </div>
-
-            {(() => {
-              const line = annotatedLines.find(l => l.id === editingToken.lineId);
-              if (!line) return null;
-              const start = line.tokens.slice(0, editingToken.tokenIndex).reduce((sum, t) => sum + t.surface.length, 0);
-              const before = line.cleanText.slice(Math.max(0, start - 24), start);
-              const after = line.cleanText.slice(start + editingToken.surface.length, start + editingToken.surface.length + 24);
-              return (
-                <div className="text-xs text-zinc-600 bg-zinc-50/70 border border-zinc-200/80 p-3 rounded-lg leading-relaxed">
-                  <span className="text-zinc-500 font-medium mr-1">所在短句：</span>
-                  <span>{before}</span>
-                  <span className="bg-amber-100 text-zinc-900 font-bold px-1.5 py-0.5 rounded mx-0.5 border border-amber-200">
-                    {editingToken.surface}
-                  </span>
-                  <span>{after}</span>
-                </div>
-              );
-            })()}
-
-            <div>
-              <div className="text-xs font-medium text-zinc-700 mb-1.5">标注范围（词组共享一组居中注音）：</div>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  disabled={editingToken.tokenIndex === 0}
-                  onClick={() => resizeRubyRange(editingToken.tokenIndex - 1, editingToken.tokenEndIndex)}
-                  className={`${neuButton} px-3 py-1.5 text-xs disabled:opacity-40`}
-                >向左扩展</button>
-                <button
-                  type="button"
-                  disabled={editingToken.tokenEndIndex >= (annotatedLines.find(line => line.id === editingToken.lineId)?.tokens.length || 0) - 1}
-                  onClick={() => resizeRubyRange(editingToken.tokenIndex, editingToken.tokenEndIndex + 1)}
-                  className={`${neuButton} px-3 py-1.5 text-xs disabled:opacity-40`}
-                >向右扩展</button>
-                <button
-                  type="button"
-                  disabled={editingToken.tokenIndex === editingToken.tokenEndIndex}
-                  onClick={() => resizeRubyRange(editingToken.tokenIndex, editingToken.tokenEndIndex - 1)}
-                  className={`${neuButton} px-3 py-1.5 text-xs disabled:opacity-40`}
-                >缩小范围</button>
-              </div>
-              <p className="text-[11px] text-zinc-500 mt-1.5">例如选择「二」后向右扩展至「二人」，输入「ふたり」并保存。修改按台本 ID 保存，改标题不会丢失；仅应用于相同原文行。</p>
-              <div lang="ja" className="script-line text-center py-3 text-2xl text-zinc-900">
-                <ruby>{editingToken.surface}<rt style={{ fontSize: `${rubyFontSize}px` }}>{customRubyInput || '\u00a0'}</rt></ruby>
-              </div>
-            </div>
-
-            {editingToken.alternatives && editingToken.alternatives.length > 0 && (
-              <div>
-                <div className="text-xs font-medium text-zinc-700 mb-1.5">💡 前后文常见候选读音（点击直接套用）：</div>
-                <div className="flex flex-wrap gap-1.5">
-                  {editingToken.alternatives.map((alt, aidx) => (
-                    <button
-                      key={aidx}
-                      type="button"
-                      onClick={() => setCustomRubyInput(alt)}
-                      className={`${customRubyInput === alt ? neuButtonActive : neuButton} px-3 py-1 text-xs`}
-                    >
-                      {alt}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            <div>
-              <label className="mb-2.5 flex items-center gap-2 text-xs font-medium text-zinc-800 cursor-pointer">
-                <input type="checkbox" className="rounded border-zinc-300 text-zinc-900 focus:ring-zinc-900/10" checked={correctionScope === 'glossary'} onChange={event => setCorrectionScope(event.target.checked ? 'glossary' : 'occurrence')} />
-                加入专名词典，应用于所有台本的同名文字
-              </label>
-              <label className="block text-xs font-medium text-zinc-700 mb-1">
-                自定义注音 (平假名/片假名/罗马音)：
-              </label>
-              <input
-                type="text"
-                value={customRubyInput}
-                onChange={(e) => setCustomRubyInput(e.target.value)}
-                placeholder="输入该语境下的准确假名..."
-                className={`${neuInput} w-full px-3 py-2 text-sm`}
-                autoFocus
-                onCompositionStart={() => { rubyCompositionRef.current = true; }}
-                onCompositionEnd={() => { rubyCompositionRef.current = false; }}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !rubyCompositionRef.current && !e.nativeEvent.isComposing && e.nativeEvent.keyCode !== 229) {
-                    e.preventDefault();
-                    saveTokenRuby();
-                  }
-                }}
-              />
-            </div>
-
-            <div className="flex items-center justify-between pt-2 border-t border-zinc-100">
-              <button
-                type="button"
-                onClick={removeTokenRuby}
-                className="text-xs text-red-600 hover:text-red-700 underline font-medium"
-              >
-                清除所选文字注音
-              </button>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setEditingToken(null)}
-                  className={`${neuButton} px-3.5 py-1.5 text-xs`}
-                >
-                  取消
-                </button>
-                <button
-                  type="button"
-                  onClick={saveTokenRuby}
-                  className="rounded-lg border border-zinc-200 bg-white px-3.5 py-1.5 text-xs font-medium text-zinc-900 hover:bg-zinc-50 shadow-xs transition-colors"
-                >
-                  保存修改
-                </button>
-                <button
-                  type="button"
-                  onClick={saveAndOpenNextReview}
-                  disabled={isAdvancingReview}
-                  className="rounded-lg bg-zinc-900 px-4 py-1.5 text-xs font-medium text-white hover:bg-zinc-800 disabled:opacity-50 shadow-xs transition-colors"
-                >
-                  保存并下一处
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-      </Modal>
+        annotatedLines={annotatedLines}
+        rubyFontSize={rubyFontSize}
+        customRubyInput={customRubyInput}
+        setCustomRubyInput={setCustomRubyInput}
+        resizeRubyRange={resizeRubyRange}
+        correctionScope={correctionScope}
+        setCorrectionScope={setCorrectionScope}
+        rubyCompositionRef={rubyCompositionRef}
+        saveTokenRuby={saveTokenRuby}
+        removeTokenRuby={removeTokenRuby}
+        saveAndOpenNextReview={saveAndOpenNextReview}
+        isAdvancingReview={isAdvancingReview}
+        t={t}
+      />
 
       {/* Modal for viewing and deleting learned readings */}
-      <Modal
+      <LearnedReadingsModal
         isOpen={isLearnedModalOpen}
         onClose={() => setIsLearnedModalOpen(false)}
-        title="📚 本台本语境已学读音"
-      >
-        <div className="space-y-4">
-          <p className="text-xs text-zinc-500 leading-relaxed">
-            在复核时确认的读音会自动学习所在短句语境。同一台本中处于相同前后文的词语将自动应用，无需重复复核。
-          </p>
-          {learnedReadings.length === 0 ? (
-            <div className="text-center py-6 text-zinc-400 text-xs">暂无已学语境记录</div>
-          ) : (
-            <div className="max-h-[300px] overflow-y-auto space-y-2">
-              {learnedReadings.map((item, idx) => (
-                <div key={idx} className="flex items-center justify-between p-3 bg-zinc-50/70 border border-zinc-200/80 rounded-lg text-xs">
-                  <div className="space-y-0.5">
-                    <div className="flex items-center gap-2">
-                      <span className="font-semibold text-zinc-900 text-sm">{item.surface}</span>
-                      <span className="font-medium text-blue-600">→ {item.reading}</span>
-                      <span className="text-[10px] text-zinc-400">({item.type})</span>
-                    </div>
-                    <div className="text-zinc-500 text-[11px]">
-                      语境：<span>{item.before ? `...${item.before}` : ''}</span>
-                      <strong className="text-zinc-800 font-semibold">[{item.surface}]</strong>
-                      <span>{item.after ? `${item.after}...` : ''}</span>
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setDatabase(prev => deleteLearnedReading(prev, documentId, idx))}
-                    className="text-red-600 hover:text-red-700 underline text-xs ml-3 flex-shrink-0"
-                  >
-                    删除
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-          <div className="flex justify-end pt-1 border-t border-zinc-100">
-            <button
-              type="button"
-              onClick={() => setIsLearnedModalOpen(false)}
-              className="rounded-lg bg-zinc-900 px-5 py-1.5 text-xs font-medium text-white hover:bg-zinc-800 transition-colors shadow-xs"
-            >
-              关闭
-            </button>
-          </div>
-        </div>
-      </Modal>
+        learnedReadings={learnedReadings}
+        onDeleteLearnedReading={idx => setDatabase(prev => deleteLearnedReading(prev, documentId, idx))}
+        t={t}
+      />
     </main>
   );
 }
