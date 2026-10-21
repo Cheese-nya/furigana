@@ -1,0 +1,483 @@
+import { fingerprintText } from './correctionDatabase';
+import { cleanScriptTitle, stripExportWatermark } from './docxImporter';
+import type { RubyOverride } from './rubyOverrides';
+import { validateRubyOverrides } from './rubyOverrides';
+import type { SrtCue } from './srt';
+
+export type BookCategory = 'script' | 'novel' | 'subtitle' | 'other';
+export type BookFormat = 'txt' | 'srt' | 'docx';
+export type BookCoverTheme = 'indigo' | 'emerald' | 'amber' | 'rose' | 'slate';
+
+export interface BookChapter {
+  id: string;
+  title: string;
+  startLine: number;
+  endLine: number;
+}
+
+export interface ReadingProgress {
+  chapterIndex: number;
+  lineIndex: number;
+  percentage: number;
+  updatedAt: number;
+}
+
+export interface BookmarkItem {
+  id: string;
+  chapterIndex: number;
+  lineIndex: number;
+  label: string;
+  snippet: string;
+  createdAt: number;
+}
+
+export interface BookItem {
+  bookId: string;
+  title: string;
+  author: string;
+  description?: string;
+  coverUrl?: string;
+  sourceUrl?: string;
+  category: BookCategory;
+  format: BookFormat;
+  coverTheme: BookCoverTheme;
+  content: string;
+  fingerprint: string;
+  sourceOverrides: RubyOverride[];
+  srtCues?: SrtCue[];
+  chapters: BookChapter[];
+  readingProgress: ReadingProgress;
+  bookmarks: BookmarkItem[];
+  favorite: boolean;
+  createdAt: number;
+  updatedAt: number;
+  lastReadAt: number;
+}
+
+/**
+ * Version 1 rewrote `other` (and Pixiv books) to `script` on every load, so a picked
+ * 其他 never stuck. Version 2 keeps every stored category: version 1 data is migrated
+ * once when it is loaded or imported, and is saved back as version 2.
+ */
+export const LIBRARY_VERSION = 2;
+
+export interface LibraryDatabase {
+  version: typeof LIBRARY_VERSION;
+  books: Record<string, BookItem>;
+}
+
+/** @deprecated Former name of {@link LibraryDatabase}; it now always holds version 2 data. */
+export type LibraryDatabaseV1 = LibraryDatabase;
+
+const CATEGORIES: readonly BookCategory[] = ['script', 'novel', 'subtitle', 'other'];
+const FORMATS: readonly BookFormat[] = ['txt', 'srt', 'docx'];
+const THEMES: readonly BookCoverTheme[] = ['indigo', 'emerald', 'amber', 'rose', 'slate'];
+const VALID_THEMES = THEMES;
+const FINGERPRINT = /^sha256:[a-f0-9]{64}$/;
+
+
+export function emptyLibraryDatabase(): LibraryDatabase {
+  return { version: LIBRARY_VERSION, books: {} };
+}
+
+function object(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function textLines(text: string): string[] {
+  return text.replace(/\r\n?/g, '\n').split('\n');
+}
+
+/** Scripts stay one piece: never split a 台本 into chapters, even when headings are present. */
+export function extractChapters(text: string, fallbackTitle = '全文'): BookChapter[] {
+  const lines = textLines(text);
+  return [{
+    id: 'chapter:1',
+    title: cleanScriptTitle(fallbackTitle) || '全文',
+    startLine: 0,
+    endLine: Math.max(0, lines.length - 1),
+  }];
+}
+
+function themeForIndex(index: number): BookCoverTheme {
+  return THEMES[index % THEMES.length];
+}
+
+function emptyProgress(now = Date.now()): ReadingProgress {
+  return { chapterIndex: 0, lineIndex: 0, percentage: 0, updatedAt: now };
+}
+
+function findByFingerprint(db: LibraryDatabase, fingerprint: string): BookItem | undefined {
+  return Object.values(db.books).find(book => book.fingerprint === fingerprint);
+}
+
+export interface UpsertBookInput {
+  bookId?: string;
+  title: string;
+  author?: string;
+  description?: string;
+  coverUrl?: string;
+  sourceUrl?: string;
+  category?: BookCategory;
+  format?: BookFormat;
+  coverTheme?: BookCoverTheme;
+  content: string;
+  fingerprint?: string;
+  sourceOverrides?: RubyOverride[];
+  srtCues?: SrtCue[];
+  favorite?: boolean;
+  now?: number;
+}
+
+export async function upsertBook(db: LibraryDatabase, input: UpsertBookInput): Promise<LibraryDatabase> {
+  const content = stripExportWatermark(input.content);
+  const title = cleanScriptTitle(input.title) || '未命名台本';
+  const fingerprint = input.fingerprint || await fingerprintText(content);
+  const now = input.now ?? Date.now();
+  const existing = (input.bookId && db.books[input.bookId]) || findByFingerprint(db, fingerprint);
+  const bookId = existing?.bookId || input.bookId || `book:${crypto.randomUUID()}`;
+  const readingProgress = existing?.readingProgress ?? emptyProgress(now);
+  const author = existing
+    ? (input.author !== undefined ? input.author.trim() : existing.author)
+    : (input.author?.trim() ?? '');
+  const description = existing
+    ? (input.description !== undefined ? input.description.trim() : existing.description)
+    : (input.description?.trim() || undefined);
+  const coverUrl = existing
+    ? (input.coverUrl !== undefined ? input.coverUrl.trim() : existing.coverUrl)
+    : (input.coverUrl?.trim() || undefined);
+  const sourceUrl = existing
+    ? (input.sourceUrl !== undefined ? input.sourceUrl.trim() : existing.sourceUrl)
+    : (input.sourceUrl?.trim() || undefined);
+  const book: BookItem = {
+    bookId,
+    title,
+    author,
+    ...(description !== undefined ? { description } : {}),
+    ...(coverUrl !== undefined ? { coverUrl } : {}),
+    ...(sourceUrl !== undefined ? { sourceUrl } : {}),
+    category: input.category ?? existing?.category ?? 'script',
+    format: input.format ?? existing?.format ?? 'txt',
+    coverTheme: input.coverTheme ?? existing?.coverTheme ?? themeForIndex(Object.keys(db.books).length),
+    content,
+    fingerprint,
+    sourceOverrides: input.sourceOverrides ?? existing?.sourceOverrides ?? [],
+    ...(input.srtCues || existing?.srtCues ? { srtCues: input.srtCues ?? existing?.srtCues } : {}),
+    chapters: extractChapters(content, title),
+    readingProgress: { ...readingProgress, chapterIndex: 0 },
+    bookmarks: existing?.bookmarks ?? [],
+    favorite: input.favorite ?? existing?.favorite ?? false,
+    createdAt: existing?.createdAt ?? now,
+    updatedAt: now,
+    lastReadAt: existing?.lastReadAt ?? 0,
+  };
+  const books = { ...db.books };
+  if (existing && existing.bookId !== bookId) delete books[existing.bookId];
+  books[bookId] = book;
+  return { version: LIBRARY_VERSION, books };
+}
+
+export interface BookMetadataPatch {
+  title?: string;
+  author?: string;
+  description?: string;
+  coverUrl?: string;
+  coverTheme?: BookCoverTheme;
+  category?: BookCategory;
+}
+
+export function updateBookMetadata(
+  db: LibraryDatabase,
+  bookId: string,
+  patch: BookMetadataPatch,
+  now = Date.now(),
+): LibraryDatabase {
+  const book = db.books[bookId];
+  if (!book) return db;
+  const title = patch.title !== undefined && patch.title.trim() ? patch.title.trim() : book.title;
+  const author = patch.author !== undefined ? patch.author.trim() : book.author;
+  const description = patch.description !== undefined ? patch.description.trim() : book.description;
+  const coverUrl = patch.coverUrl !== undefined ? patch.coverUrl.trim() : book.coverUrl;
+  const coverTheme = patch.coverTheme && VALID_THEMES.includes(patch.coverTheme) ? patch.coverTheme : book.coverTheme;
+  const category = patch.category && CATEGORIES.includes(patch.category) ? patch.category : book.category;
+  const updated: BookItem = {
+    ...book,
+    title,
+    author,
+    ...(description !== undefined ? { description } : {}),
+    ...(coverUrl !== undefined ? { coverUrl } : {}),
+    coverTheme,
+    category,
+    updatedAt: now,
+  };
+  return { ...db, books: { ...db.books, [bookId]: updated } };
+}
+
+/** Return all books ordered by last read time descending, falling back to update time. */
+export function listBooks(db: LibraryDatabase): BookItem[] {
+  return Object.values(db.books).sort((a, b) => (b.lastReadAt || b.updatedAt) - (a.lastReadAt || a.updatedAt));
+}
+
+export function deleteBook(db: LibraryDatabase, bookId: string): LibraryDatabase {
+  if (!db.books[bookId]) return db;
+  const books = { ...db.books };
+  delete books[bookId];
+  return { ...db, books };
+}
+
+export function toggleBookFavorite(db: LibraryDatabase, bookId: string, now = Date.now()): LibraryDatabase {
+  const book = db.books[bookId];
+  if (!book) return db;
+  return { ...db, books: { ...db.books, [bookId]: { ...book, favorite: !book.favorite, updatedAt: now } } };
+}
+
+export function updateReadingProgress(db: LibraryDatabase, bookId: string, progress: Omit<ReadingProgress, 'updatedAt'> & { updatedAt?: number }, now = Date.now()): LibraryDatabase {
+  const book = db.books[bookId];
+  if (!book) return db;
+  const updatedAt = progress.updatedAt ?? now;
+  return { ...db, books: { ...db.books, [bookId]: {
+    ...book,
+    readingProgress: { chapterIndex: progress.chapterIndex, lineIndex: progress.lineIndex, percentage: progress.percentage, updatedAt },
+    lastReadAt: updatedAt,
+    updatedAt,
+  } } };
+}
+
+export function addBookmark(db: LibraryDatabase, bookId: string, bookmark: Omit<BookmarkItem, 'id' | 'createdAt'> & { id?: string; createdAt?: number }, now = Date.now()): LibraryDatabase {
+  const book = db.books[bookId];
+  if (!book) return db;
+  const item: BookmarkItem = {
+    id: bookmark.id || `bookmark:${crypto.randomUUID()}`,
+    chapterIndex: bookmark.chapterIndex,
+    lineIndex: bookmark.lineIndex,
+    label: bookmark.label,
+    snippet: bookmark.snippet,
+    createdAt: bookmark.createdAt ?? now,
+  };
+  const bookmarks = [...book.bookmarks.filter(value => value.id !== item.id), item];
+  return { ...db, books: { ...db.books, [bookId]: { ...book, bookmarks, updatedAt: item.createdAt } } };
+}
+
+export function removeBookmark(db: LibraryDatabase, bookId: string, bookmarkId: string, now = Date.now()): LibraryDatabase {
+  const book = db.books[bookId];
+  if (!book) return db;
+  return { ...db, books: { ...db.books, [bookId]: { ...book, bookmarks: book.bookmarks.filter(item => item.id !== bookmarkId), updatedAt: now } } };
+}
+
+function finiteNumber(value: unknown, label: string): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) throw new Error(`${label}无效`);
+  return value;
+}
+
+function nonNegativeInteger(value: unknown, label: string): number {
+  const number = finiteNumber(value, label);
+  if (!Number.isInteger(number) || number < 0) throw new Error(`${label}无效`);
+  return number;
+}
+
+function validateProgress(value: unknown): ReadingProgress {
+  if (!object(value)) throw new Error('阅读进度格式无效');
+  return {
+    chapterIndex: nonNegativeInteger(value.chapterIndex, '阅读章节'),
+    lineIndex: nonNegativeInteger(value.lineIndex, '阅读行号'),
+    percentage: finiteNumber(value.percentage, '阅读百分比'),
+    updatedAt: finiteNumber(value.updatedAt, '阅读进度时间'),
+  };
+}
+
+function validateBookmark(value: unknown): BookmarkItem {
+  if (!object(value) || typeof value.id !== 'string' || !value.id || typeof value.label !== 'string' || typeof value.snippet !== 'string') {
+    throw new Error('书签格式无效');
+  }
+  return {
+    id: value.id,
+    chapterIndex: nonNegativeInteger(value.chapterIndex, '书签章节'),
+    lineIndex: nonNegativeInteger(value.lineIndex, '书签行号'),
+    label: value.label,
+    snippet: value.snippet,
+    createdAt: finiteNumber(value.createdAt, '书签时间'),
+  };
+}
+
+function validateCue(value: unknown): SrtCue {
+  if (!object(value) || typeof value.index !== 'string' || typeof value.start !== 'string' || typeof value.end !== 'string' ||
+    !Array.isArray(value.lines) || !value.lines.every(line => typeof line === 'string')) throw new Error('字幕时间轴格式无效');
+  return { index: value.index, start: value.start, end: value.end, lines: value.lines as string[] };
+}
+
+function validateBook(id: string, value: unknown, version: number): BookItem {
+  if (!object(value) || value.bookId !== id || typeof value.title !== 'string' || typeof value.author !== 'string' ||
+    typeof value.content !== 'string' || typeof value.fingerprint !== 'string' || !FINGERPRINT.test(value.fingerprint) ||
+    !CATEGORIES.includes(value.category as BookCategory) || !FORMATS.includes(value.format as BookFormat) ||
+    !THEMES.includes(value.coverTheme as BookCoverTheme) || typeof value.favorite !== 'boolean' || !Array.isArray(value.chapters) ||
+    !Array.isArray(value.bookmarks)) throw new Error(`台本记录无效：${id}`);
+  const sourceOverrides = validateRubyOverrides(value.sourceOverrides);
+  if (!Array.isArray(value.sourceOverrides) || sourceOverrides.length !== value.sourceOverrides.length) throw new Error(`台本注音损坏：${id}`);
+  const content = stripExportWatermark(value.content);
+  const title = cleanScriptTitle(value.title) || '未命名台本';
+  const readingProgress = validateProgress(value.readingProgress);
+  const description = typeof value.description === 'string' ? value.description : undefined;
+  const coverUrl = typeof value.coverUrl === 'string' ? value.coverUrl : undefined;
+  const sourceUrl = typeof value.sourceUrl === 'string' ? value.sourceUrl : undefined;
+  const category = version === 1 ? legacyCategory(id, value.category as BookCategory, sourceUrl) : value.category as BookCategory;
+  const book: BookItem = {
+    bookId: id,
+    title,
+    author: value.author,
+    ...(description !== undefined ? { description } : {}),
+    ...(coverUrl !== undefined ? { coverUrl } : {}),
+    ...(sourceUrl !== undefined ? { sourceUrl } : {}),
+    category,
+    format: value.format as BookFormat,
+    coverTheme: value.coverTheme as BookCoverTheme,
+    content,
+    fingerprint: value.fingerprint,
+    sourceOverrides,
+    chapters: extractChapters(content, title),
+    readingProgress: { ...readingProgress, chapterIndex: 0 },
+    bookmarks: value.bookmarks.map(validateBookmark),
+    favorite: value.favorite,
+    createdAt: finiteNumber(value.createdAt, '创建时间'),
+    updatedAt: finiteNumber(value.updatedAt, '更新时间'),
+    lastReadAt: finiteNumber(value.lastReadAt, '最近阅读时间'),
+  };
+  if (value.srtCues !== undefined) {
+    if (!Array.isArray(value.srtCues)) throw new Error(`字幕时间轴格式无效：${id}`);
+    book.srtCues = value.srtCues.map(validateCue);
+  }
+  return book;
+}
+
+/** The version 1 normalization, applied once: `other` and Pixiv books become `script`, built-in books keep theirs. */
+function legacyCategory(id: string, category: BookCategory, sourceUrl: string | undefined): BookCategory {
+  if (id.startsWith('book:starter-')) return category;
+  return category === 'other' || sourceUrl?.includes('pixiv.net') ? 'script' : category;
+}
+
+/**
+ * Strict validation: corrupted libraries must fail instead of being rewritten as empty.
+ * Accepts version 1 (migrated once, see {@link LIBRARY_VERSION}) and version 2; always returns version 2.
+ */
+export function validateLibraryDatabase(value: unknown): LibraryDatabase {
+  if (!object(value)) throw new Error('书库格式无效');
+  const version = value.version;
+  if (version !== 1 && version !== LIBRARY_VERSION) throw new Error(`不支持书库版本：${String(version)}`);
+  if (!object(value.books)) throw new Error('书库台本格式无效');
+  return {
+    version: LIBRARY_VERSION,
+    books: Object.fromEntries(Object.entries(value.books).map(([id, book]) => [id, validateBook(id, book, version)])),
+  };
+}
+
+const DUBBING_SCRIPT = `第1話　放課後の約束
+生徒A：今日は一本だけお願いがある。
+生徒B：二人で帰ろう。三分だけ待って。
+生徒A：このラーメン、辛い？　それとも甘い？
+生徒B：風が強いから、コートを着たほうがいいよ。
+生徒A：わかった。校門の前で。
+
+第2話　夕暮れの教室
+生徒B：昨日の約束、覚えてる？
+生徒A：もちろん。一本の鉛筆を貸してくれた人だよ。
+生徒B：二人分のパンを買ってきた。三分で食べられるかな。
+生徒A：辛い話じゃないよ。風の音を聞きながら帰ろう。
+`;
+
+const SOSEKI_DREAM = `こんな夢を見た。
+
+腕組をして枕元に坐っていると、仰向に寝た女が、静かな声で、もう死にますと云う。女は長い髪を枕に敷いて、輪郭の柔らかな瓜実顔をその中に横たえている。真白な頬の底に温かい血の色が薄く差して、唇の色は無論赤い。
+
+死にますなんて、そんな嘘を云うものじゃないよ、と私は笑って返した。すると女は黒い眼を眠そうに開けて、死ぬんですもの、仕方がないわと云う。
+
+本当に死ぬのかい。
+
+ええ、死にますとも。
+
+女の顔には少しも死にそうな様子はなかった。私はまた、死ぬんなら、今のうちに死ぬがいい、と冗談を云った。
+
+女は静かに眼を開いて、私の顔を見ながら、もう死にます、と繰り返した。私は黙って女の顔を見ていた。
+
+こんな夢を見た。
+`;
+
+const MIYAZAWA_NIGHT = `午後の授業が終わると、ジョバンニは町を通って家へ帰って来ました。
+
+今日は銀河のお祭りの前の日です。ジョバンニは黒い鞄を固く胸に押えて、口を大きく結んで、一直線に家の方へ急いでいました。
+
+家へ帰ると、お母さんはやっぱり今朝のとおり、暗い台所の前にぼんやりと座っていました。ジョバンニは鞄を置いて、お母さんに「今日は銀河のお祭りなんだよ」と云いました。
+
+お母さんは少し笑って、「そう。じゃあ、カムパネルラも行くんでしょう」と云いました。
+
+ジョバンニは窓の外の青い夕暮れを見ながら、今夜こそ本当の銀河鉄道に乗れるかもしれないと思いました。
+`;
+
+export async function createStarterBooks(now = Date.now()): Promise<LibraryDatabase> {
+  const specs: Array<Omit<UpsertBookInput, 'fingerprint'> & { bookId: string; coverTheme: BookCoverTheme }> = [
+    {
+      bookId: 'book:starter-dubbing',
+      title: '声優アフレコ練習台本：放課後の約束',
+      author: 'Furigana Dubbing Studio',
+      category: 'script',
+      format: 'txt',
+      coverTheme: 'indigo',
+      content: DUBBING_SCRIPT.trim(),
+    },
+    {
+      bookId: 'book:starter-soseki',
+      title: '夢十夜（第一夜）',
+      author: '夏目漱石',
+      category: 'novel',
+      format: 'txt',
+      coverTheme: 'emerald',
+      content: SOSEKI_DREAM.trim(),
+    },
+    {
+      bookId: 'book:starter-miyazawa',
+      title: '銀河鉄道の夜（序章）',
+      author: '宮沢賢治',
+      category: 'novel',
+      format: 'txt',
+      coverTheme: 'amber',
+      content: MIYAZAWA_NIGHT.trim(),
+    },
+  ];
+  let db = emptyLibraryDatabase();
+  for (const spec of specs) db = await upsertBook(db, { ...spec, now });
+  return db;
+}
+
+export function exportLibraryBackup(db: LibraryDatabase): string {
+  const valid = validateLibraryDatabase(db);
+  return JSON.stringify({ kind: 'furigana-library', version: valid.version, books: valid.books });
+}
+
+/** Version 1 backups are migrated like version 1 libraries; version 2 backups keep their categories. */
+export function importLibraryBackup(db: LibraryDatabase, rawJson: string): LibraryDatabase {
+  let parsed: unknown;
+  try { parsed = JSON.parse(rawJson); }
+  catch { throw new Error('书库备份不是有效的 JSON'); }
+  if (!object(parsed) || parsed.kind !== 'furigana-library' || (parsed.version !== 1 && parsed.version !== LIBRARY_VERSION) ||
+    !object(parsed.books)) {
+    throw new Error('书库备份格式无效');
+  }
+  const incoming = validateLibraryDatabase({ version: parsed.version, books: parsed.books });
+  const current = validateLibraryDatabase(db);
+  const books = { ...current.books };
+  for (const book of Object.values(incoming.books)) {
+    const existing = books[book.bookId] || findByFingerprint({ version: LIBRARY_VERSION, books }, book.fingerprint);
+    if (!existing) {
+      books[book.bookId] = book;
+      continue;
+    }
+    const preferIncoming = book.updatedAt >= existing.updatedAt;
+    books[existing.bookId] = preferIncoming
+      ? { ...book, bookId: existing.bookId, readingProgress: book.readingProgress.updatedAt >= existing.readingProgress.updatedAt ? book.readingProgress : existing.readingProgress,
+        bookmarks: book.bookmarks.length >= existing.bookmarks.length ? book.bookmarks : existing.bookmarks, favorite: book.favorite || existing.favorite,
+        createdAt: Math.min(book.createdAt, existing.createdAt), lastReadAt: Math.max(book.lastReadAt, existing.lastReadAt) }
+      : { ...existing, favorite: existing.favorite || book.favorite, bookmarks: existing.bookmarks.length >= book.bookmarks.length ? existing.bookmarks : book.bookmarks,
+        readingProgress: existing.readingProgress.updatedAt >= book.readingProgress.updatedAt ? existing.readingProgress : book.readingProgress,
+        lastReadAt: Math.max(existing.lastReadAt, book.lastReadAt) };
+    if (existing.bookId !== book.bookId && books[book.bookId] && books[book.bookId] !== books[existing.bookId]) delete books[book.bookId];
+  }
+  return validateLibraryDatabase({ version: LIBRARY_VERSION, books });
+}

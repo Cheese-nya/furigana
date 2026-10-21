@@ -11,10 +11,11 @@ import {
   AlignmentType,
   HeadingLevel,
   Packer,
-  BorderStyle,
   XmlComponent,
+  Bookmark,
 } from 'docx';
 import type { ScriptLine } from './furigana';
+import { cleanScriptTitle, EXPORT_TITLE_BOOKMARK } from './docxImporter';
 
 class ElementComponent extends XmlComponent {
   constructor(name: string, children: XmlComponent[] = [], value?: string) {
@@ -83,49 +84,28 @@ export async function buildDocxBlob(lines: ScriptLine[], options?: DocxExportOpt
   const rubySizeHalfPts = Math.round((options?.rubyFontSize || 10) * 1.5);
   const lineSpacingVal = Math.round((options?.lineSpacing || 1.8) * 240);
 
-  const docTitle = options?.title?.trim() || '日语假名配音台本';
+  const docTitle = cleanScriptTitle(options?.title || '') || '日语假名配音台本';
 
-  // Title
+  // Title only — no exporter subtitle or horizontal rule. The bookmark lets
+  // importDocx drop the title instead of turning it into a script line.
   children.push(
     new Paragraph({
       children: [
-        new TextRun({
-          text: docTitle,
-          bold: true,
-          size: 36, // 18pt
-          font: 'Yu Gothic',
+        new Bookmark({
+          id: EXPORT_TITLE_BOOKMARK,
+          children: [
+            new TextRun({
+              text: docTitle,
+              bold: true,
+              size: 36, // 18pt
+              font: 'Yu Gothic',
+            }),
+          ],
         }),
       ],
       heading: HeadingLevel.HEADING_1,
       alignment: AlignmentType.CENTER,
-      spacing: { after: 120 },
-    })
-  );
-
-  // Subtitle
-  children.push(
-    new Paragraph({
-      children: [
-        new TextRun({
-          text: 'Furigana Dubbing Studio 自动注音导出',
-          color: '666666',
-          size: 20, // 10pt
-          font: 'Yu Gothic',
-        }),
-      ],
-      alignment: AlignmentType.CENTER,
       spacing: { after: 400 },
-    })
-  );
-
-  // Horizontal rule
-  children.push(
-    new Paragraph({
-      children: [new TextRun({ text: '' })],
-      border: {
-        bottom: { style: BorderStyle.SINGLE, size: 6, color: 'CCCCCC' },
-      },
-      spacing: { after: 300 },
     })
   );
 
@@ -178,33 +158,7 @@ export async function buildDocxBlob(lines: ScriptLine[], options?: DocxExportOpt
         spacing: { after: 120, line: lineSpacingVal },
       })
     );
-
-
   }
-
-  // Footer
-  children.push(
-    new Paragraph({
-      children: [new TextRun({ text: '' })],
-      border: {
-        bottom: { style: BorderStyle.SINGLE, size: 6, color: 'CCCCCC' },
-      },
-      spacing: { before: 400, after: 200 },
-    })
-  );
-  children.push(
-    new Paragraph({
-      children: [
-        new TextRun({
-          text: '由 Furigana Dubbing Studio 自动生成 • チーズ@beimisama',
-          color: '999999',
-          size: 16,
-          font: 'Yu Gothic',
-        }),
-      ],
-      alignment: AlignmentType.CENTER,
-    })
-  );
 
   const doc = new Document({
     sections: [

@@ -1,21 +1,10 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import Module from 'node:module';
-import { fileURLToPath } from 'node:url';
 import { test } from 'node:test';
-import ts from 'typescript';
 import JSZip from 'jszip';
 import { DOMParser } from '@xmldom/xmldom';
+import { loadTypescript } from './loadTypescript.mjs';
 
-// Load the browser-side TypeScript exporter without a browser or Next server.
-const filename = fileURLToPath(new URL('../app/utils/docxExporter.ts', import.meta.url));
-const exporter = new Module(filename);
-exporter.filename = filename;
-exporter.paths = Module._nodeModulePaths(fileURLToPath(new URL('..', import.meta.url)));
-exporter._compile(ts.transpileModule(readFileSync(filename, 'utf8'), {
-  compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
-}).outputText, filename);
-const { buildDocxBlob } = exporter.exports;
+const { buildDocxBlob } = loadTypescript('../app/utils/docxExporter.ts');
 const namespace = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
 const elements = (node, name) => Array.from(node.getElementsByTagNameNS(namespace, name));
 
@@ -55,5 +44,22 @@ for (const options of [undefined, { baseFontSize: 24, rubyFontSize: 14, lineSpac
     assert.equal(elements(rubies[1], 'rubyBase')[0].textContent, '二人');
     assert.equal(elements(rubies[1], 'rt')[0].textContent, 'ふたり');
     assert.equal(elements(paragraph, 'spacing')[0].getAttributeNS(namespace, 'line'), String(Math.round((options?.lineSpacing || 1.8) * 240)));
+    const documentText = elements(xml, 't').map(node => node.textContent).join('\n');
+    assert.equal(documentText.includes('Furigana Dubbing Studio 自动注音导出'), false);
+    assert.equal(documentText.includes('由 Furigana Dubbing Studio 自动生成'), false);
+    assert.equal(documentText.includes('チーズ@beimisama'), false);
   });
 }
+
+test('Word export title drops a trailing _dubbing suffix and has no footer rule', async () => {
+  const line = { id: 'example', rawText: '', cleanText: '', tokens: [{ surface: '本文', hasKanji: false }] };
+  const blob = await buildDocxBlob([line], { title: '放課後_dubbing_dubbing.docx' });
+  const zip = await JSZip.loadAsync(await blob.arrayBuffer());
+  const xml = new DOMParser().parseFromString(await zip.file('word/document.xml').async('string'), 'text/xml');
+  const text = elements(xml, 't').map(node => node.textContent).join('\n');
+  assert.match(text, /放課後/);
+  assert.equal(text.includes('_dubbing'), false);
+  assert.equal(text.includes('自动注音导出'), false);
+  assert.equal(text.includes('自动生成'), false);
+  assert.equal(elements(xml, 'pBdr').length, 0);
+});

@@ -9,6 +9,29 @@ export interface ImportedScript {
   overrides: RubyOverride[];
 }
 
+/** Hidden bookmark on the exporter's title paragraph; re-imports keep only script lines. */
+export const EXPORT_TITLE_BOOKMARK = '_FuriganaTitle';
+
+const EXPORT_WATERMARK = /^(?:由\s*Furigana Dubbing Studio\s*自动生成.*|Furigana Dubbing Studio\s*自动注音导出)\s*$/u;
+
+/** Drop exporter subtitle/footer lines and the blank separators they leave behind. */
+export function stripExportWatermark(text: string): string {
+  const lines = text.replace(/\r\n?/g, '\n').split('\n');
+  const kept = lines.filter(line => !EXPORT_WATERMARK.test(line.trim()));
+  let start = 0;
+  let end = kept.length;
+  while (start < end && kept[start].trim() === '') start += 1;
+  while (end > start && kept[end - 1].trim() === '') end -= 1;
+  return kept.slice(start, end).join('\n');
+}
+
+/** Strip file extensions and any trailing `_dubbing` / `-dubbing` suffixes from a script title. */
+export function cleanScriptTitle(title: string): string {
+  let cleaned = title.trim().replace(/\.(?:docx|txt|srt|vtt)$/i, '');
+  cleaned = cleaned.replace(/(?:[_-]dubbing)+$/i, '');
+  return cleaned.trim();
+}
+
 /** Read body text and phonetic guides, including legacy paragraph-level ruby.
  * Ruby base text belongs to the script; ruby readings must never be duplicated
  * into the body text. DOMParser is native in the browser and Windows WebView2.
@@ -28,6 +51,8 @@ export function parseDocxXml(source: string): ImportedScript {
   const paragraphs: string[] = [];
   const overrides: RubyOverride[] = [];
   for (const paragraph of Array.from(body.getElementsByTagNameNS(WORD_NS, 'p'))) {
+    if (Array.from(paragraph.getElementsByTagNameNS(WORD_NS, 'bookmarkStart'))
+      .some(mark => mark.getAttributeNS(WORD_NS, 'name') === EXPORT_TITLE_BOOKMARK)) continue;
     let text = '';
     const rubies: { start: number; surface: string; reading: string }[] = [];
     const plainText = (node: Element): string => Array.from(node.getElementsByTagNameNS(WORD_NS, 't')).map(value => value.textContent || '').join('');
@@ -52,6 +77,7 @@ export function parseDocxXml(source: string): ImportedScript {
       for (const child of Array.from(node.childNodes)) if (child.nodeType === 1) walk(child as Element);
     };
     walk(paragraph);
+    if (EXPORT_WATERMARK.test(text.trim())) continue;
     paragraphs.push(text);
     for (const ruby of rubies) {
       const before = text.slice(0, ruby.start);
@@ -61,5 +87,5 @@ export function parseDocxXml(source: string): ImportedScript {
         start: ruby.start - lineStart, type: 'hiragana' });
     }
   }
-  return { text: paragraphs.join('\n'), overrides };
+  return { text: stripExportWatermark(paragraphs.join('\n')), overrides };
 }

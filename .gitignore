@@ -20,8 +20,16 @@
 __pycache__/
 *.pyc
 
-# Local binary outputs
+# Local binary outputs & mobile build artifacts
 /*.exe
+/*.apk
+/*.idsig
+*.keystore
+/android/build/
+/android/assets/
+/android/keystore/
+/ios/App/App/public/
+/.ecc/
 
 # Environment & IDE
 .env*

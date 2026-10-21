@@ -1,0 +1,27 @@
+{
+  "name": "Furigana Dubbing Studio",
+  "short_name": "Furigana",
+  "description": "面向日语学习者与声优配音的离线振假名（ルビ）注音与排版系统。支持多音字消歧、数量词音变、专名词典与原生 Word / SRT 导出。",
+  "id": "./",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#fafafa",
+  "theme_color": "#18181b",
+  "orientation": "any",
+  "lang": "zh-CN",
+  "icons": [
+    {
+      "src": "./logo.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "./logo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

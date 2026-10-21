@@ -10,17 +10,30 @@ export interface RubyOverride {
   type: RubyType;
 }
 
+// Adjacent ranges (one ends exactly where the other starts) are not an overlap: the
+// invariant is that a line never holds two entries covering the same character. It is
+// enforced when entries are written (upsertRubyOverride) and when they are applied
+// (applyRubyOverrides), not when a stored list is read: a stored overlap is a display
+// problem, never a reason to reject the whole file.
+function rangesOverlap(left: RubyOverride, right: RubyOverride): boolean {
+  return left.start < right.start + right.surface.length && right.start < left.start + left.surface.length;
+}
+
 export function upsertRubyOverride(entries: RubyOverride[], entry: RubyOverride): RubyOverride[] {
-  const end = entry.start + entry.surface.length;
-  return [...entries.filter(value => value.line !== entry.line ||
-    value.start + value.surface.length <= entry.start || value.start >= end), entry];
+  return [...entries.filter(value => value.line !== entry.line || !rangesOverlap(value, entry)), entry];
 }
 
 export function applyRubyOverrides(line: ScriptLine, overrides: RubyOverride[], type: RubyType, source: ReadingSource = 'manual'): ScriptLine {
   let tokens = line.tokens;
+  const applied: RubyOverride[] = [];
   for (const entry of overrides.filter(value => value.line === line.cleanText).sort((a, b) => a.start - b.start)) {
     const end = entry.start + entry.surface.length;
     if (!entry.surface || line.cleanText.slice(entry.start, end) !== entry.surface) continue;
+    // A stored list may still hold overlapping entries: an older build wrote them, and a
+    // hand-edited backup can too. Rewriting a range that an already-applied entry covers
+    // would erase the earlier reading, so the first entry of a range wins - the same rule
+    // upsertRubyOverride enforces when it writes.
+    if (applied.some(other => rangesOverlap(other, entry))) continue;
     const replacement: Token[] = [];
     let offset = 0;
     let inserted = false;
@@ -47,18 +60,27 @@ export function applyRubyOverrides(line: ScriptLine, overrides: RubyOverride[], 
       offset = tokenEnd;
     }
     tokens = replacement;
+    // Only an entry that actually landed on a token blocks a later overlap.
+    if (inserted) applied.push(entry);
   }
   return { ...line, tokens };
 }
 
+function isRubyOverride(entry: unknown): entry is RubyOverride {
+  if (typeof entry !== 'object' || entry === null) return false;
+  const item = entry as Partial<RubyOverride>;
+  return typeof item.line === 'string' && Number.isInteger(item.start) && (item.start ?? -1) >= 0 &&
+    typeof item.surface === 'string' && item.surface.length > 0 && typeof item.reading === 'string' &&
+    ['hiragana', 'katakana', 'romaji'].includes(item.type || '') &&
+    item.line.slice(item.start, (item.start ?? 0) + item.surface.length) === item.surface;
+}
+
+// Validation only drops entries that are malformed, never entries that merely overlap.
+// Strict callers (correctionDatabase.validOverrides, libraryDatabase.validateBook) treat a
+// shorter result as corruption and refuse to load the whole database, so a stored overlap
+// must not turn a display glitch into an unreadable file. Overlaps are resolved where the
+// annotations are actually applied, by applyRubyOverrides.
 export function validateRubyOverrides(value: unknown): RubyOverride[] {
   if (!Array.isArray(value)) return [];
-  return value.filter((entry): entry is RubyOverride => {
-    if (typeof entry !== 'object' || entry === null) return false;
-    const item = entry as Partial<RubyOverride>;
-    return typeof item.line === 'string' && Number.isInteger(item.start) && (item.start ?? -1) >= 0 &&
-      typeof item.surface === 'string' && item.surface.length > 0 && typeof item.reading === 'string' &&
-      ['hiragana', 'katakana', 'romaji'].includes(item.type || '') &&
-      item.line.slice(item.start, (item.start ?? 0) + item.surface.length) === item.surface;
-  });
+  return value.filter(isRubyOverride);
 }

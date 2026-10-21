@@ -3,6 +3,7 @@ import { before, test } from 'node:test';
 import { loadTypescript } from './loadTypescript.mjs';
 const { annotateLine, parseCompoundToTokens, kanaToRomaji } = loadTypescript('../app/utils/furigana.ts');
 const { initKuromoji } = loadTypescript('../app/utils/kuromojiEngine.ts');
+const { collectReviewGroups } = loadTypescript('../app/utils/review.ts');
 
 // Kuromoji's Node loader takes a filesystem path, while the app uses /dict.
 before(async () => {
@@ -51,12 +52,37 @@ for (const [text, reading] of [
   ['三階と四分', 'さんがいとよんぷん'],
   ['百本と三百本と六百本', 'ひゃっぽんとさんびゃっぽんとろっぴゃっぽん'],
   ['３００本と千本', 'さんびゃっぽんとせんぼん'],
+  // Counter gaps of the real dictionary (phase 4, G6).
+  ['四時と九時', 'よじとくじ'], ['十四時と二十四時', 'じゅうよじとにじゅうよじ'], ['四時半に', 'よじはんに'],
+  ['七時と十時', 'ななじとじゅうじ'],
+  ['一歳と八歳と十歳', 'いっさいとはっさいとじゅっさい'], ['二十歳になった', 'はたちになった'], ['二十一歳', 'にじゅういっさい'],
+  ['二日と三日と四日', 'ふつかとみっかとよっか'], ['五日と六日と七日', 'いつかとむいかとなのか'],
+  ['八日、九日、十日', 'ようか、ここのか、とおか'], ['十四日と二十日と二十四日', 'じゅうよっかとはつかとにじゅうよっか'],
+  ['４日と2日', 'よっかとふつか'], ['三日間', 'みっかかん'], ['十一日と三十日', 'じゅういちにちとさんじゅうにち'],
+  ['一週間', 'いっしゅうかん'], ['一軒と一歩', 'いっけんといっぽ'], ['一件と一点', 'いっけんといってん'],
+  ['一着と一通と一頭', 'いっちゃくといっつうといっとう'], ['十一軒と二十一点', 'じゅういっけんとにじゅういってん'],
+  ['三軒と三足', 'さんげんとさんぞく'], ['何軒ある？', 'なんげんある？'], ['何足', 'なんぞく'],
 ]) {
   test(`offline reading: ${text}`, () => {
     assert.equal(readingOf(text), reading);
     assert.equal(annotateLine(text).tokens.map(token => token.surface).join(''), text);
   });
 }
+
+test('一日 keeps the dictionary reading いちにち but stays in review with ついたち', () => {
+  for (const text of ['一日', '4月1日', '一日は休み']) {
+    const line = annotateLine(text);
+    const day = line.tokens.find(token => /^[一1]日$/.test(token.surface));
+    assert.ok(day, text);
+    assert.deepEqual([day.ruby, day.needsReview, day.word.alternatives], ['いちにち', true, ['いちにち', 'ついたち']], text);
+    const groups = collectReviewGroups([line]).filter(group => group.surface === day.surface);
+    assert.deepEqual(groups.map(group => [group.currentRuby, group.alternatives]), [['いちにち', ['いちにち', 'ついたち']]], text);
+  }
+  // Certain counts never enter the review queue.
+  for (const text of ['十一日', '二日', '四時', '一歳', '一週間', '三軒', '一日間']) {
+    assert.deepEqual(collectReviewGroups([annotateLine(text)]).map(group => group.surface), [], text);
+  }
+});
 
 test('romaji handles digraphs, gemination, syllabic n and long vowels', () => {
   for (const [kana, expected] of [
