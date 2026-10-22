@@ -477,7 +477,16 @@ function EditorPreviewPane({
   correctionError, previewPage, setPreviewPage, openTokenEditor, fontSize, lineSpacing, rubyFontSize, rubyColor,
 }: EditorWorkspaceProps) {
   const previewStart = Math.min(previewPage * 200, Math.max(0, Math.floor((annotatedLines.length - 1) / 200) * 200));
-  const missingReadings = annotatedLines.reduce((sum, line) => sum + line.tokens.filter(token => token.hasKanji && !token.ruby && !token.annotationSuppressed).length, 0);
+  const missingTargets = annotatedLines.flatMap(line => line.tokens.flatMap((token, tokenIndex) =>
+    token.hasKanji && !token.ruby && !token.annotationSuppressed ? [{ lineId: line.id, tokenIndex }] : []));
+  const missingReadings = missingTargets.length;
+  const missingCursorRef = React.useRef(0);
+  const jumpToNextMissing = () => {
+    if (!missingTargets.length || isAnnotating) return;
+    const target = missingTargets[missingCursorRef.current % missingTargets.length];
+    missingCursorRef.current++;
+    openTokenEditor(target.lineId, target.tokenIndex);
+  };
   const totalRubyCount = annotatedLines.reduce((sum, line) => sum + line.tokens.filter(token => token.hasKanji && !!token.ruby).length, 0);
   const manualFixCount = documentCorrections.length;
   return (
@@ -599,7 +608,16 @@ function EditorPreviewPane({
       {annotationError && <p role="alert" className="mb-2.5 text-xs font-medium text-red-600 dark:text-red-300 bg-red-50/85 dark:bg-red-950/60 border border-red-200 dark:border-red-800/60 rounded-xl p-2.5">{t.annotationFailed}{annotationError}</p>}
       {reviewError && <p role="alert" className="mb-2.5 text-xs font-medium text-red-600 dark:text-red-300 bg-red-50/85 dark:bg-red-950/60 border border-red-200 dark:border-red-800/60 rounded-xl p-2.5">{t.reviewFailed}{reviewError}</p>}
       {correctionError && <p role="alert" className="text-xs font-medium text-red-600 dark:text-red-300 bg-red-50/85 dark:bg-red-950/60 border border-red-200 dark:border-red-800/60 rounded-xl p-2.5 mb-3">{correctionError}</p>}
-      {missingReadings > 0 && <p className="text-xs font-medium text-amber-800 dark:text-amber-200 bg-amber-50/85 dark:bg-amber-950/60 border border-amber-200 dark:border-amber-700/60 rounded-xl p-2.5 mb-3">{missingReadings} {t.missingReadingsAlert}</p>}
+      {missingReadings > 0 && (
+        <button
+          type="button"
+          disabled={isAnnotating}
+          onClick={jumpToNextMissing}
+          className="w-full text-left text-xs font-medium text-amber-800 dark:text-amber-200 bg-amber-50/85 dark:bg-amber-950/60 border border-amber-200 dark:border-amber-700/60 rounded-xl p-2.5 mb-3 cursor-pointer hover:bg-amber-100/90 dark:hover:bg-amber-900/60 disabled:opacity-50 disabled:cursor-default"
+        >
+          {missingReadings} {t.missingReadingsAlert}
+        </button>
+      )}
       {annotatedLines.some(line => line.tokens.some(token => token.annotationSuppressed)) && <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">{t.suppressedReadingsNote}</p>}
       {annotatedLines.length > 200 && (
         <div className="mb-3 flex items-center justify-between gap-3 text-xs text-slate-600 dark:text-slate-300">

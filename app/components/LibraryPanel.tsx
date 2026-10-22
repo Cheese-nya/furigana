@@ -1,6 +1,6 @@
 'use client';
 
-import { memo, useCallback, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { badgeClass, buttonActiveClass, buttonClass, inputClass } from './uiTokens';
 import type { BookCategory, BookCoverTheme, BookItem, BookMetadataPatch } from '../utils/libraryDatabase';
 import type { Translations } from '../utils/i18n';
@@ -208,10 +208,12 @@ function TrashIcon() {
   );
 }
 
-function CheckIcon() {
+function MoreIcon() {
   return (
-    <svg className="h-3 w-3 shrink-0" fill="none" stroke="currentColor" strokeWidth={2.2} viewBox="0 0 24 24" aria-hidden>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+    <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24" aria-hidden>
+      <circle cx="5.5" cy="12" r="1.75" />
+      <circle cx="12" cy="12" r="1.75" />
+      <circle cx="18.5" cy="12" r="1.75" />
     </svg>
   );
 }
@@ -219,30 +221,40 @@ function CheckIcon() {
 interface BookShelfCardProps {
   book: BookItem;
   isActive: boolean;
-  confirming: boolean;
   categoryLabelText: string;
   t: Translations;
   onOpenInReader: (book: BookItem) => void;
   onOpenInEditor: (book: BookItem) => void;
   onOpenMetaModal: (book: BookItem) => void;
   onToggleFavorite: (bookId: string) => void;
-  onDeleteBook: (bookId: string) => void;
-  onSetConfirmDeleteId: (bookId: string | null) => void;
+  onRequestDelete: (bookId: string) => void;
+  onOpenActions: (bookId: string) => void;
 }
+
+const LONG_PRESS_MS = 480;
 
 const BookShelfCard = memo(function BookShelfCard({
   book,
   isActive,
-  confirming,
   categoryLabelText,
   t,
   onOpenInReader,
   onOpenInEditor,
   onOpenMetaModal,
   onToggleFavorite,
-  onDeleteBook,
-  onSetConfirmDeleteId,
+  onRequestDelete,
+  onOpenActions,
 }: BookShelfCardProps) {
+  // Touch devices have no hover, so a long press (or the ⋯ button) opens the action sheet.
+  const pressTimerRef = useRef<number | null>(null);
+  const longPressedRef = useRef(false);
+  const pressOriginRef = useRef<{ x: number; y: number } | null>(null);
+  const cancelPress = () => {
+    if (pressTimerRef.current !== null) window.clearTimeout(pressTimerRef.current);
+    pressTimerRef.current = null;
+    pressOriginRef.current = null;
+  };
+  useEffect(() => cancelPress, []);
   const percent = Math.max(0, Math.min(100, Math.round(book.readingProgress.percentage)));
   const started = percent > 0 || book.lastReadAt > 0;
   const hasCoverImage = Boolean(book.coverUrl?.trim());
@@ -258,13 +270,41 @@ const BookShelfCard = memo(function BookShelfCard({
         role="button"
         tabIndex={0}
         aria-label={book.title}
-        onClick={() => onOpenInReader(book)}
+        onClick={() => {
+          if (longPressedRef.current) {
+            longPressedRef.current = false;
+            return;
+          }
+          onOpenInReader(book);
+        }}
+        onPointerDown={event => {
+          longPressedRef.current = false;
+          if (event.pointerType === 'mouse') return;
+          pressOriginRef.current = { x: event.clientX, y: event.clientY };
+          pressTimerRef.current = window.setTimeout(() => {
+            pressTimerRef.current = null;
+            longPressedRef.current = true;
+            onOpenActions(book.bookId);
+          }, LONG_PRESS_MS);
+        }}
+        onPointerMove={event => {
+          const origin = pressOriginRef.current;
+          if (origin && Math.hypot(event.clientX - origin.x, event.clientY - origin.y) > 10) cancelPress();
+        }}
+        onPointerUp={cancelPress}
+        onPointerCancel={cancelPress}
+        onPointerLeave={cancelPress}
+        onContextMenu={event => {
+          event.preventDefault();
+          if (!longPressedRef.current) onOpenActions(book.bookId);
+        }}
         onKeyDown={event => {
           if (event.key === 'Enter' || event.key === ' ') {
             event.preventDefault();
             onOpenInReader(book);
           }
         }}
+        style={{ WebkitTouchCallout: 'none', WebkitUserSelect: 'none', userSelect: 'none' }}
         className={`book-leather-cover book-leather-${book.coverTheme} book-leather-theme-${book.coverTheme} relative flex aspect-[3/4.2] w-full cursor-pointer flex-col overflow-hidden rounded-l-[3px] rounded-r-[7px] bg-gradient-to-b from-white to-[#faf9f5] dark:from-[#242a3c] dark:to-[#141824] outline-none shadow-[0_10px_24px_-6px_rgba(0,0,0,0.14),2px_0_0_0_#fafaf9,4px_0_0_0_#e4e4e7] dark:shadow-[0_16px_32px_-6px_rgba(0,0,0,0.68),2px_0_0_0_#333a4d,4px_0_0_0_#2b3142] transition-all duration-300 ease-out group-hover:-translate-y-2.5 group-hover:scale-[1.03] group-hover:-rotate-[0.6deg] group-hover:shadow-[0_20px_38px_-10px_rgba(0,0,0,0.22),2px_0_0_0_#fafaf9,4px_0_0_0_#e4e4e7] dark:group-hover:shadow-[0_24px_46px_-8px_rgba(0,0,0,0.78),2px_0_0_0_#3d455c,4px_0_0_0_#333a4d] focus-visible:ring-2 focus-visible:ring-amber-300/80 ${isActive ? 'ring-2 ring-amber-300/90' : ''}`}
       >
         <span
@@ -394,12 +434,25 @@ const BookShelfCard = memo(function BookShelfCard({
               }`}
             >
               <span>{fill(t.libraryBookLines, { count: derived.lines })}</span>
-              <span>{fill(t.libraryBookProgress, { percent })}</span>
+              <span className="pointer-coarse:ml-auto">{fill(t.libraryBookProgress, { percent })}</span>
+              <button
+                type="button"
+                data-testid="book-more-actions-btn"
+                aria-label={t.libraryMoreActions}
+                aria-haspopup="dialog"
+                className="book-action-btn -my-1 ml-1.5 hidden pointer-coarse:grid h-7 w-7 shrink-0 place-items-center rounded-full border border-black/[0.06] bg-white/90 text-zinc-600 shadow-xs"
+                onClick={event => {
+                  event.stopPropagation();
+                  onOpenActions(book.bookId);
+                }}
+              >
+                <MoreIcon />
+              </button>
             </div>
             <div className={`h-1 overflow-hidden rounded-full ${hasCoverImage ? 'bg-white/30' : 'bg-black/[0.06]'}`} role="progressbar" aria-valuenow={percent} aria-valuemin={0} aria-valuemax={100}>
               <div className={`h-full rounded-full ${hasCoverImage ? 'bg-white' : COVER_BAR[book.coverTheme]}`} style={{ width: `${percent}%` }} />
             </div>
-            <div className={`flex items-center justify-between sm:justify-start gap-1 sm:gap-1.5 pt-0.5 transition-opacity duration-200 ${confirming ? 'opacity-100' : 'opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100'}`}>
+            <div className="flex pointer-coarse:hidden items-center justify-between sm:justify-start gap-1 sm:gap-1.5 pt-0.5 transition-opacity duration-200 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100">
               <button
                 type="button"
                 aria-label={started ? t.libraryContinueReading : t.libraryStartReading}
@@ -439,31 +492,15 @@ const BookShelfCard = memo(function BookShelfCard({
               </button>
               <button
                 type="button"
-                aria-label={confirming ? t.libraryDeleteBookConfirm.replace('{title}', book.title) : t.delete}
-                title={confirming ? t.libraryDeleteBookConfirm.replace('{title}', book.title) : t.delete}
-                className={`ml-auto inline-flex items-center justify-center gap-0.5 sm:gap-1 border transition-transform duration-150 ${
-                  confirming
-                    ? 'px-1.5 sm:px-2.5 h-6 sm:h-8 rounded-full border-rose-600 bg-rose-600 text-white text-[9.5px] sm:text-[11px] font-semibold shadow-2xs hover:bg-rose-700'
-                    : 'book-action-danger w-6 h-6 sm:w-8 sm:h-8 rounded-full border-rose-200/80 bg-white/90 text-rose-600 shadow-xs hover:scale-105 hover:bg-rose-50'
-                }`}
+                aria-label={t.delete}
+                title={t.delete}
+                className="book-action-danger ml-auto grid w-6 h-6 sm:w-8 sm:h-8 rounded-full shrink-0 place-items-center border border-rose-200/80 bg-white/90 text-rose-600 shadow-xs transition-transform duration-150 hover:scale-105 hover:bg-rose-50"
                 onClick={event => {
                   event.stopPropagation();
-                  if (confirming) {
-                    onSetConfirmDeleteId(null);
-                    onDeleteBook(book.bookId);
-                  } else {
-                    onSetConfirmDeleteId(book.bookId);
-                  }
+                  onRequestDelete(book.bookId);
                 }}
               >
-                {confirming ? (
-                  <>
-                    <CheckIcon />
-                    <span>{t.confirm}</span>
-                  </>
-                ) : (
-                  <TrashIcon />
-                )}
+                <TrashIcon />
               </button>
             </div>
           </div>
@@ -507,6 +544,7 @@ export function LibraryPanel({
   const [pixivStatus, setPixivStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [actionBookId, setActionBookId] = useState<string | null>(null);
   const [draft, setDraft] = useState({ title: '', author: '', category: 'script' as BookCategory, coverTheme: 'indigo' as BookCoverTheme, content: '' });
   const [editingMetaBookId, setEditingMetaBookId] = useState<string | null>(null);
   const [metaDraft, setMetaDraft] = useState<{
@@ -535,6 +573,20 @@ export function LibraryPanel({
     updated: t.librarySortUpdated,
     title: t.librarySortTitle,
   };
+
+  const actionBook = actionBookId ? books.find(book => book.bookId === actionBookId) ?? null : null;
+  const deleteBook = confirmDeleteId ? books.find(book => book.bookId === confirmDeleteId) ?? null : null;
+
+  useEffect(() => {
+    if (!actionBookId && !confirmDeleteId) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      setActionBookId(null);
+      setConfirmDeleteId(null);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [actionBookId, confirmDeleteId]);
 
   const hasActiveFilter = Boolean(query.trim()) || category !== 'all' || favoritesOnly;
 
@@ -919,17 +971,117 @@ export function LibraryPanel({
               key={book.bookId}
               book={book}
               isActive={activeBookId === book.bookId}
-              confirming={confirmDeleteId === book.bookId}
               categoryLabelText={categoryLabel[book.category]}
               t={t}
               onOpenInReader={onOpenInReader}
               onOpenInEditor={onOpenInEditor}
               onOpenMetaModal={openMetaModal}
               onToggleFavorite={onToggleFavorite}
-              onDeleteBook={onDeleteBook}
-              onSetConfirmDeleteId={setConfirmDeleteId}
+              onRequestDelete={setConfirmDeleteId}
+              onOpenActions={setActionBookId}
             />
           ))}
+        </div>
+      )}
+
+      {actionBook && (
+        <div
+          data-testid="book-action-sheet"
+          role="dialog"
+          aria-modal="true"
+          aria-label={actionBook.title}
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-950/35 dark:bg-black/65 p-0 sm:p-4 backdrop-blur-md"
+          onClick={() => setActionBookId(null)}
+        >
+          <div
+            onClick={event => event.stopPropagation()}
+            className="lg-sheet w-full max-w-sm max-sm:rounded-t-[28px] max-sm:rounded-b-none sm:rounded-[28px] p-4 pb-[max(1rem,env(safe-area-inset-bottom))] flex flex-col gap-1"
+          >
+            <div className="mx-auto -mt-1 mb-1 h-1.5 w-10 rounded-full bg-slate-400/45 dark:bg-white/25 sm:hidden" aria-hidden="true" />
+            <p className="px-2 pb-2 text-center text-sm font-semibold text-zinc-900 dark:text-slate-100 line-clamp-2">{actionBook.title}</p>
+            {[
+              { label: actionBook.lastReadAt > 0 || actionBook.readingProgress.percentage > 0 ? t.libraryContinueReading : t.libraryStartReading, icon: <BookOpenIcon />, run: () => onOpenInReader(actionBook) },
+              { label: t.libraryEditInStudio, icon: <PencilIcon />, run: () => onOpenInEditor(actionBook) },
+              { label: t.libEditMetaAction, icon: <GearIcon />, run: () => openMetaModal(actionBook) },
+              { label: actionBook.favorite ? t.libraryRemoveFavorite : t.libraryAddFavorite, icon: <StarIcon filled={actionBook.favorite} />, run: () => onToggleFavorite(actionBook.bookId) },
+            ].map(item => (
+              <button
+                key={item.label}
+                type="button"
+                className="flex min-h-12 items-center gap-3 rounded-2xl px-4 text-left text-[15px] text-zinc-900 dark:text-slate-100 hover:bg-black/[0.05] dark:hover:bg-white/[0.08] active:bg-black/[0.08]"
+                onClick={() => {
+                  setActionBookId(null);
+                  item.run();
+                }}
+              >
+                <span className="text-zinc-500 dark:text-slate-400">{item.icon}</span>
+                {item.label}
+              </button>
+            ))}
+            <button
+              type="button"
+              className="flex min-h-12 items-center gap-3 rounded-2xl px-4 text-left text-[15px] font-medium text-rose-600 dark:text-rose-400 hover:bg-rose-500/10 active:bg-rose-500/15"
+              onClick={() => {
+                setActionBookId(null);
+                setConfirmDeleteId(actionBook.bookId);
+              }}
+            >
+              <TrashIcon />
+              {t.delete}
+            </button>
+            <button
+              type="button"
+              className="mt-1 min-h-12 rounded-2xl bg-black/[0.05] dark:bg-white/[0.08] text-[15px] font-semibold text-zinc-900 dark:text-slate-100"
+              onClick={() => setActionBookId(null)}
+            >
+              {t.cancel}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {deleteBook && (
+        <div
+          data-testid="book-delete-dialog"
+          role="alertdialog"
+          aria-modal="true"
+          aria-labelledby="book-delete-title"
+          aria-describedby="book-delete-desc"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/35 dark:bg-black/65 p-6 backdrop-blur-md"
+          onClick={() => setConfirmDeleteId(null)}
+        >
+          <div
+            onClick={event => event.stopPropagation()}
+            className="lg-sheet w-full max-w-xs rounded-[24px] p-5 flex flex-col gap-4 text-center"
+          >
+            <div>
+              <h3 id="book-delete-title" className="font-semibold text-base text-zinc-900 dark:text-slate-100">{t.libraryDeleteBookTitle}</h3>
+              <p id="book-delete-desc" className="mt-1.5 text-[13px] leading-relaxed text-zinc-600 dark:text-slate-300">
+                {t.libraryDeleteBookConfirm.replace('{title}', deleteBook.title)}
+              </p>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                autoFocus
+                className="min-h-11 rounded-full bg-black/[0.06] dark:bg-white/[0.1] text-sm font-medium text-zinc-900 dark:text-slate-100"
+                onClick={() => setConfirmDeleteId(null)}
+              >
+                {t.cancel}
+              </button>
+              <button
+                type="button"
+                className="min-h-11 rounded-full bg-rose-600 text-sm font-semibold text-white hover:bg-rose-700"
+                onClick={() => {
+                  const book = deleteBook;
+                  setConfirmDeleteId(null);
+                  onDeleteBook(book.bookId);
+                }}
+              >
+                {t.delete}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

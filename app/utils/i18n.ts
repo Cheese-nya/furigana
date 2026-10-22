@@ -224,6 +224,10 @@ export interface Translations {
   libraryStartReading: string;
   libraryEditInStudio: string;
   libraryDeleteBookConfirm: string;
+  libraryDeleteBookTitle: string;
+  libraryMoreActions: string;
+  libraryAddFavorite: string;
+  libraryRemoveFavorite: string;
   libraryBookAuthorPlaceholder: string;
   libraryBackupImportedNotice: string;
   libraryBackupExportedNotice: string;
@@ -555,6 +559,10 @@ export const translations: Record<Locale, Translations> = {
     libraryStartReading: '开始阅读',
     libraryEditInStudio: '在工作台编辑',
     libraryDeleteBookConfirm: '确定从台本库删除「{title}」？此操作不可撤销。',
+    libraryDeleteBookTitle: '删除台本',
+    libraryMoreActions: '更多操作',
+    libraryAddFavorite: '加入收藏',
+    libraryRemoveFavorite: '取消收藏',
     libraryBookAuthorPlaceholder: '作者（可选）',
     libraryBackupImportedNotice: '台本库备份已导入并合并。',
     libraryBackupExportedNotice: '台本库备份已导出。',
@@ -879,6 +887,10 @@ export const translations: Record<Locale, Translations> = {
     libraryStartReading: 'Start reading',
     libraryEditInStudio: 'Edit in Studio',
     libraryDeleteBookConfirm: 'Delete “{title}” from the Script Library? This cannot be undone.',
+    libraryDeleteBookTitle: 'Delete Script',
+    libraryMoreActions: 'More actions',
+    libraryAddFavorite: 'Add to Favorites',
+    libraryRemoveFavorite: 'Remove from Favorites',
     libraryBookAuthorPlaceholder: 'Author (optional)',
     libraryBackupImportedNotice: 'Script Library backup imported and merged.',
     libraryBackupExportedNotice: 'Script Library backup exported.',
