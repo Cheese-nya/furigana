@@ -1,0 +1,308 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Furigana 设计预览</title>
+<style>
+:root{
+  --bg:#eef0f7; --ink:#0f172a; --ink2:#475569; --ink3:#94a3b8;
+  --accent:#5b5bf0; --accent2:#7c6cff;
+  --glass:rgba(255,255,255,.58); --glass-hi:rgba(255,255,255,.9); --glass-edge:rgba(255,255,255,.75);
+  --paper:#fbfaf6; --shadow:0 18px 48px -18px rgba(30,41,90,.28),0 2px 6px rgba(30,41,90,.06);
+  --spring:cubic-bezier(.32,.72,0,1);
+}
+:root[data-theme=dark]{
+  --bg:#0b0d14; --ink:#f1f5f9; --ink2:#a5b0c2; --ink3:#64748b;
+  --glass:rgba(30,34,48,.52); --glass-hi:rgba(255,255,255,.14); --glass-edge:rgba(255,255,255,.12);
+  --paper:#15171f; --shadow:0 18px 48px -18px rgba(0,0,0,.7),0 2px 6px rgba(0,0,0,.3);
+}
+*{box-sizing:border-box;margin:0}
+body{font-family:-apple-system,"SF Pro Text","PingFang SC","Hiragino Sans","Noto Sans JP",sans-serif;background:var(--bg);color:var(--ink);padding:40px 16px 80px;-webkit-font-smoothing:antialiased;transition:background .4s}
+.wrap{max-width:1240px;margin:0 auto}
+.label{font-size:13px;color:var(--ink2);letter-spacing:.02em;margin:48px 0 14px;display:flex;gap:10px;align-items:center}
+.label b{font-weight:600;color:var(--ink)}
+.label .tag{font-size:11px;padding:2px 8px;border-radius:99px;background:var(--glass);border:1px solid var(--glass-edge)}
+.topbar{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.topbar h1{font-size:22px;font-weight:650;letter-spacing:-.02em}
+.topbar p{font-size:13px;color:var(--ink2);margin-top:4px}
+
+/* stage = a screen with ambient aurora so glass has something to refract */
+.stage{position:relative;overflow:hidden;border-radius:28px;background:var(--bg);box-shadow:0 0 0 1px var(--glass-edge),var(--shadow);isolation:isolate}
+.aurora{position:absolute;inset:-20%;z-index:-1;filter:blur(60px);opacity:.9}
+.aurora i{position:absolute;border-radius:50%;animation:drift 18s ease-in-out infinite alternate}
+.aurora i:nth-child(1){width:46%;height:46%;left:4%;top:0;background:#a5b4fc}
+.aurora i:nth-child(2){width:40%;height:40%;right:6%;top:6%;background:#7dd3fc;animation-delay:-6s}
+.aurora i:nth-child(3){width:38%;height:38%;left:38%;bottom:0;background:#f0abfc;opacity:.55;animation-delay:-11s}
+:root[data-theme=dark] .aurora{opacity:.35}
+@keyframes drift{to{transform:translate(6%,8%) scale(1.12)}}
+
+.glass{background:var(--glass);backdrop-filter:blur(28px) saturate(180%);-webkit-backdrop-filter:blur(28px) saturate(180%);
+  border:1px solid var(--glass-edge);box-shadow:inset 0 1px 0 var(--glass-hi),inset 0 -1px 0 rgba(255,255,255,.08),var(--shadow);position:relative}
+.glass::after{content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;
+  background:linear-gradient(135deg,rgba(255,255,255,.35),transparent 38%,transparent 70%,rgba(255,255,255,.12))}
+:root[data-theme=dark] .glass::after{opacity:.25}
+
+.press{transition:transform .35s var(--spring),background .2s,box-shadow .25s;cursor:pointer;user-select:none}
+.press:hover{transform:translateY(-1px)}
+.press:active{transform:scale(.95)}
+
+/* ---------- desktop ---------- */
+.desk{padding:18px 20px 22px;min-height:640px}
+.bar{display:flex;align-items:center;gap:14px;padding:8px 8px 8px 16px;border-radius:24px}
+.brand{display:flex;align-items:center;gap:10px;font-weight:650;letter-spacing:-.01em;font-size:15px}
+.logo{width:30px;height:30px;border-radius:10px;display:grid;place-items:center;color:#fff;font-size:14px;font-weight:700;
+  background:linear-gradient(140deg,#7c6cff,#4f7cff);box-shadow:inset 0 1px 0 rgba(255,255,255,.5),0 4px 12px -4px #5b5bf0}
+.seg{position:relative;display:flex;padding:3px;border-radius:99px;background:rgba(120,130,160,.14)}
+.seg button{position:relative;z-index:1;border:0;background:none;font:inherit;font-size:13px;color:var(--ink2);padding:7px 14px;border-radius:99px;display:flex;gap:6px;align-items:center;cursor:pointer;transition:color .3s}
+.seg button.on{color:var(--ink);font-weight:600}
+.seg .thumb{position:absolute;top:3px;bottom:3px;border-radius:99px;background:var(--glass-hi);
+  box-shadow:0 3px 10px -3px rgba(30,41,90,.25),inset 0 1px 0 rgba(255,255,255,.9);transition:left .5s var(--spring),width .5s var(--spring)}
+:root[data-theme=dark] .seg .thumb{background:rgba(255,255,255,.16)}
+.count{font-size:10.5px;padding:1px 6px;border-radius:99px;background:rgba(91,91,240,.14);color:var(--accent);font-weight:600}
+.sp{flex:1}
+.cluster{display:flex;gap:2px;padding:3px;border-radius:99px;background:rgba(120,130,160,.12)}
+.ico{width:34px;height:34px;border-radius:99px;display:grid;place-items:center;color:var(--ink2);font-size:13px}
+.ico:hover{background:rgba(255,255,255,.55);color:var(--ink)}
+.dot{width:7px;height:7px;border-radius:50%;background:#22c55e;box-shadow:0 0 0 3px rgba(34,197,94,.18)}
+.chip{display:flex;align-items:center;gap:7px;padding:0 12px;height:34px;border-radius:99px;font-size:12.5px;color:var(--ink2)}
+
+.tools{margin-top:12px;display:flex;align-items:center;gap:10px;padding:6px;border-radius:20px;width:max-content;max-width:100%;flex-wrap:wrap}
+.btn{height:32px;padding:0 13px;border-radius:99px;border:0;font:inherit;font-size:12.5px;display:inline-flex;align-items:center;gap:6px;color:var(--ink);background:transparent}
+.btn:hover{background:rgba(255,255,255,.6)}
+:root[data-theme=dark] .btn:hover{background:rgba(255,255,255,.08)}
+.btn.pri{color:#fff;background:linear-gradient(180deg,#6d6cff,#5048e5);box-shadow:inset 0 1px 0 rgba(255,255,255,.4),0 6px 16px -6px #5b5bf0;font-weight:600}
+.divider{width:1px;height:18px;background:rgba(120,130,160,.25)}
+.seg.sm button{padding:5px 11px;font-size:12px}
+
+.cols{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);gap:14px;margin-top:14px}
+.panel{border-radius:24px;padding:16px;min-height:430px;display:flex;flex-direction:column}
+.ph{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+.ph h3{font-size:13px;font-weight:600;color:var(--ink)}
+.ph .meta{font-size:11.5px;color:var(--ink3)}
+.title-in{flex:1;height:30px;border-radius:10px;border:1px solid transparent;background:rgba(120,130,160,.1);padding:0 10px;font:inherit;font-size:13px;color:var(--ink)}
+.editor{flex:1;border-radius:16px;background:rgba(255,255,255,.55);padding:16px 18px;font-size:15px;line-height:2;color:var(--ink);box-shadow:inset 0 1px 2px rgba(30,41,90,.06)}
+:root[data-theme=dark] .editor{background:rgba(0,0,0,.22)}
+.editor .sp-name{color:var(--accent);font-weight:600}
+.caret{display:inline-block;width:2px;height:1.1em;background:var(--accent);vertical-align:-3px;animation:blink 1.1s steps(2) infinite}
+@keyframes blink{50%{opacity:0}}
+.ring{width:22px;height:22px;border-radius:50%;background:conic-gradient(var(--accent) var(--p,100%),rgba(120,130,160,.2) 0);display:grid;place-items:center}
+.ring::before{content:"";width:16px;height:16px;border-radius:50%;background:var(--paper)}
+.paper{flex:1;border-radius:16px;background:var(--paper);padding:22px 26px;box-shadow:0 1px 0 rgba(255,255,255,.8) inset,0 10px 30px -18px rgba(30,41,90,.35);
+  font-family:"Hiragino Mincho ProN","Yu Mincho","Noto Serif JP",serif;font-size:19px;line-height:2.5;color:var(--ink)}
+.paper p{opacity:0;transform:translateY(8px);animation:rise .7s var(--spring) forwards}
+.paper p:nth-child(2){animation-delay:.08s}.paper p:nth-child(3){animation-delay:.16s}.paper p:nth-child(4){animation-delay:.24s}
+@keyframes rise{to{opacity:1;transform:none}}
+ruby rt{font-size:.5em;color:var(--accent);font-family:-apple-system,"Hiragino Sans",sans-serif;letter-spacing:.04em}
+.spk{font-family:-apple-system,"Hiragino Sans",sans-serif;font-size:13px;font-weight:600;color:var(--ink2);margin-right:6px;padding:2px 8px;border-radius:6px;background:rgba(91,91,240,.08)}
+
+/* ---------- library ---------- */
+.lib{padding:22px;min-height:420px}
+.lib h2{font-size:28px;font-weight:700;letter-spacing:-.025em}
+.lib .sub{font-size:13px;color:var(--ink2);margin-top:4px}
+.search{display:flex;align-items:center;gap:8px;height:38px;border-radius:99px;padding:0 14px;color:var(--ink3);font-size:13px;flex:1;max-width:340px}
+.shelf{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:22px;margin-top:20px}
+.book{border-radius:6px 14px 14px 6px;aspect-ratio:3/4.1;padding:14px 14px 12px 20px;display:flex;flex-direction:column;position:relative;color:#fff;overflow:hidden;
+  box-shadow:0 1px 0 rgba(255,255,255,.4) inset,0 16px 30px -14px rgba(20,24,60,.55),0 2px 4px rgba(20,24,60,.15);transition:transform .5s var(--spring),box-shadow .5s var(--spring)}
+.book::before{content:"";position:absolute;left:0;top:0;bottom:0;width:9px;background:linear-gradient(90deg,rgba(0,0,0,.25),rgba(255,255,255,.18),rgba(0,0,0,.05))}
+.book::after{content:"";position:absolute;inset:0;background:linear-gradient(115deg,rgba(255,255,255,.32),transparent 35%);opacity:.7;transition:opacity .4s}
+.book:hover{transform:translateY(-6px) rotateX(4deg);box-shadow:0 1px 0 rgba(255,255,255,.4) inset,0 28px 40px -16px rgba(20,24,60,.6)}
+.book .kind{font-size:10px;letter-spacing:.08em;opacity:.8}
+.book .bt{font-family:"Hiragino Mincho ProN","Noto Serif JP",serif;font-size:17px;line-height:1.35;margin-top:8px;font-weight:600}
+.book .au{font-size:11px;opacity:.75;margin-top:6px}
+.book .prog{margin-top:auto;height:3px;border-radius:3px;background:rgba(255,255,255,.25);overflow:hidden}
+.book .prog i{display:block;height:100%;background:#fff;border-radius:3px}
+.bk-a{background:linear-gradient(160deg,#4f46e5,#312e81)}
+.bk-b{background:linear-gradient(160deg,#0f766e,#134e4a)}
+.bk-c{background:linear-gradient(160deg,#b45309,#78350f)}
+.bk-d{background:linear-gradient(160deg,#be185d,#701a45)}
+.bk-new{background:transparent;border:1.5px dashed rgba(120,130,160,.4);color:var(--ink3);box-shadow:none;align-items:center;justify-content:center;font-size:13px;gap:6px}
+.bk-new::before,.bk-new::after{display:none}
+
+/* ---------- mobile ---------- */
+.phones{display:flex;gap:28px;flex-wrap:wrap;justify-content:center}
+.phone{width:320px;height:660px;border-radius:46px;padding:10px;background:#111;box-shadow:var(--shadow)}
+.screen{position:relative;height:100%;border-radius:38px;overflow:hidden;background:var(--paper);isolation:isolate}
+.island{position:absolute;top:10px;left:50%;transform:translateX(-50%);width:96px;height:28px;border-radius:20px;background:#000;z-index:5}
+.r-head{position:absolute;top:48px;left:12px;right:12px;display:flex;justify-content:space-between;z-index:3}
+.r-head .glass{border-radius:99px}
+.r-body{padding:108px 22px 120px;font-family:"Hiragino Mincho ProN","Noto Serif JP",serif;font-size:18px;line-height:2.45;height:100%;overflow:hidden}
+.tabbar{position:absolute;left:12px;right:12px;bottom:18px;height:62px;border-radius:32px;display:flex;padding:5px;z-index:3;transition:transform .5s var(--spring),width .5s var(--spring)}
+.tabbar .t{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-size:10.5px;color:var(--ink2);border-radius:26px;position:relative;z-index:1;transition:color .3s}
+.tabbar .t svg{width:22px;height:22px}
+.tabbar .t.on{color:var(--accent);font-weight:600}
+.tabbar .blob{position:absolute;top:5px;bottom:5px;border-radius:26px;background:rgba(91,91,240,.12);transition:left .55s var(--spring),width .55s var(--spring)}
+.mini .tabbar{transform:translateY(4px) scale(.82)}
+.fab{position:absolute;right:16px;bottom:94px;width:48px;height:48px;border-radius:50%;display:grid;place-items:center;z-index:3;color:var(--accent)}
+.sheet{position:absolute;left:8px;right:8px;bottom:8px;border-radius:32px;padding:10px 18px 22px;z-index:4;transform:translateY(105%);transition:transform .6s var(--spring)}
+.sheet.open{transform:none}
+.grab{width:36px;height:5px;border-radius:5px;background:rgba(120,130,160,.4);margin:0 auto 14px}
+.sheet h4{font-size:15px;font-weight:650;margin-bottom:12px}
+.row{display:flex;justify-content:space-between;align-items:center;font-size:13px;padding:10px 0;border-bottom:1px solid rgba(120,130,160,.15)}
+.row:last-child{border:0}
+.slider{width:120px;height:4px;border-radius:4px;background:rgba(120,130,160,.25);position:relative}
+.slider i{position:absolute;left:0;top:0;bottom:0;width:60%;border-radius:4px;background:var(--accent)}
+.slider b{position:absolute;left:60%;top:50%;width:20px;height:20px;border-radius:50%;background:#fff;transform:translate(-50%,-50%);box-shadow:0 2px 8px rgba(0,0,0,.2)}
+
+.notes{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px}
+.note{border-radius:20px;padding:16px 18px;font-size:13px;line-height:1.7;color:var(--ink2)}
+.note h5{font-size:14px;color:var(--ink);margin-bottom:6px}
+.note code{font-family:ui-monospace,Menlo,monospace;font-size:11.5px;background:rgba(120,130,160,.14);padding:1px 5px;border-radius:5px;color:var(--ink)}
+
+@media (max-width:820px){.cols{grid-template-columns:1fr}.bar{flex-wrap:wrap}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}.paper p{opacity:1;transform:none}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="topbar">
+    <div><h1>Furigana · Liquid Glass 改版预览</h1><p>可交互：点击顶部标签、手机标签栏、“排版”按钮查看动效。右侧切换明暗。</p></div>
+    <div class="seg" id="theme"><span class="thumb"></span><button class="on" data-v="light">浅色</button><button data-v="dark">深色</button></div>
+  </div>
+
+  <!-- ===== Desktop editor ===== -->
+  <div class="label"><b>① 工作台 · 桌面</b><span class="tag">导航与工具栏合并为一条浮动玻璃栏</span></div>
+  <div class="stage desk">
+    <div class="aurora"><i></i><i></i><i></i></div>
+    <div class="bar glass">
+      <div class="brand"><div class="logo">ふ</div>Furigana</div>
+      <div class="sp"></div>
+      <div class="seg" id="nav"><span class="thumb"></span>
+        <button class="on">工作台</button><button>台本库 <span class="count">3</span></button><button>阅读器</button><button>批处理</button>
+      </div>
+      <div class="sp"></div>
+      <div class="cluster">
+        <div class="chip"><span class="dot"></span>词典就绪</div>
+        <div class="ico press">中</div>
+        <div class="ico press">☾</div>
+        <div class="ico press">⌥</div>
+      </div>
+    </div>
+
+    <div class="tools glass">
+      <div class="seg sm" id="kana"><span class="thumb"></span><button class="on">平假名</button><button>片假名</button><button>罗马音</button></div>
+      <div class="divider"></div>
+      <button class="btn press">Aa 排版</button>
+      <button class="btn press">专名词典 <span class="count">0</span></button>
+      <div class="divider"></div>
+      <button class="btn press">存入台本库</button>
+      <button class="btn press">在阅读器打开</button>
+      <button class="btn pri press">导出 ▾</button>
+    </div>
+
+    <div class="cols">
+      <div class="panel glass">
+        <div class="ph"><h3>台本</h3><input class="title-in" value="日语假名配音台本"><button class="btn press">导入</button></div>
+        <div class="editor">
+          <span class="sp-name">山田先生</span>：みなさん、こんにちは！今日の日本語アフレコ台本へようこそ。<br>
+          <span class="sp-name">佐藤</span>：先生、この漢字の読み方は何ですか？<br>
+          <span class="sp-name">山田先生</span>：これは「未来」と「希望」です。<br>
+          <span class="sp-name">鈴木</span>：声優の配音練習を始めましょう！<span class="caret"></span>
+        </div>
+      </div>
+      <div class="panel glass">
+        <div class="ph"><h3>实时预览</h3><span class="meta">4 行 · 注音 18</span><div class="sp"></div>
+          <div class="seg sm" id="dir"><span class="thumb"></span><button class="on">横排</button><button>竖排</button></div>
+          <div class="ring" style="--p:100%"></div>
+        </div>
+        <div class="paper">
+          <p><span class="spk">山田先生</span>みなさん、こんにちは！<ruby>今日<rt>きょう</rt></ruby>の<ruby>日本語<rt>にほんご</rt></ruby>アフレコ<ruby>台本<rt>だいほん</rt></ruby>へようこそ。</p>
+          <p><span class="spk">佐藤</span><ruby>先生<rt>せんせい</rt></ruby>、この<ruby>漢字<rt>かんじ</rt></ruby>の<ruby>読<rt>よ</rt></ruby>み<ruby>方<rt>かた</rt></ruby>は<ruby>何<rt>なん</rt></ruby>ですか？</p>
+          <p><span class="spk">山田先生</span>これは「<ruby>未来<rt>みらい</rt></ruby>」と「<ruby>希望<rt>きぼう</rt></ruby>」です。</p>
+          <p><span class="spk">鈴木</span><ruby>声優<rt>せいゆう</rt></ruby>の<ruby>配音<rt>はいおん</rt></ruby><ruby>練習<rt>れんしゅう</rt></ruby>を<ruby>始<rt>はじ</rt></ruby>めましょう！</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== Library ===== -->
+  <div class="label"><b>② 台本库</b><span class="tag">书架式封面 · 悬停抬起 + 高光</span></div>
+  <div class="stage lib">
+    <div class="aurora"><i></i><i></i><i></i></div>
+    <div style="display:flex;align-items:flex-end;gap:16px;flex-wrap:wrap">
+      <div><h2>台本库</h2><div class="sub">3 本 · 最近打开</div></div>
+      <div class="sp"></div>
+      <div class="search glass">⌕ 搜索台本名、作者或正文</div>
+      <div class="seg sm" id="filter"><span class="thumb"></span><button class="on">全部</button><button>台本</button><button>小说</button><button>字幕</button></div>
+    </div>
+    <div class="shelf">
+      <div class="book bk-a press"><span class="kind">台本 · TXT</span><div class="bt">声優アフレコ練習台本：放課後の約束</div><div class="au">Furigana Studio</div><div class="prog"><i style="width:42%"></i></div></div>
+      <div class="book bk-b press"><span class="kind">小说 · TXT</span><div class="bt">夢十夜（第一夜）</div><div class="au">夏目漱石</div><div class="prog"><i style="width:78%"></i></div></div>
+      <div class="book bk-c press"><span class="kind">小说 · TXT</span><div class="bt">銀河鉄道の夜（序章）</div><div class="au">宮沢賢治</div><div class="prog"><i style="width:12%"></i></div></div>
+      <div class="book bk-d press"><span class="kind">字幕 · SRT</span><div class="bt">第3話 アフレコ</div><div class="au">导入于 10/18</div><div class="prog"><i style="width:0"></i></div></div>
+      <div class="book bk-new press">＋ 新建 / 导入</div>
+    </div>
+  </div>
+
+  <!-- ===== Mobile ===== -->
+  <div class="label"><b>③ 移动端 · 阅读器</b><span class="tag">浮动胶囊标签栏 · 滚动时收缩 · 底部玻璃面板</span></div>
+  <div class="phones">
+    <div class="phone"><div class="screen" id="ph1">
+      <div class="island"></div>
+      <div class="r-head"><div class="glass ico">‹</div><div class="glass chip" style="color:var(--ink)">夢十夜 · 第一夜</div><div class="glass ico press" id="aa">Aa</div></div>
+      <div class="r-body">
+        こんな<ruby>夢<rt>ゆめ</rt></ruby>を<ruby>見<rt>み</rt></ruby>た。<br>
+        <ruby>腕組<rt>うでぐみ</rt></ruby>をして<ruby>枕元<rt>まくらもと</rt></ruby>に<ruby>坐<rt>すわ</rt></ruby>っていると、<ruby>仰向<rt>あおむき</rt></ruby>に<ruby>寝<rt>ね</rt></ruby>た<ruby>女<rt>おんな</rt></ruby>が、<ruby>静<rt>しず</rt></ruby>かな<ruby>声<rt>こえ</rt></ruby>でもう<ruby>死<rt>し</rt></ruby>にますと<ruby>云<rt>い</rt></ruby>う。<ruby>女<rt>おんな</rt></ruby>は<ruby>長<rt>なが</rt></ruby>い<ruby>髪<rt>かみ</rt></ruby>を<ruby>枕<rt>まくら</rt></ruby>に<ruby>敷<rt>し</rt></ruby>いて……
+      </div>
+      <div class="tabbar glass" id="tb"><span class="blob"></span>
+        <div class="t"><svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M16.9 4.5l1.7-1.7a1.9 1.9 0 112.6 2.6L10.6 16a4.5 4.5 0 01-1.9 1.1L6 18l.8-2.7a4.5 4.5 0 011.1-1.9z"/></svg>工作台</div>
+        <div class="t"><svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M12 6.8C10.5 5.3 8.3 4.5 4.5 4.5V18c3.8 0 6 .8 7.5 2.3 1.5-1.5 3.8-2.3 7.5-2.3V4.5c-3.7 0-6 .8-7.5 2.3zM12 6.8v13.5"/></svg>台本库</div>
+        <div class="t on"><svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M4 5.3A2.3 2.3 0 016.3 3h5.2v16.5H6.3A2.3 2.3 0 004 21.8zM20 5.3A2.3 2.3 0 0017.8 3h-5.3v16.5h5.3a2.3 2.3 0 012.2 2.3z"/></svg>阅读器</div>
+        <div class="t"><svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M3 7.5A1.5 1.5 0 014.5 6h4.4a1.5 1.5 0 011 .4L11 7.6a1.5 1.5 0 001.1.4h7.4A1.5 1.5 0 0121 9.5v8.3a1.5 1.5 0 01-1.5 1.5h-15A1.5 1.5 0 013 17.8z"/></svg>批处理</div>
+      </div>
+      <div class="sheet glass" id="sheet"><div class="grab"></div><h4>排版设置</h4>
+        <div class="row">字号<div class="slider"><i></i><b></b></div></div>
+        <div class="row">行距<div class="slider"><i style="width:72%"></i><b style="left:72%"></b></div></div>
+        <div class="row">字体<div class="seg sm" id="font"><span class="thumb"></span><button class="on">明朝</button><button>ゴシック</button></div></div>
+        <div class="row">方向<div class="seg sm" id="dir2"><span class="thumb"></span><button>横排</button><button class="on">竖排</button></div></div>
+      </div>
+    </div></div>
+
+    <div class="phone"><div class="screen mini" style="background:var(--bg)">
+      <div class="aurora"><i></i><i></i><i></i></div>
+      <div class="island"></div>
+      <div style="padding:58px 16px 0"><div style="font-size:30px;font-weight:700;letter-spacing:-.03em">台本库</div><div style="font-size:12px;color:var(--ink2)">向下滚动 → 标签栏收缩</div></div>
+      <div class="shelf" style="grid-template-columns:1fr 1fr;gap:14px;padding:0 16px">
+        <div class="book bk-a"><span class="kind">台本</span><div class="bt" style="font-size:14px">放課後の約束</div><div class="prog"><i style="width:42%"></i></div></div>
+        <div class="book bk-b"><span class="kind">小说</span><div class="bt" style="font-size:14px">夢十夜</div><div class="prog"><i style="width:78%"></i></div></div>
+        <div class="book bk-c"><span class="kind">小说</span><div class="bt" style="font-size:14px">銀河鉄道の夜</div><div class="prog"><i style="width:12%"></i></div></div>
+        <div class="book bk-d"><span class="kind">字幕</span><div class="bt" style="font-size:14px">第3話</div><div class="prog"><i style="width:0"></i></div></div>
+      </div>
+      <div class="glass fab press">＋</div>
+      <div class="tabbar glass" id="tb2"><span class="blob"></span>
+        <div class="t">✎<span>工作台</span></div><div class="t on">▤<span>台本库</span></div><div class="t">❏<span>阅读器</span></div><div class="t">▦<span>批处理</span></div>
+      </div>
+    </div></div>
+  </div>
+
+  <!-- ===== Motion & type spec ===== -->
+  <div class="label"><b>④ 动效与排版规范</b></div>
+  <div class="notes">
+    <div class="note glass"><h5>弹簧曲线</h5>统一 <code>cubic-bezier(.32,.72,0,1)</code>（iOS sheet 曲线）。分段指示器 500ms 滑动变形；按压 <code>scale(.95)</code>；悬停仅 1px 抬起。</div>
+    <div class="note glass"><h5>进场节奏</h5>预览段落逐行 <code>rise</code> 进场，间隔 80ms；面板/弹窗从底部弹出；尊重 <code>prefers-reduced-motion</code>。</div>
+    <div class="note glass"><h5>玻璃层级</h5>只有导航、工具栏、面板、标签栏用玻璃；阅读纸面改为不透明暖白 <code>#fbfaf6</code>，保证正文对比度。背景加缓慢漂移的极光色块供玻璃折射。</div>
+    <div class="note glass"><h5>排版</h5>正文改明朝体 19px / 行高 2.5；振假名 0.5em 强调色；角色名改为标签。UI 字号最小 11px；标题 -0.02em 字距。</div>
+    <div class="note glass"><h5>布局</h5>顶部两张卡合并为一条 bar + 一条工具胶囊；导出格式收进“导出 ▾”菜单，去掉一排禁用按钮；预览进度改为标题旁小圆环。</div>
+    <div class="note glass"><h5>移动端</h5>标签栏 62px 浮动胶囊，图标 22px、文字 10.5px（现为 14px/10px、34px 高）；向下滚动缩到 82%，上滑恢复。</div>
+  </div>
+</div>
+
+<script>
+function seg(id,cb){const el=document.getElementById(id);if(!el)return;const th=el.querySelector('.thumb'),bs=[...el.querySelectorAll('button')];
+  const place=b=>{th.style.left=b.offsetLeft+'px';th.style.width=b.offsetWidth+'px'};
+  bs.forEach(b=>b.onclick=()=>{bs.forEach(x=>x.classList.remove('on'));b.classList.add('on');place(b);cb&&cb(b)});
+  requestAnimationFrame(()=>place(el.querySelector('button.on')));}
+['nav','kana','dir','filter','font','dir2'].forEach(id=>seg(id));
+seg('theme',b=>{document.documentElement.dataset.theme=b.dataset.v;});
+function tabs(id){const el=document.getElementById(id),blob=el.querySelector('.blob'),ts=[...el.querySelectorAll('.t')];
+  const place=t=>{blob.style.left=t.offsetLeft+'px';blob.style.width=t.offsetWidth+'px'};
+  ts.forEach(t=>t.onclick=()=>{ts.forEach(x=>x.classList.remove('on'));t.classList.add('on');place(t)});
+  requestAnimationFrame(()=>place(el.querySelector('.t.on')));}
+tabs('tb');tabs('tb2');
+if(location.hash==='#dark')document.querySelector('#theme [data-v=dark]').click();
+const sheet=document.getElementById('sheet');document.getElementById('aa').onclick=()=>sheet.classList.toggle('open');
+setTimeout(()=>sheet.classList.add('open'),900);
+window.addEventListener('resize',()=>document.querySelectorAll('.seg button.on,.tabbar .t.on').forEach(b=>b.click()));
+</script>
+</body>
+</html>

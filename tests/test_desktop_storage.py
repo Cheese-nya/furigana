@@ -57,5 +57,44 @@ class DesktopCorrectionsTest(unittest.TestCase):
             self.assertEqual(api.load_corrections(), {'test': []})
 
 
+class DesktopLibraryTest(unittest.TestCase):
+    def test_missing_library_returns_none_and_save_round_trips_across_restarts(self):
+        with tempfile.TemporaryDirectory() as directory:
+            api = launcher.Api(directory)
+            self.assertIsNone(api.load_library_database())
+            data = {'version': 1, 'books': {'book:1': {'title': '歪な鳥篭', 'content': '二人で行っておいで。'}}}
+            self.assertTrue(api.save_library_database(data)['success'])
+            self.assertEqual(launcher.Api(directory).load_library_database(), data)
+            self.assertFalse((Path(directory) / 'library-v1.tmp').exists())
+            updated = {'version': 1, 'books': {}}
+            self.assertTrue(api.save_library_database(updated)['success'])
+            self.assertEqual(api.load_library_database(), updated)
+            # The frontend migrates version 1 and writes version 2 back.
+            migrated = {'version': 2, 'books': {'book:1': {'title': '歪な鳥篭', 'category': 'other'}}}
+            self.assertTrue(api.save_library_database(migrated)['success'])
+            self.assertEqual(launcher.Api(directory).load_library_database(), migrated)
+
+    def test_invalid_library_data_is_rejected(self):
+        with tempfile.TemporaryDirectory() as directory:
+            api = launcher.Api(directory)
+            good = {'version': 1, 'books': {}}
+            self.assertTrue(api.save_library_database(good)['success'])
+            for bad in (None, [], {'version': 3, 'books': {}}, {'version': '2', 'books': {}}, {'version': 1}, {'version': 2, 'books': []}):
+                self.assertFalse(api.save_library_database(bad)['success'])
+            self.assertEqual(api.load_library_database(), good)
+
+    def test_corrupt_library_file_is_never_overwritten(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'library-v1.json'
+            path.write_text('{broken', encoding='utf-8')
+            api = launcher.Api(directory)
+            with self.assertRaises(ValueError):
+                api.load_library_database()
+            # A fresh save must refuse to clobber a corrupt file.
+            self.assertFalse(api.save_library_database({'version': 1, 'books': {}})['success'])
+            self.assertEqual(path.read_text(encoding='utf-8'), '{broken')
+            self.assertFalse((Path(directory) / 'library-v1.tmp').exists())
+
+
 if __name__ == '__main__':
     unittest.main()

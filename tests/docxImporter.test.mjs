@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { DOMParser } from '@xmldom/xmldom';
 import { loadTypescript } from './loadTypescript.mjs';
-const { parseDocxXml } = loadTypescript('../app/utils/docxImporter.ts');
+const { parseDocxXml, stripExportWatermark, cleanScriptTitle } = loadTypescript('../app/utils/docxImporter.ts');
 const { applyRubyOverrides, upsertRubyOverride, validateRubyOverrides } = loadTypescript('../app/utils/rubyOverrides.ts');
 globalThis.DOMParser = DOMParser;
 const ns = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
@@ -29,4 +29,44 @@ test('manual corrections override source ruby and survive annotation mode change
   assert.equal(cleared.tokens[0].ruby, undefined);
   assert.equal(applyRubyOverrides({ ...line, cleanText: '二人と' }, entries, 'hiragana').tokens[0].ruby, 'に');
   assert.deepEqual(validateRubyOverrides([{ ...entry, start: -1 }, null, entry]), [entry]);
+});
+
+test('stripExportWatermark removes exporter lines and leftover blank edges', () => {
+  const raw = [
+    '',
+    'Furigana Dubbing Studio 自动注音导出',
+    '',
+    '生徒A：今日は一本だけ。',
+    '由 Furigana Dubbing Studio 自动生成 • チーズ@beimisama',
+    '由  Furigana Dubbing Studio  自动生成',
+    '',
+    '正文は残る',
+    '',
+  ].join('\n');
+  assert.equal(stripExportWatermark(raw), '生徒A：今日は一本だけ。\n\n正文は残る');
+  assert.equal(stripExportWatermark('Furigana Dubbing Studio 自动注音导出\n'), '');
+  assert.equal(stripExportWatermark('普通の一行\n\n次の行'), '普通の一行\n\n次の行');
+});
+
+test('cleanScriptTitle strips extensions and repeated dubbing suffixes', () => {
+  assert.equal(cleanScriptTitle('foo_dubbing'), 'foo');
+  assert.equal(cleanScriptTitle('foo_dubbing_dubbing'), 'foo');
+  assert.equal(cleanScriptTitle('放課後-DUBBING.docx'), '放課後');
+  assert.equal(cleanScriptTitle('  script.SRT  '), 'script');
+  assert.equal(cleanScriptTitle('notes.vtt'), 'notes');
+  assert.equal(cleanScriptTitle('plain title.txt'), 'plain title');
+  assert.equal(cleanScriptTitle('dubbing_notes'), 'dubbing_notes');
+});
+
+test('parseDocxXml drops watermark paragraphs before joining text', () => {
+  const paragraph = body => `<w:p><w:r><w:t>${body}</w:t></w:r></w:p>`;
+  const xml = `<w:document xmlns:w="${ns}"><w:body>${[
+    'Furigana Dubbing Studio 自动注音导出',
+    '前',
+    '由 Furigana Dubbing Studio 自动生成 • チーズ@beimisama',
+    '後',
+  ].map(paragraph).join('')}</w:body></w:document>`;
+  const result = parseDocxXml(xml);
+  assert.equal(result.text, '前\n後');
+  assert.deepEqual(result.overrides, []);
 });

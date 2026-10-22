@@ -2,7 +2,10 @@ import type { KuromojiToken } from './kuromojiEngine';
 
 // Small offline pronunciation lexicon for numbers + counters. Morphological
 // dictionaries often return イチ + ハツ rather than the spoken イッパツ.
-const COUNTERS: Record<string, string[]> = {
+// Index 0 is the multiple-of-ten form, 1-9 follow a digit. A partial row only
+// lists the digits the dictionary gets wrong; the others stay with the dictionary.
+type Endings = Readonly<Partial<Record<number, string>>>;
+const COUNTERS: Record<string, Endings> = {
   '発': ['じゅっぱつ', 'いっぱつ', 'にはつ', 'さんぱつ', 'よんはつ', 'ごはつ', 'ろっぱつ', 'ななはつ', 'はっぱつ', 'きゅうはつ'],
   '本': ['じゅっぽん', 'いっぽん', 'にほん', 'さんぼん', 'よんほん', 'ごほん', 'ろっぽん', 'ななほん', 'はっぽん', 'きゅうほん'],
   '杯': ['じゅっぱい', 'いっぱい', 'にはい', 'さんばい', 'よんはい', 'ごはい', 'ろっぱい', 'ななはい', 'はっぱい', 'きゅうはい'],
@@ -12,6 +15,47 @@ const COUNTERS: Record<string, string[]> = {
   '冊': ['じゅっさつ', 'いっさつ', 'にさつ', 'さんさつ', 'よんさつ', 'ごさつ', 'ろくさつ', 'ななさつ', 'はっさつ', 'きゅうさつ'],
   '階': ['じゅっかい', 'いっかい', 'にかい', 'さんがい', 'よんかい', 'ごかい', 'ろっかい', 'ななかい', 'はっかい', 'きゅうかい'],
   '分': ['じゅっぷん', 'いっぷん', 'にふん', 'さんぷん', 'よんぷん', 'ごふん', 'ろっぷん', 'ななふん', 'はっぷん', 'きゅうふん'],
+  '時': { 4: 'よじ', 7: 'しちじ', 9: 'くじ' },
+  '日': { 7: 'しちにち', 9: 'くにち' },
+  '歳': { 0: 'じゅっさい', 1: 'いっさい', 8: 'はっさい' },
+  '週間': { 1: 'いっしゅうかん' },
+  '軒': { 1: 'いっけん', 3: 'さんげん', 8: 'はっけん' },
+  '歩': { 0: 'じゅっぽ', 1: 'いっぽ', 6: 'ろっぽ', 8: 'はっぽ' },
+  '件': { 1: 'いっけん' },
+  '点': { 0: 'じゅってん', 1: 'いってん' },
+  '着': { 1: 'いっちゃく' },
+  '通': { 1: 'いっつう' },
+  '頭': { 0: 'じゅっとう', 1: 'いっとう', 8: 'はっとう' },
+  '足': { 3: 'さんぞく' },
+};
+// Whole counts whose reading is not built from the digits.
+const FIXED_READINGS: Record<string, Readonly<Record<number, string>>> = {
+  '歳': { 20: 'はたち' },
+  '通り': { 1: 'ひととおり', 2: 'ふたとおり' },
+  '月': {
+    1: 'いちがつ', 2: 'にがつ', 3: 'さんがつ', 4: 'しがつ', 5: 'ごがつ', 6: 'ろくがつ',
+    7: 'しちがつ', 8: 'はちがつ', 9: 'くがつ', 10: 'じゅうがつ', 11: 'じゅういちがつ', 12: 'じゅうにがつ',
+  },
+  '日': {
+    2: 'ふつか', 3: 'みっか', 4: 'よっか', 5: 'いつか', 6: 'むいか', 7: 'なのか', 8: 'ようか', 9: 'ここのか', 10: 'とおか',
+    14: 'じゅうよっか', 20: 'はつか', 24: 'にじゅうよっか',
+  },
+};
+// Counts with two common readings: keep the dictionary's first and send the word to review.
+const AMBIGUOUS_READINGS: Record<string, Readonly<Record<number, readonly string[]>>> = {
+  '日': { 1: ['いちにち', 'ついたち'] },
+};
+// The dictionary fuses some counters with the following morpheme (四 + 時半, 三 + 日間).
+const FUSED_COUNTERS: Record<string, { counter: string; tail: string }> = {
+  '時半': { counter: '時', tail: 'はん' },
+  '時間': { counter: '時', tail: 'かん' },
+  '日間': { counter: '日', tail: 'かん' },
+};
+// Round hundreds geminate (ひゃっぽん) and round thousands take these endings (せんぼん);
+// counters missing here leave round hundreds and thousands to the dictionary.
+const THOUSAND_ENDINGS: Record<string, string> = {
+  '発': 'ぱつ', '本': 'ぼん', '杯': 'ばい', '匹': 'びき', '回': 'かい',
+  '個': 'こ', '冊': 'さつ', '階': 'がい', '分': 'ぷん',
 };
 const DIGITS = ['ぜろ', 'いち', 'に', 'さん', 'よん', 'ご', 'ろく', 'なな', 'はち', 'きゅう'];
 const KANJI_DIGITS = '〇一二三四五六七八九';
@@ -32,9 +76,17 @@ function parseNumber(surface: string): number | null {
 }
 
 export function counterReading(number: string, counter: string): string | null {
-  const endings = COUNTERS[counter];
+  const fused = FUSED_COUNTERS[counter];
+  if (fused) {
+    const reading = counterReading(number, fused.counter);
+    return reading && reading + fused.tail;
+  }
   const value = parseNumber(number);
-  if (!endings || value === null) return null;
+  if (value === null) return null;
+  const fixed = FIXED_READINGS[counter]?.[value];
+  if (fixed) return fixed;
+  const endings = COUNTERS[counter];
+  if (!endings) return null;
   const thousands = Math.floor(value / 1000);
   const hundreds = Math.floor(value % 1000 / 100);
   const remainder = value % 100;
@@ -45,26 +97,41 @@ export function counterReading(number: string, counter: string): string | null {
     hundreds === 8 ? 'はっぴゃく' : DIGITS[hundreds] + 'ひゃく';
   const prefix = thousandReading + hundredReading;
   if (remainder > 0) {
-    if (remainder < 10) return prefix + endings[remainder];
     const tens = Math.floor(remainder / 10);
     const units = remainder % 10;
-    const tensPrefix = tens === 1 ? '' : DIGITS[tens];
-    return prefix + tensPrefix + (units === 0 ? endings[0] : 'じゅう' + endings[units]);
+    const ending = endings[units];
+    if (!ending) return null;
+    const tensReading = tens === 0 ? '' : (tens === 1 ? '' : DIGITS[tens]) + (units === 0 ? '' : 'じゅう');
+    return prefix + tensReading + ending;
   }
+  const thousandEnding = THOUSAND_ENDINGS[counter];
+  const one = endings[1];
+  if (!thousandEnding || !one) return null;
   if (hundreds > 0) {
     if (counter === '冊') return prefix + 'さつ';
-    return prefix.slice(0, -1) + 'っ' + endings[1].slice(2);
+    return prefix.slice(0, -1) + 'っ' + one.slice(2);
   }
-  const thousandEndings: Record<string, string> = {
-    '発': 'ぱつ', '本': 'ぼん', '杯': 'ばい', '匹': 'びき', '回': 'かい',
-    '個': 'こ', '冊': 'さつ', '階': 'がい', '分': 'ぷん',
-  };
-  return prefix + thousandEndings[counter];
+  return prefix + thousandEnding;
 }
 
-export function findCounterCompound(tokens: KuromojiToken[], index: number): { length: number; surface: string; reading: string } | null {
+export interface CounterCompound {
+  length: number;
+  surface: string;
+  reading: string;
+  /** Present only when the count has more than one common reading. */
+  alternatives?: string[];
+}
+
+export function findCounterCompound(tokens: KuromojiToken[], index: number): CounterCompound | null {
   // Never repair just the tail of a larger number or an identifier.
   if (NUMBER_CHAR.test(tokens[index - 1]?.surface_form || '')) return null;
+  if (tokens[index]?.surface_form === '何') {
+    // 何 takes the same sound change as 三: なんぼん, なんばい, なんがい, なんげん.
+    const counter = tokens[index + 1];
+    const three = counter && COUNTERS[counter.surface_form]?.[3];
+    if (tokens[index].pos_detail_1 !== '数' || counter?.pos_detail_1 !== '接尾' || !three) return null;
+    return { length: 2, surface: '何' + counter.surface_form, reading: 'なん' + three.slice(2) };
+  }
   let number = '';
   let end = index;
   while (end < tokens.length && NUMBER_CHAR.test(tokens[end].surface_form)) {
@@ -74,8 +141,18 @@ export function findCounterCompound(tokens: KuromojiToken[], index: number): { l
   }
   if (end === index || !tokens[end]) return null;
   const counter = tokens[end].surface_form;
-  // Check POS as well as surface: 本 can be a book noun outside a count.
-  if (tokens[end].pos_detail_1 !== '接尾') return null;
-  const reading = counterReading(number, counter);
-  return reading ? { length: end - index + 1, surface: number + counter, reading } : null;
+  // Check POS as well as surface: 本 can be a book noun outside a count (月 is 名詞-一般).
+  if (tokens[end].pos_detail_1 !== '接尾' && counter !== '月') return null;
+  const length = end - index + 1;
+  const value = parseNumber(number);
+  const choices = value === null ? undefined : AMBIGUOUS_READINGS[counter]?.[value];
+  const reading = choices?.[0] ?? counterReading(number, counter);
+  if (!reading) return null;
+  if ((counter === '日' || counter === '時間' || counter === '週間') &&
+      tokens[end + 1]?.surface_form === '中' && tokens[end + 1].pos_detail_1 === '接尾') {
+    return { length: length + 1, surface: number + counter + '中', reading: reading + 'じゅう' };
+  }
+  return choices
+    ? { length, surface: number + counter, reading, alternatives: [...choices] }
+    : { length, surface: number + counter, reading };
 }

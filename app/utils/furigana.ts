@@ -312,13 +312,17 @@ export function disambiguateToken(
     // override a separate occurrence describing emotional pain.
     const boundary = (token: KuromojiToken) => /[、。，,.!?！？;；]/u.test(token.surface_form) ||
       (token.pos_detail_1 === '接続助詞' && /^(が|けど|けれど|けれども|のに|ても|でも)$/.test(token.surface_form));
-    let start = i;
-    let end = i + 1;
-    while (start > 0 && !boundary(allTokens[start - 1])) start--;
-    while (end < allTokens.length && !boundary(allTokens[end])) end++;
-    const context = allTokens.slice(start, end).filter((_, index) => start + index !== i).map(token => token.surface_form).join('');
-    const food = foodKeywords.test(context);
-    const pain = painKeywords.test(context);
+    const evidence = (isBoundary: (token: KuromojiToken) => boolean) => {
+      let start = i;
+      let end = i + 1;
+      while (start > 0 && !isBoundary(allTokens[start - 1])) start--;
+      while (end < allTokens.length && !isBoundary(allTokens[end])) end++;
+      const context = allTokens.slice(start, end).filter((_, index) => start + index !== i).map(token => token.surface_form).join('');
+      return { food: foodKeywords.test(context), pain: painKeywords.test(context) };
+    };
+    const clause = evidence(boundary);
+    // A bare predicate clause (このラーメン、辛い？) takes its topic from the rest of the sentence.
+    const { food, pain } = clause.food || clause.pain ? clause : evidence(token => /[。.!?！？]/u.test(token.surface_form));
     if (food && !pain) reading = 'からい';
     if (pain && !food) reading = 'つらい';
     // Conflicting or absent evidence keeps the dictionary reading and both choices.
@@ -328,7 +332,8 @@ export function disambiguateToken(
   // 2. 何 (なん vs なに)
   else if (surface === '何') {
     const nextSurface = nextToken ? nextToken.surface_form : '';
-    const isCounter = /^(人|日|回|度|番|年|時|分|秒|個|本|枚|匹|冊|通|台|階|体|点|色|曲|種類)/.test(nextSurface);
+    // The dictionary tags 何 as a numeral before any counter suffix (何歳, 何杯, 何軒).
+    const isCounter = kt.pos_detail_1 === '数' || /^(人|日|回|度|番|年|時|分|秒|個|本|枚|匹|冊|通|台|階|体|点|色|曲|種類)/.test(nextSurface);
     const isNanFollower = /^(で|だ|です|である|だった|だろう|の)/.test(nextSurface);
 
     if (isCounter || isNanFollower || nextSurface === 'と') {
@@ -483,8 +488,10 @@ export function annotateLine(
       const kt = kuromojiTokens[i];
       const counterCompound = findCounterCompound(kuromojiTokens, i);
       if (counterCompound) {
-        tokens.push(...parseCompoundToTokens(counterCompound.surface, counterCompound.reading, rubyType)
-          .map(token => ({ ...token, readingSource: 'automatic' as const, needsReview: false })));
+        // Counter readings are certain, except counts with two common readings (一日), which stay in review.
+        const { alternatives } = counterCompound;
+        tokens.push(...parseCompoundToTokens(counterCompound.surface, counterCompound.reading, rubyType, alternatives)
+          .map(token => ({ ...token, readingSource: 'automatic' as const, ...(alternatives ? {} : { needsReview: false }) })));
         i += counterCompound.length - 1;
         continue;
       }

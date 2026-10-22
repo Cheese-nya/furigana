@@ -1,14 +1,17 @@
 import assert from 'node:assert/strict';
 import { afterEach, test } from 'node:test';
 import { loadTypescript } from './loadTypescript.mjs';
-const { saveBlob } = loadTypescript('../app/utils/fileSave.ts');
+const { saveBlob, isMobileSharePreferred, pickBatchDirectory, saveBlobToDirectory, buildBatchZipBlob } = loadTypescript('../app/utils/fileSave.ts');
+import JSZip from 'jszip';
 const originalWindow = globalThis.window;
 const originalReader = globalThis.FileReader;
+const originalNavigator = Object.getOwnPropertyDescriptor(globalThis, 'navigator');
 afterEach(() => {
   if (originalWindow === undefined) delete globalThis.window;
   else globalThis.window = originalWindow;
   if (originalReader === undefined) delete globalThis.FileReader;
   else globalThis.FileReader = originalReader;
+  if (originalNavigator) Object.defineProperty(globalThis, 'navigator', originalNavigator);
 });
 
 function nativeSave(result) {
@@ -46,4 +49,140 @@ test('browser save only completes after closing the file', async () => {
   }) }) };
   assert.deepEqual(await saveBlob(blob, '台本.txt'), { success: true, path: '台本.txt' });
   assert.deepEqual(operations, ['write', 'close']);
+});
+
+const ANDROID_UA = 'Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36';
+const DESKTOP_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
+
+// Node exposes `navigator` as a getter-only global; swap it via defineProperty.
+function installNavigator(nav) {
+  Object.defineProperty(globalThis, 'navigator', { value: nav, configurable: true, writable: true });
+}
+
+function mobileShareWindow(shareImpl, canShareImpl = () => true) {
+  const nav = {
+    userAgent: ANDROID_UA,
+    share: shareImpl,
+    canShare: canShareImpl,
+  };
+  installNavigator(nav);
+  return { navigator: nav };
+}
+
+test('mobile share sheet succeeds like any other save target', async () => {
+  const blob = new Blob(['台本']);
+  const shares = [];
+  globalThis.window = mobileShareWindow(async data => { shares.push(data); });
+  assert.equal(isMobileSharePreferred(globalThis.window), true);
+  assert.deepEqual(await saveBlob(blob, '台本.txt'), { success: true, path: '台本.txt' });
+  assert.equal(shares.length, 1);
+  assert.equal(shares[0].title, '台本.txt');
+  assert.equal(shares[0].files.length, 1);
+  assert.ok(shares[0].files[0] instanceof File);
+});
+
+test('mobile share sheet cancellation remains cancellation', async () => {
+  globalThis.window = mobileShareWindow(async () => { throw new DOMException('cancel', 'AbortError'); });
+  assert.deepEqual(await saveBlob(new Blob(['あ']), '台本.txt'), { success: false });
+});
+
+test('mobile share failures are not silently swallowed', async () => {
+  globalThis.window = mobileShareWindow(async () => { throw new Error('Not allowed to share'); });
+  await assert.rejects(saveBlob(new Blob(['あ']), '台本.txt'), /Not allowed to share/);
+});
+
+test('desktop without a picker prefers direct download over the share sheet', async () => {
+  globalThis.window = {
+    navigator: { userAgent: DESKTOP_UA, share: async () => assert.fail('desktop must not use the share sheet'), canShare: () => true },
+  };
+  assert.equal(isMobileSharePreferred(globalThis.window), false);
+});
+
+test('an unshareable file type falls back to direct download', async () => {
+  let anchorClicked = false;
+  const element = { href: '', download: '', style: {}, click: () => { anchorClicked = true; }, remove: () => {} };
+  globalThis.window = mobileShareWindow(async () => assert.fail('share must not be called'), () => false);
+  globalThis.document = { createElement: () => element, body: { appendChild: () => {} }, }; // weightless anchor scaffold
+  globalThis.URL.createObjectURL = () => 'blob:fake';
+  globalThis.URL.revokeObjectURL = () => {};
+  const result = await saveBlob(new Blob(['あ']), '台本.txt');
+  delete globalThis.document;
+  assert.equal(anchorClicked, true);
+  assert.deepEqual(result, { success: true, path: '台本.txt', downloadStarted: true });
+});
+
+test('coarse pointer devices lean toward the share sheet even without a mobile UA', async () => {
+  const nav = { userAgent: DESKTOP_UA, share: async () => {}, canShare: () => true };
+  globalThis.window = { navigator: nav, matchMedia: query => ({ matches: query === '(pointer: coarse)' }) };
+  installNavigator(nav);
+  assert.equal(isMobileSharePreferred(globalThis.window), true);
+});
+
+test('skipFilePicker bypasses showSaveFilePicker and uses a direct download', async () => {
+  let anchorClicked = false;
+  const element = { href: '', download: '', style: {}, click: () => { anchorClicked = true; }, remove: () => {} };
+  globalThis.window = {
+    showSaveFilePicker: async () => { throw new Error('picker must be skipped'); },
+  };
+  globalThis.document = { createElement: () => element, body: { appendChild: () => {} } };
+  globalThis.URL.createObjectURL = () => 'blob:direct';
+  globalThis.URL.revokeObjectURL = () => {};
+  const result = await saveBlob(new Blob(['あ']), '台本.txt', { skipFilePicker: true });
+  delete globalThis.document;
+  assert.equal(anchorClicked, true);
+  assert.equal(element.download, '台本.txt');
+  assert.deepEqual(result, { success: true, path: '台本.txt', downloadStarted: true });
+});
+
+test('native save still runs when skipFilePicker is set', async () => {
+  nativeSave({ success: true, path: 'native.txt' });
+  assert.deepEqual(await saveBlob(new Blob(['あ']), '台本.txt', { skipFilePicker: true }), { success: true, path: 'native.txt' });
+});
+
+test('pickBatchDirectory uses readwrite mode and propagates cancellation', async () => {
+  const calls = [];
+  globalThis.window = {
+    showDirectoryPicker: async options => { calls.push(options); return { kind: 'directory' }; },
+  };
+  assert.deepEqual(await pickBatchDirectory(), { kind: 'directory' });
+  assert.deepEqual(calls, [{ mode: 'readwrite' }]);
+
+  globalThis.window = {
+    showDirectoryPicker: async () => { throw new DOMException('cancel', 'AbortError'); },
+  };
+  await assert.rejects(pickBatchDirectory(), error => error.name === 'AbortError');
+
+  globalThis.window = {};
+  assert.equal(await pickBatchDirectory(), null);
+});
+
+test('saveBlobToDirectory writes through the chosen directory handle', async () => {
+  const operations = [];
+  const blob = new Blob(['台本']);
+  const dirHandle = {
+    getFileHandle: async (name, options) => {
+      operations.push(['handle', name, options]);
+      return { createWritable: async () => ({
+        write: async value => { assert.equal(value, blob); operations.push('write'); },
+        close: async () => { operations.push('close'); },
+      }) };
+    },
+  };
+  await saveBlobToDirectory(dirHandle, '放課後/台本.txt', blob);
+  assert.deepEqual(operations, [['handle', '放課後_台本.txt', { create: true }], 'write', 'close']);
+});
+
+test('buildBatchZipBlob bundles files and disambiguates duplicate names', async () => {
+  const zipBlob = await buildBatchZipBlob([
+    { filename: '放課後.txt', blob: new Blob(['一']) },
+    { filename: '放課後.txt', blob: new Blob(['二']) },
+    { filename: 'notes.srt', blob: new Blob(['三']) },
+    { filename: '放課後.txt', blob: new Blob(['四']) },
+  ]);
+  const zip = await JSZip.loadAsync(await zipBlob.arrayBuffer());
+  const names = Object.keys(zip.files).sort();
+  assert.deepEqual(names, ['notes.srt', '放課後 (2).txt', '放課後 (3).txt', '放課後.txt']);
+  assert.equal(await zip.file('放課後.txt').async('string'), '一');
+  assert.equal(await zip.file('放課後 (2).txt').async('string'), '二');
+  assert.equal(await zip.file('放課後 (3).txt').async('string'), '四');
 });

@@ -1,19 +1,66 @@
+import JSZip from 'jszip';
+
 export interface SaveResult {
   success: boolean;
   path?: string;
   downloadStarted?: boolean;
 }
 
-interface SaveWindow extends Window {
-  pywebview?: { api?: { save_file(filename: string, data: string): Promise<{ success: boolean; path?: string; error?: string }> } };
-  showSaveFilePicker?: (options: { suggestedName: string; types: { description: string; accept: Record<string, string[]> }[] }) => Promise<{
-    name: string;
+export interface SaveFileOptions {
+  /** Batch downloads skip the per-file save picker and use a direct download (or native save). */
+  skipFilePicker?: boolean;
+}
+
+export type BatchSaveMode = 'zip' | 'folder' | 'direct';
+
+export interface BatchOutputFile {
+  filename: string;
+  blob: Blob;
+  mimeType?: string;
+}
+
+export interface DirectoryHandleLike {
+  getFileHandle(name: string, options?: { create?: boolean }): Promise<{
     createWritable(): Promise<{ write(blob: Blob): Promise<void>; close(): Promise<void> }>;
   }>;
 }
 
+interface SaveWindow extends Omit<Window, 'showSaveFilePicker' | 'matchMedia'> {
+  pywebview?: { api?: { save_file(filename: string, data: string): Promise<{ success: boolean; path?: string; error?: string }> } };
+  AndroidBridge?: { saveFile?: (filename: string, base64Data: string) => string };
+  showSaveFilePicker?: (options: { suggestedName: string; types: { description: string; accept: Record<string, string[]> }[] }) => Promise<{
+    name: string;
+    createWritable(): Promise<{ write(blob: Blob): Promise<void>; close(): Promise<void> }>;
+  }>;
+  showDirectoryPicker?: (options?: { mode?: 'read' | 'readwrite' }) => Promise<DirectoryHandleLike>;
+  matchMedia?: (query: string) => MediaQueryList | { matches: boolean };
+}
+
+type ShareNavigator = Navigator & {
+  canShare?: (data?: ShareData) => boolean;
+  share?: (data?: ShareData) => Promise<void>;
+  standalone?: boolean;
+};
+
+const MOBILE_UA = /Android|iPhone|iPad|iPod|Mobile/i;
+
+/**
+ * Mobile share sheet (Web Share API Level 2) is only preferred on hand-held
+ * devices, so desktop browsers without `showSaveFilePicker` still fall through
+ * to a plain direct download.
+ */
+export function isMobileSharePreferred(target: SaveWindow): boolean {
+  const nav = (target.navigator ?? (typeof navigator !== 'undefined' ? navigator : undefined)) as ShareNavigator | undefined;
+  if (!nav || typeof File !== 'function') return false;
+  if (typeof nav.share !== 'function' || typeof nav.canShare !== 'function') return false;
+  if (MOBILE_UA.test(nav.userAgent || '')) return true;
+  if (target.matchMedia?.('(pointer: coarse)')?.matches) return true;
+  if (nav.standalone) return true;
+  return false;
+}
+
 /** Only fall back when a save API is unavailable, never after a failed write. */
-export async function saveBlob(blob: Blob, filename: string): Promise<SaveResult> {
+export async function saveBlob(blob: Blob, filename: string, options?: SaveFileOptions): Promise<SaveResult> {
   const target = window as SaveWindow;
   const api = target.pywebview?.api;
   if (api?.save_file) {
@@ -29,7 +76,26 @@ export async function saveBlob(blob: Blob, filename: string): Promise<SaveResult
     throw new Error(result?.error || '文件保存失败');
   }
 
-  if (target.showSaveFilePicker) {
+  const androidSave = target.AndroidBridge?.saveFile;
+  if (typeof androidSave === 'function') {
+    const base64 = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result).split(',')[1]);
+      reader.onerror = () => reject(reader.error || new Error('文件读取失败'));
+      reader.readAsDataURL(blob);
+    });
+    let parsed: { success?: boolean; path?: string; error?: string } | null = null;
+    try {
+      const raw = androidSave.call(target.AndroidBridge, filename, base64);
+      parsed = JSON.parse(raw);
+    } catch (error) {
+      throw new Error(error instanceof Error ? error.message : String(error));
+    }
+    if (parsed?.success) return { success: true, path: parsed.path };
+    throw new Error(parsed?.error || '文件保存失败');
+  }
+
+  if (target.showSaveFilePicker && !options?.skipFilePicker) {
     const ext = filename.split('.').pop()?.toLowerCase() || 'txt';
     const types: Record<string, { description: string; accept: Record<string, string[]> }> = {
       txt: { description: 'TXT 文本文件', accept: { 'text/plain': ['.txt'] } },
@@ -50,6 +116,20 @@ export async function saveBlob(blob: Blob, filename: string): Promise<SaveResult
     return { success: true, path: handle.name };
   }
 
+  if (isMobileSharePreferred(target)) {
+    const nav = (target.navigator ?? (typeof navigator !== 'undefined' ? navigator : undefined)) as ShareNavigator;
+    const file = new File([blob], filename, { type: blob.type || 'text/plain' });
+    if (nav.canShare?.({ files: [file] })) {
+      try {
+        await nav.share?.({ files: [file], title: filename });
+        return { success: true, path: filename };
+      } catch (error) {
+        if (error instanceof Error && error.name === 'AbortError') return { success: false };
+        throw error;
+      }
+    }
+  }
+
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement('a');
   anchor.href = url;
@@ -63,4 +143,56 @@ export async function saveBlob(blob: Blob, filename: string): Promise<SaveResult
     anchor.remove();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
+}
+
+function safeFileName(filename: string): string {
+  const cleaned = filename.replace(/[\\/]/g, '_').replace(/\u0000/g, '').trim();
+  return cleaned || 'untitled';
+}
+
+/**
+ * Ask once for a read-write directory. User cancellation (AbortError) propagates.
+ * Returns null when the File System Access API is unavailable.
+ */
+export async function pickBatchDirectory(): Promise<DirectoryHandleLike | null> {
+  const picker = (window as SaveWindow).showDirectoryPicker;
+  if (typeof picker !== 'function') return null;
+  return picker.call(window, { mode: 'readwrite' });
+}
+
+/** Write one blob into an already-chosen directory handle, with no extra picker. */
+export async function saveBlobToDirectory(dirHandle: DirectoryHandleLike, filename: string, blob: Blob): Promise<void> {
+  const handle = await dirHandle.getFileHandle(safeFileName(filename), { create: true });
+  const writable = await handle.createWritable();
+  await writable.write(blob);
+  await writable.close();
+}
+
+function uniqueZipName(filename: string, used: Set<string>): string {
+  const safe = safeFileName(filename);
+  if (!used.has(safe)) {
+    used.add(safe);
+    return safe;
+  }
+  const dot = safe.lastIndexOf('.');
+  const stem = dot > 0 ? safe.slice(0, dot) : safe;
+  const ext = dot > 0 ? safe.slice(dot) : '';
+  let index = 2;
+  let candidate = `${stem} (${index})${ext}`;
+  while (used.has(candidate)) {
+    index += 1;
+    candidate = `${stem} (${index})${ext}`;
+  }
+  used.add(candidate);
+  return candidate;
+}
+
+/** Bundle batch outputs into one zip. Duplicate names become `name (2).ext`. */
+export async function buildBatchZipBlob(files: BatchOutputFile[]): Promise<Blob> {
+  const zip = new JSZip();
+  const used = new Set<string>();
+  for (const file of files) {
+    zip.file(uniqueZipName(file.filename, used), file.blob);
+  }
+  return zip.generateAsync({ type: 'blob' });
 }

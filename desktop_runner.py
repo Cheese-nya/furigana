@@ -63,6 +63,9 @@ def wait_for_server(port, timeout=10):
 
 import base64
 
+# Library data versions the frontend reads (app/utils/libraryDatabase.ts); it migrates 1 and writes 2.
+LIBRARY_VERSIONS = (1, 2)
+
 
 class Api:
     def __init__(self, data_dir=None):
@@ -72,7 +75,9 @@ class Api:
         root = Path(data_dir) if data_dir else Path(os.environ.get('LOCALAPPDATA') or Path.home() / '.local' / 'share') / 'FuriganaDubbingStudio'
         self._corrections_path = root / 'corrections.json'
         self._database_path = root / 'corrections-v2.json'
+        self._library_path = root / 'library-v1.json'
         self._corrections_lock = threading.Lock()
+        self._library_lock = threading.Lock()
 
     def load_corrections(self):
         with self._corrections_lock:
@@ -124,6 +129,41 @@ class Api:
                     handle.flush()
                     os.fsync(handle.fileno())
                 os.replace(temporary, self._database_path)
+            return {'success': True}
+        except Exception as error:
+            return {'success': False, 'error': str(error)}
+
+    def load_library_database(self):
+        """Return the persisted library, or None so the frontend can seed starter books.
+
+        Version 1 files are returned as stored; the frontend migrates them and saves version 2.
+        """
+        with self._library_lock:
+            if not self._library_path.exists():
+                return None
+            with self._library_path.open(encoding='utf-8') as handle:
+                data = json.load(handle)
+            if not isinstance(data, dict) or data.get('version') not in LIBRARY_VERSIONS or not isinstance(data.get('books'), dict):
+                raise ValueError('Invalid library database; original file retained')
+            return data
+
+    def save_library_database(self, data):
+        try:
+            if not isinstance(data, dict) or data.get('version') not in LIBRARY_VERSIONS or not isinstance(data.get('books'), dict):
+                return {'success': False, 'error': 'Invalid library database'}
+            with self._library_lock:
+                # Validate the existing file before replacing: a corrupt library
+                # must stay recoverable instead of being overwritten.
+                if self._library_path.exists():
+                    with self._library_path.open(encoding='utf-8') as handle:
+                        json.load(handle)
+                self._library_path.parent.mkdir(parents=True, exist_ok=True)
+                temporary = self._library_path.with_suffix('.tmp')
+                with temporary.open('w', encoding='utf-8') as handle:
+                    json.dump(data, handle, ensure_ascii=False)
+                    handle.flush()
+                    os.fsync(handle.fileno())
+                os.replace(temporary, self._library_path)
             return {'success': True}
         except Exception as error:
             return {'success': False, 'error': str(error)}

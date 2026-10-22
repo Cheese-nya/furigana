@@ -47,19 +47,30 @@ export function ExportProgressModal({
       title={getModalTitle()}
     >
       <div className="space-y-5 py-2">
-        <div className="flex items-center justify-between text-xs font-medium text-zinc-700">
+        <div className="flex items-center justify-between text-xs font-medium text-slate-700 dark:text-slate-300">
           <span>{t.generatingProgress} ({exportFormat.toUpperCase()})</span>
-          <span>{exportProgress}%</span>
+          <span className="font-semibold text-indigo-600 dark:text-indigo-400 tabular-nums">{exportProgress}%</span>
         </div>
 
-        <div className="w-full h-2 bg-zinc-100 border border-zinc-200 rounded-full overflow-hidden">
+        <div className="w-full h-2.5 rounded-full overflow-hidden liquid-glass-inset p-0.5 border border-white/80 dark:border-white/10 bg-slate-200/50 dark:bg-white/5">
           <div
-            className="h-full bg-zinc-900 rounded-full transition-all duration-300"
+            className={`h-full rounded-full transition-all duration-300 ${
+              exportOutcome === 'error'
+                ? 'bg-rose-500'
+                : 'bg-gradient-to-r from-indigo-500 via-indigo-600 to-emerald-500 shadow-[0_0_12px_rgba(99,102,241,0.5)]'
+            }`}
             style={{ width: `${exportProgress}%` }}
           />
         </div>
 
-        <p role={exportOutcome === 'error' ? 'alert' : 'status'} className="text-xs text-center text-zinc-600">
+        <p
+          role={exportOutcome === 'error' ? 'alert' : 'status'}
+          className={`text-xs text-center leading-relaxed ${
+            exportOutcome === 'error'
+              ? 'text-rose-600 dark:text-rose-400 font-medium'
+              : 'text-slate-600 dark:text-slate-300'
+          }`}
+        >
           {exportOutcome === 'processing' && (exportProgress < 80 ? t.generatingFile.replace('{format}', exportFormat.toUpperCase()) : t.waitingForSave)}
           {exportOutcome === 'saved' && t.fileSaved}
           {exportOutcome === 'download' && t.downloadHandedOver}
@@ -67,11 +78,11 @@ export function ExportProgressModal({
           {exportOutcome === 'error' && `${t.exportModalFailed}: ${exportError}`}
         </p>
 
-        <div className="flex justify-end pt-1">
+        <div className="flex justify-end pt-2 border-t border-slate-200/60 dark:border-white/10">
           <button
             disabled={isExporting}
             onClick={onClose}
-            className="rounded-lg bg-zinc-900 px-5 py-2 text-xs font-medium text-white hover:bg-zinc-800 disabled:opacity-50 transition-colors shadow-xs"
+            className="lg-pill-interactive lg-btn-prominent liquid-glass-btn-primary px-6 py-2.5 min-h-[38px] text-xs font-semibold text-white rounded-full shadow-sm disabled:opacity-50 transition-all hover:shadow"
           >
             {isExporting ? t.processing : t.done}
           </button>
