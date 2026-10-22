@@ -83,17 +83,8 @@ mkdir -p "$BUILD_DIR/compiled_res" \
          "$ANDROID_DIR/keystore" \
          "$ASSETS_WWW"
 
-python3 - "$ROOT_DIR/public/logo.png" "$ANDROID_DIR/res/mipmap-xxxhdpi/ic_launcher.png" "$ROOT_DIR/public/promo-1x1.png" <<'PYEOF'
-import sys, shutil
-src, dst, fallback = sys.argv[1], sys.argv[2], sys.argv[3]
-try:
-    from PIL import Image
-    im = Image.open(src).convert("RGBA").resize((192, 192))
-    im.save(dst, format="PNG")
-except Exception:
-    shutil.copyfile(fallback, dst)
-PYEOF
-
+# Launcher icons are committed under android/res/mipmap-* (see docs/brand), never generated
+# here: an earlier build silently fell back to an old promo image when PIL was missing.
 cat > "$ANDROID_DIR/res/values/strings.xml" <<'EOF'
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
