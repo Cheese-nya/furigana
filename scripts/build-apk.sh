@@ -84,7 +84,8 @@ mkdir -p "$BUILD_DIR/compiled_res" \
          "$ASSETS_WWW"
 
 # Launcher icons are committed under android/res/mipmap-* (see docs/brand), never generated
-# here: an earlier build silently fell back to an old promo image when PIL was missing.
+# here: an earlier build regenerated the icon and silently fell back to an old image on
+# machines without the Python imaging library, which is how v1.2.0 shipped a wrong icon.
 cat > "$ANDROID_DIR/res/values/strings.xml" <<'EOF'
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
