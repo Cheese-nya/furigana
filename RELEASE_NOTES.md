@@ -1,3 +1,47 @@
+# 🎏 浮く Uku Furigana V1.2.0 发布说明 (Release Notes)
+
+> **版本标签 (Tag)**: `v1.2.0`  
+> **发布标题 (Title)**: `浮く Uku Furigana V1.2.0 — 全新名称与 Liquid Glass 界面，书库、阅读器与 Android / iOS 版`  
+> **发布日期 (Date)**: 2026-10-22  
+
+---
+
+## 🌟 核心更新亮点 (Highlights)
+
+### 1. 🎐 更名为「浮く」（Uku Furigana）
+- 取「假名如浮动般标注于汉字之上」之意，原名 Furigana Dubbing Studio。
+- 全新极简图标：フリガナ 四字呈正方形排列，「ガ」的浊点为朱红色。
+- 应用标识（Android / iOS）改为 `com.cheese.uku`。
+
+### 2. 🪟 Liquid Glass 界面全面重做
+- 悬浮玻璃侧边栏（桌面）与底部标签栏（手机），外观可选自动 / 浅色 / 深色，跟随系统。
+- 工作台、校对浮窗、书库、阅读器、批量处理按统一设计重绘。
+
+### 3. 📚 书库、阅读器与批量处理
+- 内置台本书库、沉浸式假名阅读器（字体、字号、注音显示、竖排）。
+- 批量导入 `.txt` / `.srt` / `.vtt` / `.docx`，一键导出全部。
+- 支持从 Pixiv 导入小说（需联网）。
+
+### 4. 📱 Android 与 iOS 版本
+- 基于 Capacitor 的原生外壳，离线可用；本版起 Releases 提供已签名的 APK。
+- 已移除不需要的麦克风权限，并拒绝网页的权限请求。
+
+### 5. 🎯 注音准确度
+- 补全数词与量词音变：七時、四時間、一日中、一通り、3月 等。
+- 改进「辛い」等多音字的上下文判断；Word 注音导入导出往返、行内注音、SRT / VTT 解析的若干修复。
+- 「恢复自动」会同时清除手动覆盖与已学语境。
+
+---
+
+## ⚠️ 升级须知 (Upgrade Notes)
+
+- **许可证变更**：自本版起源代码以 [PolyForm Noncommercial 1.0.0](LICENSE) 发布，允许非商业使用，**禁止商用**。v1.1.0 及更早版本仍适用 MIT。名称与图标另见 [TRADEMARKS.md](TRADEMARKS.md)。
+- **Windows 数据迁移**：桌面版首次启动会把旧的 `FuriganaDubbingStudio` 数据目录自动迁移为 `UkuFurigana`，校对记录与书库不丢失。
+- **Android / iOS**：应用标识已更改，会被系统视为新应用，旧测试版的数据不会自动带入。
+- **已移除**：书库的 JSON 备份与恢复入口、打赏入口、诊断与修复页。
+
+---
+
 # 🎏 Furigana Dubbing Studio V1.1.0 发布说明 (Release Notes)
 
 > **版本标签 (Tag)**: `v1.1.0`  
