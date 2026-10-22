@@ -10,8 +10,8 @@
     <b>简体中文</b> • <a href="README_EN.md">English</a>
   </p>
 
-  [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-  [![Version](https://img.shields.io/badge/Version-v1.1.0-emerald.svg)](RELEASE_NOTES.md)
+  [![License: PolyForm Noncommercial](https://img.shields.io/badge/License-PolyForm_Noncommercial_1.0.0-orange.svg)](LICENSE)
+  [![Version](https://img.shields.io/github/package-json/v/Cheese-nya/furigana?label=Version&color=10b981)](RELEASE_NOTES.md)
   [![Next.js](https://img.shields.io/badge/Next.js-16-black?logo=next.js)](https://nextjs.org/)
   [![TailwindCSS](https://img.shields.io/badge/Tailwind-v4-38bdf8?logo=tailwindcss)](https://tailwindcss.com/)
   [![Desktop](https://img.shields.io/badge/Desktop-Windows_EXE-3776ab?logo=windows)](https://github.com/Cheese-nya/furigana)
@@ -143,6 +143,10 @@ furigana/
 
 ---
 
-## 开源协议
+## 许可协议
 
-本项目基于 [MIT](LICENSE) 协议开源。
+- **源代码**：自 v1.2.0 之后的提交起，以 [PolyForm Noncommercial 1.0.0](LICENSE) 许可发布。允许个人学习、研究、教学及其它**非商业**用途下的使用、修改与分发；**禁止任何商业用途**。如需商业授权，请联系作者。
+- **历史版本**：v1.2.0（提交 `6b3804a`）及更早的版本曾以 MIT 协议发布，这些版本仍适用 MIT。
+- **名称与图标**：不在上述许可范围内，见 [TRADEMARKS.md](TRADEMARKS.md)。
+- **第三方组件**：见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
+- **参与贡献**：见 [CONTRIBUTING.md](CONTRIBUTING.md) 与 [CLA.md](CLA.md)。

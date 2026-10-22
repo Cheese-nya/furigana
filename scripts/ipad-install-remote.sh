@@ -4,7 +4,7 @@
 # unlocked, so this prompts for the Mac login password interactively.
 set -euo pipefail
 export PATH="/usr/local/bin:/opt/homebrew/bin:$PATH"
-cd ~/project/furigana
+cd "${HACKINTOSH_DIR:-$HOME/project/furigana}"
 
 echo "==> 解锁登录钥匙串（请输入黑苹果的登录密码，输入时不显示）"
 security unlock-keychain ~/Library/Keychains/login.keychain-db

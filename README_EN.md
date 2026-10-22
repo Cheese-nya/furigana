@@ -11,8 +11,8 @@
     <b>English</b> • <a href="README.md">简体中文</a>
   </p>
 
-  [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-  [![Version](https://img.shields.io/badge/Version-v1.1.0-emerald.svg)](RELEASE_NOTES.md)
+  [![License: PolyForm Noncommercial](https://img.shields.io/badge/License-PolyForm_Noncommercial_1.0.0-orange.svg)](LICENSE)
+  [![Version](https://img.shields.io/github/package-json/v/Cheese-nya/furigana?label=Version&color=10b981)](RELEASE_NOTES.md)
   [![Next.js](https://img.shields.io/badge/Next.js-16-black?logo=next.js)](https://nextjs.org/)
   [![TailwindCSS](https://img.shields.io/badge/Tailwind-v4-38bdf8?logo=tailwindcss)](https://tailwindcss.com/)
   [![Desktop](https://img.shields.io/badge/Desktop-Windows_EXE-3776ab?logo=windows)](https://github.com/Cheese-nya/furigana)
@@ -146,4 +146,8 @@ furigana/
 
 ## License
 
-Released under the [MIT License](LICENSE).
+- **Source code**: commits after v1.2.0 are licensed under [PolyForm Noncommercial 1.0.0](LICENSE). Personal, educational, research, and other **noncommercial** use, modification, and distribution are permitted; **commercial use is not**. Contact the author for a commercial license.
+- **Earlier releases**: v1.2.0 (commit `6b3804a`) and earlier were released under the MIT License and remain available under MIT.
+- **Name and icons**: not covered by the license; see [TRADEMARKS.md](TRADEMARKS.md).
+- **Third-party components**: see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+- **Contributing**: see [CONTRIBUTING.md](CONTRIBUTING.md) and the [CLA](CLA.md).
