@@ -109,8 +109,18 @@ public class MainActivity extends Activity {
         public void syncTheme(String bgHex, boolean isDark) {
             final String safeHex = (bgHex != null && bgHex.matches("^#[0-9a-fA-F]{6}$"))
                     ? bgHex
-                    : (isDark ? "#0b0d13" : "#eef2f9");
+                    : (isDark ? "#000000" : "#F2F2F7");
             runOnUiThread(() -> applySystemBarAndWebViewTheme(safeHex, isDark));
+        }
+    }
+
+    private boolean isSystemDark() {
+        return (getResources().getConfiguration().uiMode & android.content.res.Configuration.UI_MODE_NIGHT_MASK) == android.content.res.Configuration.UI_MODE_NIGHT_YES;
+    }
+
+    private void pushSystemTheme() {
+        if (webView != null) {
+            webView.evaluateJavascript("window.__furiganaSystemDark=" + (isSystemDark() ? "true" : "false") + ";window.dispatchEvent(new Event('furigana-system-theme'));", null);
         }
     }
 
@@ -119,7 +129,7 @@ public class MainActivity extends Activity {
         try {
             color = Color.parseColor(bgHex);
         } catch (IllegalArgumentException e) {
-            color = Color.parseColor(isDark ? "#0b0d13" : "#eef2f9");
+            color = Color.parseColor(isDark ? "#000000" : "#F2F2F7");
         }
         Window window = getWindow();
         if (window != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
@@ -163,7 +173,7 @@ public class MainActivity extends Activity {
 
         webView = new WebView(this);
         webView.setOverScrollMode(android.view.View.OVER_SCROLL_NEVER);
-        applySystemBarAndWebViewTheme("#eef2f9", false);
+        applySystemBarAndWebViewTheme(isSystemDark() ? "#000000" : "#F2F2F7", isSystemDark());
         setContentView(webView);
 
         WebSettings settings = webView.getSettings();
@@ -185,6 +195,18 @@ public class MainActivity extends Activity {
         webView.addJavascriptInterface(new AndroidNativeBridge(), "AndroidBridge");
 
         webView.setWebViewClient(new WebViewClient() {
+
+            @Override
+            public void onPageStarted(WebView view, String url, Bitmap favicon) {
+                super.onPageStarted(view, url, favicon);
+                pushSystemTheme();
+            }
+
+            @Override
+            public void onPageFinished(WebView view, String url) {
+                super.onPageFinished(view, url);
+                pushSystemTheme();
+            }
 
             @Override
             public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
@@ -475,6 +497,12 @@ public class MainActivity extends Activity {
         } else {
             super.onBackPressed();
         }
+    }
+
+    @Override
+    public void onConfigurationChanged(android.content.res.Configuration newConfig) {
+        super.onConfigurationChanged(newConfig);
+        pushSystemTheme();
     }
 
     @Override
