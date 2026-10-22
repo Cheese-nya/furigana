@@ -306,6 +306,57 @@ export interface Translations {
   // Dark mode
   navDarkModeToggle: string;
   settingsTitle: string;
+  batchAddFiles: string;
+  batchExportAll: string;
+  batchStatusDone: string;
+  batchStatusQueued: string;
+  batchStatusFailed: string;
+  batchRemove: string;
+  batchEmptyTitle: string;
+  batchEmptyBody: string;
+  libraryRead: string;
+  libraryOpenInEditor: string;
+  libraryInfoAndCategory: string;
+  libraryDelete: string;
+  libraryEmptyTitle: string;
+  libraryEmptyBody: string;
+  libraryFilteredEmptyTitle: string;
+  libraryFilteredEmptyBody: string;
+  libraryUnread: string;
+  libraryNewShort: string;
+  libraryCategoryLabel: string;
+  librarySortLabel: string;
+  scopeOccurrence: string;
+  scopeDocument: string;
+  scopeRemember: string;
+  customRubyPlaceholder: string;
+  applyButton: string;
+  rubySheetTitle: string;
+  typographyShort: string;
+  importShort: string;
+  previewShort: string;
+  themeAuto: string;
+  chooseFile: string;
+  importFromLibrary: string;
+  tapKanjiHint: string;
+  sourceLabel: string;
+  charsUnit: string;
+  statAuto: string;
+  statGlossary: string;
+  statManual: string;
+  rubyLabel: string;
+  fontLabel: string;
+  fontSizeLabel: string;
+  showRubyLabel: string;
+  fontMinchoShort: string;
+  fontGothicShort: string;
+  dictLoadFailed: string;
+  dictErrorTitle: string;
+  dictErrorBody: string;
+  retry: string;
+  learnedReadingsMenu: string;
+  libraryEmptyPick: string;
+  writingModeShort: string;
   appearanceLabel: string;
   themeLight: string;
   themeDark: string;
@@ -643,6 +694,57 @@ export const translations: Record<Locale, Translations> = {
     // Dark mode
     navDarkModeToggle: '切换日间/黑夜模式',
     settingsTitle: '设置',
+    batchAddFiles: '添加文件',
+    batchExportAll: '全部导出',
+    batchStatusDone: '完成',
+    batchStatusQueued: '排队中',
+    batchStatusFailed: '无法读取',
+    batchRemove: '移除',
+    batchEmptyTitle: '还没有文件',
+    batchEmptyBody: '添加 TXT、DOCX 或 SRT 文件，一次注音并导出。',
+    libraryRead: '阅读',
+    libraryOpenInEditor: '在工作台打开',
+    libraryInfoAndCategory: '信息与分类',
+    libraryDelete: '删除',
+    libraryEmptyTitle: '还没有台本',
+    libraryEmptyBody: '导入 TXT、DOCX 或 SRT，也可以粘贴 Pixiv 链接。',
+    libraryFilteredEmptyTitle: '这个分类里没有作品',
+    libraryFilteredEmptyBody: '换个分类，或者取消“只看收藏”。',
+    libraryUnread: '未读',
+    libraryNewShort: '新建',
+    libraryCategoryLabel: '分类',
+    librarySortLabel: '排序',
+    scopeOccurrence: '仅此处',
+    scopeDocument: '全文同词',
+    scopeRemember: '记住',
+    customRubyPlaceholder: '自定义读音',
+    applyButton: '应用',
+    rubySheetTitle: '修改读音',
+    typographyShort: '排版',
+    importShort: '导入',
+    previewShort: '注音预览',
+    themeAuto: '自动',
+    chooseFile: '选择文件',
+    importFromLibrary: '从台本库导入',
+    tapKanjiHint: '点汉字可改读音',
+    sourceLabel: '原文',
+    charsUnit: '字',
+    statAuto: '自动',
+    statGlossary: '专名',
+    statManual: '人工',
+    rubyLabel: '注音',
+    fontLabel: '字体',
+    fontSizeLabel: '字号',
+    showRubyLabel: '显示注音',
+    fontMinchoShort: '明朝',
+    fontGothicShort: '黑体',
+    dictLoadFailed: '词典加载失败 · 重试',
+    dictErrorTitle: '词典没有加载成功',
+    dictErrorBody: '原文已保留。检查存储空间后重试，或先导出不带注音的版本。',
+    retry: '重试',
+    learnedReadingsMenu: '学到的读音',
+    libraryEmptyPick: '台本库里还没有作品',
+    writingModeShort: '排版方向',
     appearanceLabel: '外观',
     themeLight: '浅色',
     themeDark: '深色',
@@ -976,6 +1078,57 @@ export const translations: Record<Locale, Translations> = {
     // Dark mode
     navDarkModeToggle: 'Toggle Light/Dark Mode',
     settingsTitle: 'Settings',
+    batchAddFiles: 'Add Files',
+    batchExportAll: 'Export All',
+    batchStatusDone: 'Done',
+    batchStatusQueued: 'Queued',
+    batchStatusFailed: 'Failed',
+    batchRemove: 'Remove',
+    batchEmptyTitle: 'No files yet',
+    batchEmptyBody: 'Add TXT, DOCX or SRT files to annotate and export them together.',
+    libraryRead: 'Read',
+    libraryOpenInEditor: 'Open in Workbench',
+    libraryInfoAndCategory: 'Info & Category',
+    libraryDelete: 'Delete',
+    libraryEmptyTitle: 'No scripts yet',
+    libraryEmptyBody: 'Import TXT, DOCX or SRT, or paste a Pixiv link.',
+    libraryFilteredEmptyTitle: 'Nothing in this category',
+    libraryFilteredEmptyBody: 'Try another category, or turn off favourites only.',
+    libraryUnread: 'Unread',
+    libraryNewShort: 'New',
+    libraryCategoryLabel: 'Category',
+    librarySortLabel: 'Sort',
+    scopeOccurrence: 'This one',
+    scopeDocument: 'All in script',
+    scopeRemember: 'Remember',
+    customRubyPlaceholder: 'Custom reading',
+    applyButton: 'Apply',
+    rubySheetTitle: 'Change Reading',
+    typographyShort: 'Type',
+    importShort: 'Import',
+    previewShort: 'Ruby Preview',
+    themeAuto: 'Auto',
+    chooseFile: 'Choose File',
+    importFromLibrary: 'From Library',
+    tapKanjiHint: 'Tap a kanji to change its reading',
+    sourceLabel: 'Source',
+    charsUnit: 'chars',
+    statAuto: 'Auto',
+    statGlossary: 'Glossary',
+    statManual: 'Manual',
+    rubyLabel: 'Ruby',
+    fontLabel: 'Font',
+    fontSizeLabel: 'Size',
+    showRubyLabel: 'Show Ruby',
+    fontMinchoShort: 'Mincho',
+    fontGothicShort: 'Gothic',
+    dictLoadFailed: 'Dictionary failed · Retry',
+    dictErrorTitle: 'The dictionary did not load',
+    dictErrorBody: 'Your text is kept. Check storage and retry, or export without ruby for now.',
+    retry: 'Retry',
+    learnedReadingsMenu: 'Learned Readings',
+    libraryEmptyPick: 'The library is empty',
+    writingModeShort: 'Direction',
     appearanceLabel: 'Appearance',
     themeLight: 'Light',
     themeDark: 'Dark',

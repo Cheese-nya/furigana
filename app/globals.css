@@ -274,6 +274,14 @@ html[data-refract="on"] .gbtn.gbtn-prominent:hover:not(:disabled) { background: 
 .seg.seg-solid { background: var(--fill); }
 .seg.seg-solid .sel-ind { background: var(--seg-solid-ind); box-shadow: 0 3px 8px rgba(0, 0, 0, 0.10), 0 0 0 0.5px rgba(0, 0, 0, 0.04); }
 
+/* iOS switch with a stretchy knob (mockup) */
+.switch { position: relative; width: 51px; height: 31px; flex: none; border-radius: 999px; background: var(--fill); border: 0; padding: 0; cursor: pointer; transition: background-color 250ms; }
+.switch[aria-checked="true"] { background: var(--ok); }
+.switch > i { position: absolute; top: 2px; left: 2px; width: 27px; height: 27px; border-radius: 999px; background: #fff; box-shadow: 0 3px 8px rgba(0, 0, 0, 0.16), 0 0 0 0.5px rgba(0, 0, 0, 0.04); transition: left 560ms var(--spring-bouncy), width 360ms var(--spring-bouncy); }
+.switch[aria-checked="true"] > i { left: 22px; }
+.switch:active > i { width: 34px; }
+.switch[aria-checked="true"]:active > i { left: 15px; }
+
 /* reduced motion: no stretch, no swell */
 @media (prefers-reduced-motion: reduce) {
   .gbtn, .btn, .sel-ind { transition-duration: 1ms !important; }

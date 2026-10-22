@@ -19,8 +19,16 @@ interface NativeThemeWindow {
   };
 }
 
+export type ThemeMode = 'auto' | 'light' | 'dark';
+
 const listeners = new Set<() => void>();
 let memoryFallbackDark = false;
+let memoryFallbackMode: ThemeMode | null = null;
+const SYSTEM_DARK_QUERY = '(prefers-color-scheme: dark)';
+
+function systemPrefersDark(): boolean {
+  return typeof window !== 'undefined' && !!window.matchMedia?.(SYSTEM_DARK_QUERY).matches;
+}
 
 function emitChange(): void {
   listeners.forEach(listener => listener());
@@ -39,28 +47,47 @@ function subscribe(listener: () => void): () => void {
     }
   };
   window.addEventListener('storage', handleStorage);
+  // 'auto' follows the system appearance live.
+  const media = window.matchMedia?.(SYSTEM_DARK_QUERY);
+  media?.addEventListener?.('change', listener);
   return () => {
     listeners.delete(listener);
     window.removeEventListener('storage', handleStorage);
+    media?.removeEventListener?.('change', listener);
   };
 }
 
-function getSnapshot(): boolean {
+function readMode(): ThemeMode {
   try {
     if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
       const stored = localStorage.getItem(THEME_STORAGE_KEY);
-      if (stored !== null) {
-        return stored === '1';
-      }
+      if (stored === 'auto') return 'auto';
+      if (stored !== null) return stored === '1' ? 'dark' : 'light';
     }
   } catch {
     // Ignore storage read failures
   }
-  return memoryFallbackDark;
+  return memoryFallbackMode ?? (memoryFallbackDark ? 'dark' : 'light');
+}
+
+function resolveDark(mode: ThemeMode): boolean {
+  return mode === 'dark' || (mode === 'auto' && systemPrefersDark());
+}
+
+function getSnapshot(): boolean {
+  return resolveDark(readMode());
+}
+
+function getModeSnapshot(): ThemeMode {
+  return readMode();
 }
 
 function getServerSnapshot(): boolean {
   return false;
+}
+
+function getServerModeSnapshot(): ThemeMode {
+  return 'light';
 }
 
 export function syncThemeSideEffects(isDark: boolean, persist = true): void {
@@ -68,6 +95,7 @@ export function syncThemeSideEffects(isDark: boolean, persist = true): void {
     const bg = isDark ? DARK_THEME_BG : LIGHT_THEME_BG;
     if (persist) {
       memoryFallbackDark = isDark;
+      memoryFallbackMode = isDark ? 'dark' : 'light';
       if (typeof localStorage !== 'undefined') {
         localStorage.setItem(THEME_STORAGE_KEY, isDark ? '1' : '0');
       }
@@ -97,6 +125,7 @@ export function syncThemeSideEffects(isDark: boolean, persist = true): void {
 
 export function useThemeMode() {
   const darkMode = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
+  const themeMode = useSyncExternalStore(subscribe, getModeSnapshot, getServerModeSnapshot);
 
   useEffect(() => {
     syncThemeSideEffects(darkMode, false);
@@ -114,8 +143,26 @@ export function useThemeMode() {
     emitChange();
   }, []);
 
+  const setThemeMode = useCallback((mode: ThemeMode) => {
+    memoryFallbackMode = mode;
+    if (mode === 'auto') {
+      // Apply the system appearance without pinning it, then remember "auto".
+      syncThemeSideEffects(systemPrefersDark(), false);
+      try {
+        if (typeof localStorage !== 'undefined') localStorage.setItem(THEME_STORAGE_KEY, 'auto');
+      } catch {
+        // Ignore storage write failures
+      }
+    } else {
+      syncThemeSideEffects(mode === 'dark', true);
+    }
+    emitChange();
+  }, []);
+
   return {
     darkMode,
+    themeMode,
+    setThemeMode,
     setDarkMode,
     toggleDarkMode,
   };

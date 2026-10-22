@@ -18,207 +18,96 @@ const readPageSplitSource = () => [
   '../app/hooks/useBatchProcessing.ts',
 ].map(path => readFileSync(fileURLToPath(new URL(path, import.meta.url)), 'utf8')).join('\n');
 
-test('ReaderPanel 彻底移除 TTS / 语音合成系统', () => {
-  for (const forbidden of [
-    'speechSynthesis',
-    'SpeechSynthesisUtterance',
-    'speakingLine',
-    'speechRate',
-    'speakFrom',
-    'speakLine',
-    'stopSpeech',
-    'SpeakerIcon',
-    'readerTtsPlayChapter',
-    'readerTtsStop',
-    'readerTtsSpeed',
-  ]) {
-    assert.equal(source.includes(forbidden), false, `不应出现 ${forbidden}`);
-  }
-});
+const read = path => readFileSync(fileURLToPath(new URL(path, import.meta.url)), 'utf8');
+const typography = read('../app/components/TypographyPopover.tsx');
+const settings = read('../app/components/SettingsMenu.tsx');
+const editor = read('../app/components/EditorWorkspace.tsx');
+const correction = read('../app/components/RubyCorrectionModal.tsx');
+const mobileNav = read('../app/components/MobileNavBar.tsx');
+const sidebar = read('../app/components/Sidebar.tsx');
 
-test('ReaderPanel 移除章节目录、书签抽屉与上一章/下一章页脚', () => {
-  for (const forbidden of [
-    'readerTocButton',
-    'readerBookmarksButton',
-    'readerPrevChapter',
-    'readerNextChapter',
-    'readerNoBookmarks',
-  ]) {
-    assert.equal(source.includes(forbidden), false, `不应出现 ${forbidden}`);
-  }
-  // Bookmark props stay optional so app/page.tsx still compiles.
-  assert.match(source, /onAddBookmark\?: \(lineIndex: number, label\?: string\) => void;/);
-  assert.match(source, /onRemoveBookmark\?: \(bookmarkId: string\) => void;/);
-});
-
-test('默认正文字体为ゴシック体（sans）', () => {
-  assert.match(source, /const DEFAULT_PREFS: ReaderPrefs = \{[\s\S]*?fontFamily: 'sans',[\s\S]*?\};/);
-  assert.match(source, /export type ReaderFontFamily = 'sans' \| 'serif';/);
-  const popover = source.slice(source.indexOf("fontFamily === 'sans'"), source.indexOf("fontFamily === 'serif'") + 400);
-  assert.match(popover, /t\.fontGothic/);
-  assert.match(source.slice(source.indexOf("fontFamily === 'serif'")), /t\.fontMincho/);
-});
-
-test('排版设置持久化于 furigana_reader_prefs_v2', () => {
-  assert.match(source, /const PREFS_KEY = 'furigana_reader_prefs_v2';/);
-  assert.match(source, /window\.localStorage\.setItem\(\s*PREFS_KEY[\s\S]*writingMode/);
-});
-
-test('支持 writingMode horizontal / vertical 切换', () => {
-  assert.match(source, /type ReaderWritingMode = 'horizontal' \| 'vertical';/);
-  assert.match(source, /writingMode: 'horizontal'/);
-  assert.match(source, /data-testid="reader-writing-mode-toggle"/);
-  assert.match(source, /setWritingMode\('vertical'\)/);
-  assert.match(source, /setWritingMode\('horizontal'\)/);
-  assert.match(source, /t\.writingModeHorizontal/);
-  assert.match(source, /t\.writingModeVertical/);
-});
-
-test('竖向排版应用 vertical-script-flow 与 data-writing-mode', () => {
-  assert.match(source, /vertical-script-flow/);
-  assert.match(source, /data-testid="reader-script-canvas"/);
-  assert.match(source, /data-writing-mode=\{writingMode\}/);
-  assert.match(source, /height: 'calc\(100vh - 180px\)'/);
-});
-
-test('横向排版使用 34em 阅读栏宽', () => {
-  assert.match(source, /max-w-\[34em\]/);
-});
-
-test('交互词组使用 ruby-interactive-token 柔和暖黄辉光', () => {
-  assert.match(source, /ruby-interactive-token/);
-  assert.equal(source.includes('hover:bg-current/10'), false);
-});
-
-test('连续整篇渲染（全文）而非分章视图', () => {
-  assert.match(source, /全文/);
-  assert.equal(source.includes('chapterCursor'), false);
-});
-
-test('零 Emoji（仅使用单线条 SVG 图标）', () => {
-  const emojis = source.match(/\p{Extended_Pictographic}/gu) ?? [];
-  assert.deepEqual(emojis, [], `发现 Emoji: ${emojis.join(' ')}`);
-});
-
-test('DEFAULT_PREFS 包含行号隐藏、左对齐与空自定义注音颜色默认设置', () => {
-  assert.match(
-    source,
-    /const DEFAULT_PREFS: ReaderPrefs = \{[\s\S]*?showLineNumbers:\s*false,[\s\S]*?textAlign:\s*'left',[\s\S]*?customRubyColor:\s*'',[\s\S]*?\};/,
-  );
-});
-
-test('ReaderPanel 包含行号切换、水平对齐切换与注音颜色选择器控件', () => {
-  assert.ok(source.includes('data-testid="reader-line-numbers-hide-btn"'), 'reader-line-numbers-hide-btn required');
-  assert.ok(source.includes('data-testid="reader-line-numbers-show-btn"'), 'reader-line-numbers-show-btn required');
-  assert.ok(source.includes('data-testid="reader-align-left-btn"'), 'reader-align-left-btn required');
-  assert.ok(source.includes('data-testid="reader-align-center-btn"'), 'reader-align-center-btn required');
-  assert.ok(source.includes('data-testid="ruby-color-picker"'), 'ruby-color-picker required');
-  assert.ok(source.includes('data-testid={`ruby-color-swatch-${color}`}'), 'ruby-color-swatch- required');
-});
-
-test('ReaderPanel Aa 外观面板支持手机端底部浮层与桌面端弹出层及振假名校正液态玻璃卡片', () => {
-  const rubyModalSource = readFileSync(
-    fileURLToPath(new URL('../app/components/RubyCorrectionModal.tsx', import.meta.url)),
-    'utf8',
-  );
-  assert.ok(source.includes('<GlassPopover'), 'ReaderPanel Aa panel must be a glass popover');
-  assert.ok(source.includes('CANVAS_PAPER_CLASS'), 'ReaderPanel must define CANVAS_PAPER_CLASS');
-
-  assert.ok(rubyModalSource.includes('liquid-glass-btn'), 'RubyCorrectionModal must use liquid-glass-btn');
-  assert.ok(rubyModalSource.includes('liquid-glass-inset'), 'RubyCorrectionModal must use liquid-glass-inset');
-  const emojis = rubyModalSource.match(/\p{Extended_Pictographic}/gu) ?? [];
-  assert.deepEqual(emojis, [], `RubyCorrectionModal 发现 Emoji: ${emojis.join(' ')}`);
-});
-
-test('阅读器没有吸顶顶栏（沉浸式）', () => {
-  assert.equal(source.includes('sticky top-0'), false, 'ReaderPanel must not have a sticky top header');
-});
-
-test('阅读器：底部玻璃胶囊下滑隐藏、上滑/点按出现，隐藏时显示底部进度线', () => {
-  assert.ok(source.includes('data-testid="reader-fullscreen-btn"'), 'reader-fullscreen-btn required');
-  assert.ok(source.includes('data-testid="reader-exit-fullscreen-btn"'), 'reader-exit-fullscreen-btn required');
-  assert.equal(source.includes('reader-corner-top-left'), false, 'four-corner HUD must be gone');
-  assert.ok(source.includes('handleCanvasClick'), 'tap handler required');
-  assert.ok(source.includes('setHudVisible(prev => !prev)'), 'tap toggles the capsule');
-  assert.ok(/travel\s*>\s*24/.test(source) && /travel\s*<\s*-12/.test(source), 'hide/show by distance travelled in one direction');
-  assert.ok(source.includes('bottom-1 left-[22px] right-[22px]'), 'bottom progress line required');
+test('阅读器：沉浸式正文 + 底部玻璃胶囊（返回、标题与进度、注音开关、Aa）', () => {
+  assert.ok(source.includes('data-testid="reader-script-canvas"'));
+  assert.match(source, /max-w-\[34em\]/, '34em reading column');
   assert.ok(source.includes('useGlass'), 'capsule uses the refracting glass material');
+  assert.ok(source.includes('onGoToLibrary'), 'back button returns to the library');
+  assert.ok(source.includes('<IconRuby'), 'ruby toggle');
+  assert.ok(source.includes('<TypographyPopover'), 'Aa popover');
+  assert.equal(source.includes('sticky top-0'), false, 'no sticky top header');
 });
 
-test('阅读器内对待复核假名不进行标黄和虚线装饰', () => {
-  assert.equal(source.includes('RUBY_REVIEW'), false, 'ReaderPanel must not use RUBY_REVIEW yellow highlight');
-  assert.equal(
-    source.includes('decoration-amber-500'),
-    false,
-    'ReaderPanel must not render dotted amber underline on needsReview tokens',
-  );
-  assert.ok(
-    source.includes('const emphasized = authoritative;'),
-    'ReaderPanel should only emphasize authoritative tokens, not needsReview tokens',
-  );
+test('阅读器：下滑按累计距离隐藏胶囊，上滑/点按/到顶到底出现，隐藏时底部 2px 进度线', () => {
+  assert.ok(/travel\s*>\s*24/.test(source) && /travel\s*<\s*-12/.test(source));
+  assert.ok(source.includes('handleCanvasClick') && source.includes('setHudVisible(prev => !prev)'));
+  assert.ok(source.includes('y >= max - 4 || y < 40'));
+  assert.ok(source.includes('bottom-1 left-[22px] right-[22px]'), 'bottom progress line');
 });
 
-test('阅读器全屏二级菜单 (Aa / 搜索) 包含滚动穿透锁定与主题背景同步防黑边', () => {
-  assert.ok(source.includes('CANVAS_BG'), 'ReaderPanel must define CANVAS_BG map for root background sync');
-  assert.ok(source.includes('overscroll-contain'), 'reader-active-drawer must include overscroll-contain');
-  assert.ok(source.includes('reader-drawer-scroll-lock'), 'reader-active-drawer must include reader-drawer-scroll-lock');
-  assert.ok(
-    source.includes("overscrollBehavior: 'contain'"),
-    'reader-active-drawer must set inline overscrollBehavior: contain',
-  );
+test('阅读器 Aa：注音方式、排版方向（竖排）、字体、字号、显示注音', () => {
+  assert.ok(source.includes('writingMode={prefs.writingMode}'), 'reader passes the writing direction');
+  assert.ok(source.includes('vertical-script-flow'), 'vertical writing kept');
+  assert.ok(source.includes("const PREFS_KEY = 'furigana_reader_prefs_v3';"));
+  assert.ok(typography.includes('reader-writing-mode-toggle'), 'writing-direction segment');
+  for (const key of ['t.fontLabel', 't.fontSizeLabel', 't.showRubyLabel', 'role="switch"']) {
+    assert.ok(typography.includes(key), `typography popover needs ${key}`);
+  }
 });
 
-test('v1.2.0 顶部栏重排、工作台三区均衡布局与可切换格式+独立导出按钮胶囊、iPhone竖屏锁定与纤薄底部Dock', () => {
-  const pkg = JSON.parse(
-    readFileSync(fileURLToPath(new URL('../package.json', import.meta.url)), 'utf8'),
-  );
-  const pageSource = readFileSync(
-    fileURLToPath(new URL('../app/page.tsx', import.meta.url)),
-    'utf8',
-  );
-  const sidebarSource = readFileSync(
-    fileURLToPath(new URL('../app/components/Sidebar.tsx', import.meta.url)),
-    'utf8',
-  );
-  const settingsSource = readFileSync(
-    fileURLToPath(new URL('../app/components/SettingsMenu.tsx', import.meta.url)),
-    'utf8',
-  );
-  const shellHeaderSource = `${pageSource}\n${sidebarSource}\n${settingsSource}`;
-  const mobileNavSource = readFileSync(
-    fileURLToPath(new URL('../app/components/MobileNavBar.tsx', import.meta.url)),
-    'utf8',
-  );
-  const infoPlist = readFileSync(
-    fileURLToPath(new URL('../ios/App/App/Info.plist', import.meta.url)),
-    'utf8',
-  );
-  const sceneDelegate = readFileSync(
-    fileURLToPath(new URL('../ios/App/App/SceneDelegate.swift', import.meta.url)),
-    'utf8',
-  );
+test('阅读器：样稿以外的功能已删除', () => {
+  for (const removed of ['showLineNumbers', 'textAlign', 'customRubyColor', 'RUBY_COLOR_SWATCHES', 'sepia', 'mint', 'requestFullscreen',
+    'reader-fullscreen-btn', 'touch_reveal', 'review_only', 'speechSynthesis', 'bookmark', 'searchHits']) {
+    assert.equal(source.includes(removed), false, `ReaderPanel must not contain ${removed}`);
+  }
+  const emojis = source.match(/\p{Extended_Pictographic}/gu) ?? [];
+  assert.deepEqual(emojis, []);
+});
 
-  // 1. Version v1.2.0 and brand title Furigana
-  assert.equal(pkg.version, '1.2.0', 'package.json version must be 1.2.0');
-  assert.ok(pageSource.includes('<Sidebar'), 'page.tsx must render the glass Sidebar');
-  assert.ok(pageSource.includes('<SettingsMenu'), 'page.tsx must render SettingsMenu');
-  assert.ok(shellHeaderSource.includes('data-testid="app-brand-title"'), 'app-brand-title required');
-  assert.ok(shellHeaderSource.includes('data-testid="app-version-badge"'), 'app-version-badge required');
-  assert.ok(shellHeaderSource.includes('v1.2.0'), 'settings menu must display v1.2.0');
-  assert.equal(pageSource.includes('setIsSidebarOpen'), false, 'the hamburger drawer must be gone');
+test('阅读器：说话人标签与正文开头去重', () => {
+  assert.ok(source.includes('const speaker = line.speaker || speakerMatch?.[1];'));
+  assert.ok(source.includes('joined.startsWith(speaker)'));
+});
 
-  // 2. Workbench 3-zone balanced layout & Export capsule with selectable format + standalone Export button
-  const workbenchSource = readPageSplitSource();
-  assert.ok(workbenchSource.includes('data-testid="workbench-export-capsule"'), 'workbench-export-capsule required');
-  assert.ok(workbenchSource.includes('export-format-option-'), 'selectable export format options required');
-  assert.ok(workbenchSource.includes('data-testid="workbench-export-submit-btn"'), 'standalone export button required');
-  assert.ok(workbenchSource.includes('handleExport(exportFormat)'), 'standalone export button must trigger handleExport(exportFormat)');
+test('工作台：样稿工具条 + 导出选格式（含存入台本库）+ 右上角导入（文件 / 台本库）', () => {
+  assert.ok(editor.includes('data-testid="workbench-export-submit-btn"'));
+  assert.ok(editor.includes('export-format-option-'));
+  assert.ok(editor.includes('handleExport(format)'));
+  assert.ok(editor.includes('handleSaveToLibrary()'), 'save to library lives in the export menu');
+  assert.ok(editor.includes('t.importFromLibrary') && editor.includes('t.chooseFile'), 'import: choose file or from library');
+  assert.ok(editor.includes('<IconMoreVertical'), 'round ⋮ settings button at top-left on phones');
+  assert.ok(editor.includes('t.tapKanjiHint') && editor.includes('t.statAuto'), 'preview card header and stats');
+  for (const removed of ['setPreviewWritingMode', 'rubyColor', 'setLineSpacing', 'editor-pixiv-toggle', 't.clearButton', "'split'", 'handleOpenInReader']) {
+    assert.equal(editor.includes(removed), false, `EditorWorkspace must not contain ${removed}`);
+  }
+});
 
-  // 3. Liquid Glass v2 tab bar: 52px glass capsule with a liquid selector
-  assert.ok(mobileNavSource.includes('h-[52px]'), 'MobileNavBar must be the 52px tab bar');
-  assert.ok(mobileNavSource.includes('className="glass'), 'MobileNavBar must use the glass material');
-  assert.ok(mobileNavSource.includes('<LiquidSelector'), 'MobileNavBar tabs must use LiquidSelector');
+test('改读音面板：候选、自定义、仅此处/全文同词/记住、取消/应用', () => {
+  for (const key of ['t.scopeOccurrence', 't.scopeDocument', 't.scopeRemember', 't.customRubyPlaceholder', 't.applyButton', 't.cancel']) {
+    assert.ok(correction.includes(key), `correction sheet needs ${key}`);
+  }
+  for (const removed of ['restoreAutomaticRuby', 'saveAndOpenNextReview', 'resizeRubyRange']) {
+    assert.equal(correction.includes(removed), false, `correction sheet must not contain ${removed}`);
+  }
+});
 
+test('设置菜单：语言、外观（自动/浅色/深色）、学到的读音、专名词典、词典状态', () => {
+  for (const key of ['t.languageLabel', 't.themeAuto', 't.themeLight', 't.themeDark', 't.learnedReadingsMenu', 't.properNounGlossary', 'dictionaryLabel']) {
+    assert.ok(settings.includes(key), `settings menu needs ${key}`);
+  }
+  for (const removed of ['x.com', 'github.com', 'reward_qrcode', 'v1.2.0', 'sidebarDeps']) {
+    assert.equal(settings.includes(removed), false, `settings menu must not contain ${removed}`);
+  }
+});
+
+test('外壳：桌面玻璃侧栏，手机 52px 玻璃 Tab 栏（无额外按钮）', () => {
+  assert.ok(sidebar.includes('data-testid="app-brand-title"'));
+  assert.ok(sidebar.includes('t.settingsTitle'), 'sidebar keeps the mockup settings row');
+  assert.ok(mobileNav.includes('h-[52px]') && mobileNav.includes('className={`glass') && mobileNav.includes('<LiquidSelector'));
+  assert.equal(mobileNav.includes('IconGear'), false, 'no extra settings button next to the tab bar');
+});
+
+test('iPhone 竖屏锁定', () => {
+  const infoPlist = read('../ios/App/App/Info.plist');
+  const sceneDelegate = read('../ios/App/App/SceneDelegate.swift');
   // 4. iPhone portrait-only orientation lock
   const iphoneOrientationBlock = infoPlist.slice(
     infoPlist.indexOf('<key>UISupportedInterfaceOrientations</key>'),
@@ -270,21 +159,6 @@ test('上下滑动到底防黑条：Web/iOS/Android 全链路同步画布底色�
     'utf8',
   );
 
-  // 1. ReaderPanel cleanup restores background based on current darkMode rather than stale previousRootBackground
-  assert.equal(
-    source.includes('previousRootBackground'),
-    false,
-    'ReaderPanel must not restore stale previousRootBackground which leaves #000000 black after theme switch',
-  );
-  assert.ok(
-    source.includes("const restoreBg = darkMode ? '#000000' : '#F2F2F7'"),
-    'ReaderPanel cleanup must restore background from current darkMode',
-  );
-  assert.ok(
-    source.includes("setProperty('--bg-primary', canvasBackground)"),
-    'ReaderPanel must sync --bg-primary so body::before matches reader canvas',
-  );
-
   // 2. iOS Capacitor configures backgroundColor & disables outer UIScrollView bounce and syncs furiganaTheme
   assert.ok(
     capacitorConfigSource.includes("backgroundColor: '#F2F2F7'"),
@@ -322,42 +196,6 @@ test('上下滑动到底防黑条：Web/iOS/Android 全链路同步画布底色�
   assert.ok(
     mainActivity.includes('syncTheme'),
     'Android MainActivity must expose syncTheme on AndroidBridge',
-  );
-});
-
-test('阅读器排版缺陷修复：.ruby-interactive-token 零水平内边距且 line.speaker 正文开头去重', () => {
-  const globalsCss = readFileSync(
-    fileURLToPath(new URL('../app/globals.css', import.meta.url)),
-    'utf8',
-  );
-
-  const tokenRuleMatch = globalsCss.match(/\.ruby-interactive-token\s*\{[^}]*\}/);
-  assert.ok(tokenRuleMatch, '.ruby-interactive-token rule must exist in app/globals.css');
-  assert.equal(
-    tokenRuleMatch[0].includes('padding: 0 2px'),
-    false,
-    '.ruby-interactive-token must not include horizontal padding: 0 2px that creates gaps between tokens',
-  );
-
-  const tokenHoverMatch = globalsCss.match(/\.ruby-interactive-token:hover\s*\{[^}]*\}/);
-  assert.ok(tokenHoverMatch, '.ruby-interactive-token:hover rule must exist in app/globals.css');
-  assert.ok(
-    tokenHoverMatch[0].includes('0 0 0 2px'),
-    '.ruby-interactive-token:hover must use box-shadow spread instead of layout padding',
-  );
-
-  assert.equal(
-    source.includes('const speakerMatch = line.speaker ? null :'),
-    false,
-    'ReaderPanel must not disable speaker deduplication when line.speaker is present',
-  );
-  assert.ok(
-    source.includes('const speaker = line.speaker || speakerMatch?.[1];'),
-    'ReaderPanel must resolve speaker from line.speaker or SPEAKER regex match',
-  );
-  assert.ok(
-    source.includes('joinedSurface.startsWith(speaker)') && source.includes('remainingSpeakerChars'),
-    'ReaderPanel must deduplicate leading speaker tokens and following colon delimiter from body text',
   );
 });
 

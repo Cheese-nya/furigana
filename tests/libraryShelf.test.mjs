@@ -8,18 +8,10 @@ const source = readFileSync(
   'utf8',
 );
 
-test('备份与维护 UI 已从台本库彻底移除，但兼容 props 仍保留', () => {
-  assert.equal(source.includes('libraryMaintenanceMenu'), false, 'must not reference t.libraryMaintenanceMenu');
-  assert.equal(source.includes('libraryExportBackup'), false, 'must not reference t.libraryExportBackup');
-  assert.equal(source.includes('libraryImportBackup'), false, 'must not reference t.libraryImportBackup');
-  assert.equal(source.includes('showMaintenanceMenu'), false, 'showMaintenanceMenu state must be removed');
-  assert.equal(source.includes('backupFileInputRef'), false, 'backupFileInputRef must be removed');
-  assert.equal(source.includes('备份与维护'), false, 'no hard-coded maintenance label may remain');
-  // Compatibility props stay optional so app/page.tsx keeps compiling untouched.
-  assert.match(source, /onExportBackup\?:\s*\(\)\s*=>\s*void/, 'onExportBackup must stay optional');
-  assert.match(source, /onImportBackup\?:\s*\(file:\s*File\)\s*=>\s*void\s*\|\s*Promise<unknown>/, 'onImportBackup must stay optional');
-  // No leftover backup import file input.
-  assert.equal(source.includes('application/json'), false, 'backup JSON file input must be removed');
+test('备份、维护与示例恢复入口已从台本库移除', () => {
+  for (const removed of ['libraryMaintenanceMenu', 'libraryExportBackup', 'libraryImportBackup', 'onExportBackup', 'onImportBackup', 'onResetStarterBooks', 'application/json']) {
+    assert.equal(source.includes(removed), false, `LibraryPanel must not contain ${removed}`);
+  }
 });
 
 test('台本库：网格容器（无书架背景、无分隔线）', () => {
@@ -53,7 +45,7 @@ test('台本库：玻璃工具条与右键/长按菜单', () => {
   assert.ok(source.includes('<GlassPopover'), 'sort / new / book actions use glass popovers');
   assert.ok(source.includes('onOpenInReader(book)'), 'cover opens the script in the reader');
   assert.ok(source.includes('onOpenInEditor('), 'menu can open the script in the editor');
-  assert.ok(source.includes('onDeleteBook(book.bookId)'), 'menu can delete the book');
+  assert.ok(source.includes('onDeleteBook(deleteTarget.bookId)'), 'menu can delete the book (after confirmation)');
   assert.ok(source.includes('confirmDeleteId'), 'two-step delete confirmation state required');
   assert.ok(source.includes('data-testid="book-delete-dialog"'), 'delete confirmation dialog required');
   assert.ok(source.includes('data-testid="book-settings-gear-btn"'), 'info & category entry required');
@@ -71,12 +63,13 @@ test('LibraryPanel.tsx 不含任何 Extended_Pictographic emoji', () => {
   assert.equal(source.includes('☆'), false, 'no outline star glyph; use SVG star');
 });
 
-test('台本库渲染 Pixiv URL 导入控件、封面艺术画与故事简介', () => {
-  assert.ok(source.includes('data-testid="pixiv-import-toggle-btn"'), 'pixiv-import-toggle-btn required');
-  assert.ok(source.includes('data-testid="pixiv-url-input"'), 'pixiv-url-input required');
-  assert.ok(source.includes('data-testid="pixiv-import-submit-btn"'), 'pixiv-import-submit-btn required');
-  assert.ok(source.includes('data-testid="book-cover-image"'), 'book-cover-image required');
-  assert.ok(source.includes('data-testid="book-cover-description"'), 'book-cover-description required');
+test('台本库：Pixiv 导入、信息与分类只编辑标题/作者/分类（无封面图片与简介、无手选封面颜色）', () => {
+  for (const id of ['pixiv-import-toggle-btn', 'pixiv-url-input', 'pixiv-import-submit-btn', 'book-meta-modal', 'book-settings-gear-btn']) {
+    assert.ok(source.includes(`"${id}"`), `${id} required`);
+  }
+  for (const removed of ['coverUrl', 'description', 'book-cover-image', 'coverTheme', 'resizeCoverImageToDataUrl']) {
+    assert.equal(source.includes(removed), false, `LibraryPanel must not contain ${removed}`);
+  }
 });
 
 const pageSource = `${readFileSync(
@@ -88,10 +81,9 @@ const pageSource = `${readFileSync(
 )}`;
 
 
-test('设置菜单包含浅色/深色外观切换（日月图标）', () => {
+test('设置菜单包含自动/浅色/深色外观切换', () => {
   assert.ok(pageSource.includes('testId="dark-mode-toggle"'), 'dark-mode-toggle required');
-  assert.ok(pageSource.includes('<IconSun'), 'sun icon required');
-  assert.ok(pageSource.includes('<IconMoon'), 'moon icon required');
+  for (const key of ["value: 'auto'", "value: 'light'", "value: 'dark'"]) assert.ok(pageSource.includes(key), key);
 });
 
 test('移动端玻璃 Tab 栏与底部弹出面板', () => {
@@ -104,7 +96,7 @@ test('移动端玻璃 Tab 栏与底部弹出面板', () => {
     'utf8',
   );
   assert.ok(mobileNavSource.includes('data-testid="mobile-nav-bar"'), 'MobileNavBar must include mobile-nav-bar testid');
-  assert.ok(mobileNavSource.includes('className="glass'), 'MobileNavBar must use the glass material');
+  assert.ok(mobileNavSource.includes('className={`glass'), 'MobileNavBar must use the glass material');
   assert.ok(mobileNavSource.includes('safe-area-inset-bottom'), 'MobileNavBar must respect safe-area-inset-bottom');
   assert.ok(modalSource.includes('max-sm:rounded-t-[34px]'), 'Modal must render as bottom sheet on mobile screens');
   assert.ok(modalSource.includes('max-sm:translate-y-full'), 'bottom sheet slides up from the bottom');
@@ -112,12 +104,17 @@ test('移动端玻璃 Tab 栏与底部弹出面板', () => {
 });
 
 test('批处理与弹窗：新设计系统、无 emoji', () => {
-  for (const file of ['BatchProcessingPanel.tsx', 'ExportProgressModal.tsx', 'BatchDoneModal.tsx', 'DependencyModal.tsx', 'GlossaryModal.tsx', 'LearnedReadingsModal.tsx']) {
+  for (const file of ['BatchProcessingPanel.tsx', 'ExportProgressModal.tsx', 'BatchDoneModal.tsx', 'GlossaryModal.tsx', 'LearnedReadingsModal.tsx']) {
     const componentSource = readFileSync(fileURLToPath(new URL(`../app/components/${file}`, import.meta.url)), 'utf8');
     assert.ok(/var\(--(label|surface|fill)/.test(componentSource) || /\bbtn\b/.test(componentSource), `${file} must use the design tokens`);
     const emojis = [...componentSource.matchAll(/\p{Extended_Pictographic}/gu)].map(match => match[0]);
     assert.deepEqual(emojis, [], `${file} expected zero emojis, found: ${emojis.join(' ')}`);
   }
+  const batch = readFileSync(fileURLToPath(new URL('../app/components/BatchProcessingPanel.tsx', import.meta.url)), 'utf8');
+  for (const removed of ['batchSaveMode', 'alsoSaveToLibrary', 'setBatchTargetFormat', 'clearBatchFiles']) {
+    assert.equal(batch.includes(removed), false, `batch page must not contain ${removed}`);
+  }
+  assert.ok(batch.includes('processBatchQueue(format)'), 'export all picks the format');
 });
 
 test('深色模式与回弹防白边', () => {

@@ -1,147 +1,115 @@
 'use client';
 
-import React, { useState } from 'react';
-import type { Translations } from '../utils/i18n';
-import { GlassButton } from './glass/GlassButton';
+import React from 'react';
 import { GlassPopover } from './glass/GlassPopover';
-import { IconTextFormat } from './glass/icons';
+import { LiquidSelector } from './glass/LiquidSelector';
+import type { Translations } from '../utils/i18n';
+
+type RubyMode = 'hiragana' | 'katakana' | 'romaji';
 
 export interface TypographyPopoverProps {
+  open: boolean;
+  onClose: () => void;
+  anchor: HTMLElement | null;
+  placement?: 'below' | 'above';
+  fontFamily: 'serif' | 'sans';
+  onFontFamilyChange: (value: 'serif' | 'sans') => void;
   fontSize: number;
-  setFontSize: (size: number) => void;
-  rubyFontSize: number;
-  setRubyFontSize: (size: number) => void;
-  lineSpacing: number;
-  setLineSpacing: (spacing: number) => void;
-  rubyColor: string;
-  setRubyColor: (color: string) => void;
+  onFontSizeChange: (value: number) => void;
+  showRuby: boolean;
+  onShowRubyChange: (value: boolean) => void;
+  /** Ruby mode row (phones, where the toolbar has no room for it). */
+  rubyType?: RubyMode;
+  onRubyTypeChange?: (value: RubyMode) => void;
+  /** Writing direction row (reader only). */
+  writingMode?: 'horizontal' | 'vertical';
+  onWritingModeChange?: (value: 'horizontal' | 'vertical') => void;
   t: Translations;
 }
 
-export function TypographyPopover({
-  fontSize,
-  setFontSize,
-  rubyFontSize,
-  setRubyFontSize,
-  lineSpacing,
-  setLineSpacing,
-  rubyColor,
-  setRubyColor,
-  t,
-}: TypographyPopoverProps) {
-  const [open, setOpen] = useState(false);
-  const [triggerEl, setTriggerEl] = useState<HTMLButtonElement | null>(null);
-  const rubyColors = [
-    { value: 'var(--ruby)', label: t.rubyColorLabel },
-    { value: 'var(--label-2)', label: t.bodyFontSize },
-    { value: 'var(--label)', label: t.typographySettings },
-    { value: 'var(--review)', label: t.needsReviewBadge },
-    { value: 'var(--ok)', label: t.manualSource },
-  ];
+const SEG = 'flex w-full [&>[data-opt]]:h-7 [&>[data-opt]]:flex-1 [&>[data-opt]]:px-2 [&>[data-opt]]:text-[13px]';
 
+function Group({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <>
-      <GlassButton
-        ref={setTriggerEl}
-        variant="item"
-        onClick={() => setOpen(previous => !previous)}
-        aria-expanded={open}
-        aria-haspopup="dialog"
-      >
-        <IconTextFormat />
-        <span>{t.typographySettings}</span>
-      </GlassButton>
-      <GlassPopover
-        open={open}
-        onClose={() => setOpen(false)}
-        anchor={triggerEl}
-        ariaLabel={t.typographySettings}
-        className="w-[min(18rem,calc(100vw-1.5rem))] p-4"
-      >
-        <div className="grid gap-4">
-          <label className="grid gap-1.5">
-            <span className="text-xs font-medium text-[var(--label-2)]">{t.bodyFontSize}</span>
-            <div className="flex items-center gap-3">
-              <input
-                type="range"
-                min={12}
-                max={28}
-                value={fontSize}
-                onChange={event => setFontSize(Number(event.target.value))}
-                className="w-full accent-[var(--label)]"
-              />
-              <output className="w-10 text-right text-xs font-semibold tabular-nums text-[var(--label)]">{fontSize}px</output>
-            </div>
-          </label>
-
-          <label className="grid gap-1.5">
-            <span className="text-xs font-medium text-[var(--label-2)]">{t.rubyFontSize}</span>
-            <div className="flex items-center gap-3">
-              <input
-                type="range"
-                min={8}
-                max={18}
-                value={rubyFontSize}
-                onChange={event => setRubyFontSize(Number(event.target.value))}
-                className="w-full accent-[var(--label)]"
-              />
-              <output className="w-10 text-right text-xs font-semibold tabular-nums text-[var(--label)]">{rubyFontSize}px</output>
-            </div>
-          </label>
-
-          <label className="grid gap-1.5">
-            <span className="text-xs font-medium text-[var(--label-2)]">{t.lineSpacing}</span>
-            <div className="flex items-center gap-3">
-              <input
-                type="range"
-                min={1.2}
-                max={3}
-                step={0.1}
-                value={lineSpacing}
-                onChange={event => setLineSpacing(Number(event.target.value))}
-                className="w-full accent-[var(--label)]"
-              />
-              <output className="w-10 text-right text-xs font-semibold tabular-nums text-[var(--label)]">{lineSpacing.toFixed(1)}x</output>
-            </div>
-          </label>
-
-          <div className="grid gap-1.5" data-testid="ruby-color-picker">
-            <span className="text-xs font-medium text-[var(--label-2)]">{t.rubyColorLabel}</span>
-            <div className="flex items-center gap-2" role="group" aria-label={t.rubyColorLabel}>
-              {rubyColors.map(color => (
-                <button
-                  key={color.value}
-                  type="button"
-                  onClick={() => setRubyColor(color.value)}
-                  aria-label={color.label}
-                  aria-pressed={rubyColor === color.value}
-                  className={`h-6 w-6 rounded-full border border-[var(--sep)] transition-transform hover:scale-105 ${
-                    rubyColor === color.value ? 'ring-2 ring-[var(--label)] ring-offset-2 ring-offset-[var(--surface)]' : ''
-                  }`}
-                  style={{ backgroundColor: color.value }}
-                />
-              ))}
-            </div>
-          </div>
-
-          <div className="border-t border-[color:var(--sep)] pt-3 text-right">
-            <button
-              type="button"
-              onClick={() => {
-                setFontSize(16);
-                setRubyFontSize(11);
-                setLineSpacing(2);
-                setRubyColor('var(--ruby)');
-              }}
-              className="btn btn-plain h-8 px-3 text-xs"
-            >
-              {t.resetTypographyDefaults}
-            </button>
-          </div>
-        </div>
-      </GlassPopover>
-    </>
+    <div className="px-2.5 pb-1.5 pt-2">
+      <div className="mb-1.5 text-xs font-semibold text-[var(--label-2)]">{label}</div>
+      {children}
+    </div>
   );
 }
 
-export default TypographyPopover;
+/** Mockup "排版" popover: ruby mode (phones), font, size, show-ruby switch. */
+export function TypographyPopover({
+  open, onClose, anchor, placement, fontFamily, onFontFamilyChange, fontSize, onFontSizeChange, showRuby, onShowRubyChange,
+  rubyType, onRubyTypeChange, writingMode, onWritingModeChange, t,
+}: TypographyPopoverProps) {
+  return (
+    <GlassPopover open={open} onClose={onClose} anchor={anchor} placement={placement} ariaLabel={t.typographySettings} className="w-[280px]">
+      {rubyType && onRubyTypeChange && (
+        <Group label={t.rubyLabel}>
+          <LiquidSelector
+            variant="solid"
+            className={SEG}
+            role="radiogroup"
+            ariaLabel={t.rubyLabel}
+            value={rubyType}
+            onChange={onRubyTypeChange}
+            options={[
+              { value: 'hiragana', label: t.hiragana },
+              { value: 'katakana', label: t.katakana },
+              { value: 'romaji', label: t.romaji },
+            ]}
+          />
+        </Group>
+      )}
+      {writingMode && onWritingModeChange && (
+        <Group label={t.writingModeShort}>
+          <LiquidSelector
+            variant="solid"
+            className={SEG}
+            role="radiogroup"
+            ariaLabel={t.writingModeShort}
+            testId="reader-writing-mode-toggle"
+            value={writingMode}
+            onChange={onWritingModeChange}
+            options={[
+              { value: 'horizontal', label: t.writingModeHorizontal },
+              { value: 'vertical', label: t.writingModeVertical },
+            ]}
+          />
+        </Group>
+      )}
+      <Group label={t.fontLabel}>
+        <LiquidSelector
+          variant="solid"
+          className={SEG}
+          role="radiogroup"
+          ariaLabel={t.fontLabel}
+          value={fontFamily}
+          onChange={onFontFamilyChange}
+          options={[
+            { value: 'serif', label: t.fontMinchoShort },
+            { value: 'sans', label: t.fontGothicShort },
+          ]}
+        />
+      </Group>
+      <Group label={t.fontSizeLabel}>
+        <input
+          type="range"
+          min={14}
+          max={26}
+          value={fontSize}
+          aria-label={t.fontSizeLabel}
+          onChange={event => onFontSizeChange(Number(event.target.value))}
+          className="w-full accent-[var(--label)]"
+        />
+      </Group>
+      <div className="flex items-center justify-between px-3 py-2 font-medium">
+        {t.showRubyLabel}
+        <button type="button" role="switch" aria-checked={showRuby} aria-label={t.showRubyLabel} className="switch" onClick={() => onShowRubyChange(!showRuby)}>
+          <i />
+        </button>
+      </div>
+    </GlassPopover>
+  );
+}

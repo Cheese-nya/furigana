@@ -7,7 +7,6 @@ import { MobileNavBar, type AppTab } from './components/MobileNavBar';
 import { LibraryPanel } from './components/LibraryPanel';
 import { ReaderPanel } from './components/ReaderPanel';
 import { GlossaryModal } from './components/GlossaryModal';
-import { DependencyModal } from './components/DependencyModal';
 import { ExportProgressModal } from './components/ExportProgressModal';
 import { BatchDoneModal } from './components/BatchDoneModal';
 import { LearnedReadingsModal } from './components/LearnedReadingsModal';
@@ -21,7 +20,6 @@ import { useLibraryController } from './hooks/useLibraryController';
 import { useBatchProcessing } from './hooks/useBatchProcessing';
 import { generateSRT, generateTXT, type SrtCue } from './utils/srt';
 import { importTextScript, scriptSourceFormat } from './utils/inlineRuby';
-import { restoreAutomaticReading } from './utils/restoreReading';
 
 import { cleanScriptTitle, importDocx } from './utils/docxImporter';
 import { upsertRubyOverride, type RubyOverride } from './utils/rubyOverrides';
@@ -35,7 +33,7 @@ import { translations, type Locale } from './utils/i18n';
 export default function DubbingStudioApp() {
   // Locale & Theme State
   const [locale, setLocale] = useState<Locale>('zh-CN');
-  const { darkMode, setDarkMode } = useThemeMode();
+  const { themeMode, setThemeMode } = useThemeMode();
 
   useEffect(() => {
     try {
@@ -58,7 +56,6 @@ export default function DubbingStudioApp() {
   const t = translations[locale];
 
   // Navigation & UI states
-  const [isDepModalOpen, setIsDepModalOpen] = useState(false);
   const [isGlossaryOpen, setIsGlossaryOpen] = useState(false);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<AppTab>('editor');
@@ -83,12 +80,10 @@ export default function DubbingStudioApp() {
   // Options
   const [rubyType, setRubyType] = useState<'hiragana' | 'katakana' | 'romaji'>('hiragana');
   const [fontSize, setFontSize] = useState<number>(16); // 默认小四 (16px)
-  const [rubyFontSize, setRubyFontSize] = useState<number>(10); // 假名字号 (10px)
-  const [lineSpacing, setLineSpacing] = useState<number>(1.8);  // 行距 (1.8x)
-  const [rubyColor, setRubyColor] = useState<string>('#8a8a8e'); // 振假名颜色（中性灰）
-  const [previewWritingMode, setPreviewWritingMode] = useState<'horizontal' | 'vertical'>('horizontal');
-  const [mobileEditorPane, setMobileEditorPane] = useState<'split' | 'input' | 'preview'>('split');
+  const [rubyFontSize] = useState<number>(10); // 假名字号 (10px)，阅读器与导出使用
+  const [lineSpacing] = useState<number>(1.8);  // 行距 (1.8x)
   const [previewFontFamily, setPreviewFontFamily] = useState<'sans' | 'serif'>('sans');
+  const [previewShowRuby, setPreviewShowRuby] = useState(true);
 
   // Editor Input & Document Title State
   const [docTitle, setDocTitle] = useState<string>('日语假名配音台本');
@@ -118,11 +113,11 @@ export default function DubbingStudioApp() {
   // Built-in library state + integration. Called here so its effects keep their original
   // position (after the tab/orientation effects, before the correction-database effects).
   const {
-    libraryDb, setLibraryDb, libraryDbRef, activeBookId, activeBook, editorBook, setEditorBookId, markEditorSource, libraryBooks,
-    libraryToast, setLibraryToast, showImportMenu, setShowImportMenu, editorPixivUrl, setEditorPixivUrl, isPixivImporting,
-    loadBookIntoWorkspace, handleSaveToLibrary, handleOpenInReader, importLibraryFiles, createOrUpdateBook,
-    exportLibraryJson, importLibraryJson, restoreStarterBooks, handleToggleFavorite, handleUpdateBookMetadata,
-    handleImportPixivNovel, handleDeleteBook, handleReaderProgress, handleAddBookmark, handleRemoveBookmark,
+    libraryDb, setLibraryDb, libraryDbRef, activeBook, setEditorBookId, markEditorSource, libraryBooks,
+    libraryToast,
+    loadBookIntoWorkspace, handleSaveToLibrary, importLibraryFiles, createOrUpdateBook,
+    handleToggleFavorite, handleUpdateBookMetadata,
+    handleImportPixivNovel, handleDeleteBook, handleReaderProgress,
   } = useLibraryController({
     t, rubyType, docTitle, rawText, sourceOverrides, srtCues, documentId, databaseRef, setDatabase, setDocumentId,
     setDocTitle, setRawText, setSourceOverrides, setSrtCues, setEditingToken, setActiveTab, setImportError,
@@ -134,10 +129,9 @@ export default function DubbingStudioApp() {
   const glossaryEntries = useMemo(() => Object.values(database.glossary), [database.glossary]);
   const annotationInput = useMemo(() => ({ text: rawText, rubyType, glossary: glossaryEntries, sourceOverrides, overrides: documentCorrections, learned: learnedReadings }),
     [rawText, rubyType, glossaryEntries, sourceOverrides, documentCorrections, learnedReadings]);
-  const { lines: annotatedLines, busy: isAnnotating, engine, progress: annotationProgress, error: annotationError,
+  const { lines: annotatedLines, busy: isAnnotating, engine, error: annotationError,
     annotate, retry: retryEngine } = useFuriganaWorker(annotationInput);
   const dictionaryStatus = engine.status;
-  const dictionaryError = engine.error || '';
   const isKuromojiLoading = dictionaryStatus === 'loading';
 
   const reviewTargets = annotatedLines.flatMap(line => {
@@ -166,8 +160,7 @@ export default function DubbingStudioApp() {
   const reviewCursorRef = useRef(0);
   const [previewPage, setPreviewPage] = useState(0);
   const [customRubyInput, setCustomRubyInput] = useState<string>('');
-  const [correctionScope, setCorrectionScope] = useState<'occurrence' | 'glossary'>('occurrence');
-  const [isAdvancingReview, setIsAdvancingReview] = useState(false);
+  const [correctionScope, setCorrectionScope] = useState<'occurrence' | 'document' | 'glossary'>('occurrence');
   const [isLearnedModalOpen, setIsLearnedModalOpen] = useState(false);
   const [reviewError, setReviewError] = useState('');
 
@@ -175,22 +168,31 @@ export default function DubbingStudioApp() {
   const advanceControllerRef = useRef<AbortController | null>(null);
   useEffect(() => () => { advanceControllerRef.current?.abort(); }, [rawText, rubyType, documentId]);
 
+  // 仅此处 = this occurrence; 全文同词 = every occurrence of the word in this script;
+  // 记住 = also remember it (proper-noun glossary + learned reading) for every script.
   const updateTokenRuby = (reading: string) => {
     if (!editingToken || isAnnotating || !correctionsReady) return;
     const line = annotatedLines.find(value => value.id === editingToken.lineId);
     if (!line) return;
     const start = line.tokens.slice(0, editingToken.tokenIndex).reduce((sum, token) => sum + token.surface.length, 0);
-    const entry: RubyOverride = { line: line.cleanText, start, surface: editingToken.surface, reading, type: rubyType };
-    const selection = selectReviewWord(line, editingToken.tokenIndex);
-    const learned = makeLearnedReading(selection, reading, rubyType);
+    const surface = editingToken.surface;
+    const entries: RubyOverride[] = correctionScope === 'occurrence'
+      ? [{ line: line.cleanText, start, surface, reading, type: rubyType }]
+      : annotatedLines.flatMap(value => {
+          const found: RubyOverride[] = [];
+          for (let at = value.cleanText.indexOf(surface); at !== -1; at = value.cleanText.indexOf(surface, at + surface.length)) {
+            found.push({ line: value.cleanText, start: at, surface, reading, type: rubyType });
+          }
+          return found;
+        });
+    const learned = makeLearnedReading(selectReviewWord(line, editingToken.tokenIndex), reading, rubyType);
     setDatabase(previous => {
-      let updated = setScriptOverrides(previous, documentId, upsertRubyOverride(previous.scripts[documentId]?.overrides || [], entry));
-      if (reading) {
-        updated = learnReading(updated, documentId, learned);
-      }
+      const overrides = entries.reduce((list, entry) => upsertRubyOverride(list, entry), previous.scripts[documentId]?.overrides || []);
+      let updated = setScriptOverrides(previous, documentId, overrides);
       if (correctionScope === 'glossary' && reading) {
+        updated = learnReading(updated, documentId, learned);
         updated = { ...updated, glossary: { ...updated.glossary,
-          [entry.surface]: { surface: entry.surface, reading, type: rubyType, createdAt: previous.glossary[entry.surface]?.createdAt || Date.now() } } };
+          [surface]: { surface, reading, type: rubyType, createdAt: previous.glossary[surface]?.createdAt || Date.now() } } };
       }
       return updated;
     });
@@ -200,7 +202,7 @@ export default function DubbingStudioApp() {
   const openTokenEditor = (lineId: string, tokenIndex: number, lines = annotatedLines, endIndex = tokenIndex) => {
     const line = lines.find(value => value.id === lineId);
     const token = line?.tokens[tokenIndex];
-    if (!line || !token?.hasKanji || !correctionsReady || isAdvancingReview) return;
+    if (!line || !token?.hasKanji || !correctionsReady) return;
     setCorrectionScope('occurrence');
     setReviewError('');
     rubyCompositionRef.current = false;
@@ -219,50 +221,6 @@ export default function DubbingStudioApp() {
   };
 
   const saveTokenRuby = () => updateTokenRuby(customRubyInput.trim());
-  const saveAndOpenNextReview = async () => {
-    if (!editingToken || isAdvancingReview) return;
-    const line = annotatedLines.find(value => value.id === editingToken.lineId);
-    if (!line) return;
-    const start = line.tokens.slice(0, editingToken.tokenIndex).reduce((sum, token) => sum + token.surface.length, 0);
-    const entry: RubyOverride = { line: line.cleanText, start, surface: editingToken.surface, reading: customRubyInput.trim(), type: rubyType };
-    const overrides = upsertRubyOverride(documentCorrections, entry);
-    const glossary = correctionScope === 'glossary' && entry.reading ? [...glossaryEntries.filter(value => value.surface !== entry.surface),
-      { surface: entry.surface, reading: entry.reading, type: rubyType, createdAt: Date.now() }] : glossaryEntries;
-    const selection = selectReviewWord(line, editingToken.tokenIndex);
-    const learnedEntry = makeLearnedReading(selection, entry.reading, rubyType);
-    const learned = entry.reading ? [...learnedReadings.filter(l => !(l.surface === learnedEntry.surface && l.before === learnedEntry.before && l.after === learnedEntry.after)), learnedEntry] : learnedReadings;
-    updateTokenRuby(entry.reading);
-    setIsAdvancingReview(true);
-    const controller = new AbortController();
-    advanceControllerRef.current?.abort();
-    advanceControllerRef.current = controller;
-    try {
-      const lines = await annotate({ ...annotationInput, overrides, glossary, learned }, controller.signal);
-      if (controller.signal.aborted) return;
-      const candidates = lines.flatMap(value => {
-        let offset = 0;
-        return value.tokens.flatMap((token, tokenIndex) => {
-          const position = offset; offset += token.surface.length;
-          return token.hasKanji && token.needsReview ? [{ lineId: value.id, tokenIndex, position }] : [];
-        });
-      });
-      const next = candidates.find(value => Number(value.lineId) > Number(line.id) ||
-        (value.lineId === line.id && value.position >= start + entry.surface.length)) || candidates[0];
-      if (next) openTokenEditor(next.lineId, next.tokenIndex, lines);
-    } catch (error) {
-      if (!controller.signal.aborted) setReviewError(`继续校对失败：${String(error)}`);
-    } finally { setIsAdvancingReview(false); }
-  };
-  // 「恢复自动」 removes the corrections behind the range (and what they taught) so the automatic
-  // reading really returns; an empty saved reading stays the explicit "no ruby" correction.
-  const restoreAutomaticRuby = () => {
-    if (!editingToken || isAnnotating || !correctionsReady) return;
-    const line = annotatedLines.find(value => value.id === editingToken.lineId);
-    if (!line) return;
-    const start = line.tokens.slice(0, editingToken.tokenIndex).reduce((sum, token) => sum + token.surface.length, 0);
-    setDatabase(previous => restoreAutomaticReading(previous, documentId, line.cleanText, start, start + editingToken.surface.length));
-    setEditingToken(null);
-  };
   const jumpToNextReview = () => {
     if (!reviewTargets.length || isAnnotating) return;
     const target = reviewTargets[reviewCursorRef.current % reviewTargets.length];
@@ -270,29 +228,9 @@ export default function DubbingStudioApp() {
     openTokenEditor(target.lineId, target.tokenIndex, annotatedLines, target.endIndex);
   };
 
-  const resizeRubyRange = (start: number, end: number) => {
-    if (!editingToken) return;
-    const line = annotatedLines.find(line => line.id === editingToken.lineId);
-    if (!line) return;
-    const selected = line.tokens.slice(start, end + 1);
-    const reading = selected.map(token => token.ruby || token.surface).join('');
-    setEditingToken({
-      ...editingToken,
-      tokenIndex: start,
-      tokenEndIndex: end,
-      surface: selected.map(token => token.surface).join(''),
-      currentRuby: reading,
-      alternatives: selected.length === 1 ? selected[0].alternatives || [] : [],
-    });
-    setCustomRubyInput(reading);
-  };
 
   const dictionaryLabel = dictionaryStatus === 'loading' ? t.dictLoading :
     dictionaryStatus === 'ready' ? t.dictReady : t.dictDegraded;
-  const deps = [
-    { name: t.depKuromojiName, status: dictionaryStatus === 'loading' ? 'repairing' : dictionaryStatus === 'ready' ? 'ready' : 'error', desc: dictionaryError || dictionaryLabel },
-    { name: t.depCorrectionStorageName, status: correctionError ? 'error' : correctionsReady ? 'ready' : 'repairing', desc: correctionError || (correctionsReady ? t.depCorrectionStorageReadyDesc : t.readingRecordsLoading) },
-  ];
 
   useEffect(() => {
     let active = true;
@@ -439,18 +377,10 @@ export default function DubbingStudioApp() {
     }
   };
 
-  /** Reader token clicks reuse the Editor correction modal, keyed by the annotated line id. */
-  const handleTokenClick = (lineIndex: number, tokenIndex: number) => {
-    const line = annotatedLines[lineIndex];
-    if (!line) return;
-    openTokenEditor(line.id, tokenIndex, annotatedLines);
-  };
-
   // Batch page queue (state, file intake and processing).
   const {
-    batchFiles, isBatchProcessing, batchTargetFormat, setBatchTargetFormat, batchSaveMode, setBatchSaveMode,
-    alsoSaveToLibrary, setAlsoSaveToLibrary, fileInputRef, handleFileSelect, handleDrop, removeBatchFile,
-    clearBatchFiles, processBatchQueue, isBatchDoneModalOpen, setIsBatchDoneModalOpen, batchDoneResults,
+    batchFiles, isBatchProcessing, fileInputRef, handleFileSelect, handleDrop, removeBatchFile,
+    processBatchQueue, isBatchDoneModalOpen, setIsBatchDoneModalOpen, batchDoneResults,
   } = useBatchProcessing({
     t, database, setDatabase, libraryDbRef, setLibraryDb, annotate, rubyType, glossaryEntries,
     fontSize, rubyFontSize, lineSpacing, generateTextContent, isKuromojiLoading, correctionsReady,
@@ -474,19 +404,22 @@ export default function DubbingStudioApp() {
   };
 
   // Sidebar navigation items
-  const renderSettings = (anchor: HTMLElement | null, open: boolean, close: () => void) => (
+  const renderSettings = (anchor: HTMLElement | null, open: boolean, close: () => void, extra?: React.ReactNode) => (
     <SettingsMenu
       open={open}
       onClose={close}
       anchor={anchor}
       locale={locale}
       onLocaleChange={handleLocaleChange}
-      darkMode={darkMode}
-      onDarkModeChange={setDarkMode}
+      themeMode={themeMode}
+      onThemeModeChange={setThemeMode}
+      learnedCount={learnedReadings.length}
+      glossaryCount={glossaryEntries.length}
+      onOpenLearned={() => setIsLearnedModalOpen(true)}
+      onOpenGlossary={() => { advanceControllerRef.current?.abort(); setIsGlossaryOpen(true); }}
       dictionaryStatus={dictionaryStatus}
       dictionaryLabel={dictionaryLabel}
-      onOpenDepModal={() => setIsDepModalOpen(true)}
-      onReloadDict={runDependencyRepair}
+      extra={extra}
       t={t}
     />
   );
@@ -514,31 +447,22 @@ export default function DubbingStudioApp() {
           <EditorWorkspace
             t={t}
             rubyType={rubyType} setRubyType={setRubyType} setEditingToken={setEditingToken}
-            fontSize={fontSize} setFontSize={setFontSize} rubyFontSize={rubyFontSize} setRubyFontSize={setRubyFontSize}
-            lineSpacing={lineSpacing} setLineSpacing={setLineSpacing} rubyColor={rubyColor} setRubyColor={setRubyColor}
-            previewWritingMode={previewWritingMode} setPreviewWritingMode={setPreviewWritingMode}
+            fontSize={fontSize} setFontSize={setFontSize}
             previewFontFamily={previewFontFamily} setPreviewFontFamily={setPreviewFontFamily}
-            mobileEditorPane={mobileEditorPane} setMobileEditorPane={setMobileEditorPane}
+            previewShowRuby={previewShowRuby} setPreviewShowRuby={setPreviewShowRuby}
             docTitle={docTitle} setDocTitle={setDocTitle} rawText={rawText} setRawText={setRawText}
-            setSourceOverrides={setSourceOverrides} setSrtCues={setSrtCues}
-            documentId={documentId} setDocumentId={setDocumentId} setDatabase={setDatabase}
-            correctionsReady={correctionsReady} correctionError={correctionError} glossaryEntries={glossaryEntries}
-            learnedReadings={learnedReadings} documentCorrections={documentCorrections}
+            correctionsReady={correctionsReady} correctionError={correctionError}
             advanceControllerRef={advanceControllerRef} setIsGlossaryOpen={setIsGlossaryOpen}
-            setIsLearnedModalOpen={setIsLearnedModalOpen}
-            editorBook={editorBook} setEditorBookId={setEditorBookId} setLibraryToast={setLibraryToast}
-            handleSaveToLibrary={handleSaveToLibrary} handleOpenInReader={handleOpenInReader}
             editorFileInputRef={editorFileInputRef} handleEditorFileImport={handleEditorFileImport}
             isImporting={isImporting} importError={importError}
-            showImportMenu={showImportMenu} setShowImportMenu={setShowImportMenu}
-            editorPixivUrl={editorPixivUrl} setEditorPixivUrl={setEditorPixivUrl}
-            isPixivImporting={isPixivImporting} handleImportPixivNovel={handleImportPixivNovel}
-            exportFormat={exportFormat} setExportFormat={setExportFormat} isExporting={isExporting} handleExport={handleExport}
+            libraryBooks={libraryBooks} onImportFromLibrary={book => loadBookIntoWorkspace(book, 'editor')}
+            handleSaveToLibrary={handleSaveToLibrary}
+            isExporting={isExporting} handleExport={handleExport}
             dictionaryStatus={dictionaryStatus} isKuromojiLoading={isKuromojiLoading} runDependencyRepair={runDependencyRepair}
-            engine={engine} annotatedLines={annotatedLines} isAnnotating={isAnnotating}
-            annotationProgress={annotationProgress} annotationError={annotationError}
+            annotatedLines={annotatedLines} isAnnotating={isAnnotating} annotationError={annotationError}
             reviewCount={reviewCount} jumpToNextReview={jumpToNextReview} reviewError={reviewError}
             openTokenEditor={openTokenEditor} previewPage={previewPage} setPreviewPage={setPreviewPage}
+            renderSettings={renderSettings}
           />
         )}
 
@@ -547,7 +471,6 @@ export default function DubbingStudioApp() {
           <LibraryPanel
             t={t}
             books={libraryBooks}
-            activeBookId={activeBookId}
             onOpenInReader={book => loadBookIntoWorkspace(book, 'reader')}
             onOpenInEditor={book => loadBookIntoWorkspace(book, 'editor')}
             onImportFiles={importLibraryFiles}
@@ -556,9 +479,6 @@ export default function DubbingStudioApp() {
             onUpdateBookMetadata={handleUpdateBookMetadata}
             onToggleFavorite={handleToggleFavorite}
             onDeleteBook={handleDeleteBook}
-            onExportBackup={() => { void exportLibraryJson(); }}
-            onImportBackup={file => { void importLibraryJson(file); }}
-            onResetStarterBooks={() => { void restoreStarterBooks(); }}
           />
         )}
 
@@ -569,43 +489,25 @@ export default function DubbingStudioApp() {
             book={activeBook}
             annotatedLines={annotatedLines}
             isProcessing={isAnnotating}
-            darkMode={darkMode}
             rubyType={rubyType}
             onRubyTypeChange={setRubyType}
-            fontSize={fontSize}
-            onFontSizeChange={setFontSize}
-            rubyFontSize={rubyFontSize}
-            onRubyFontSizeChange={setRubyFontSize}
-            lineSpacing={lineSpacing}
-            onLineSpacingChange={setLineSpacing}
-            onTokenClick={handleTokenClick}
             onUpdateProgress={handleReaderProgress}
-            onAddBookmark={handleAddBookmark}
-            onRemoveBookmark={handleRemoveBookmark}
             onGoToLibrary={() => setActiveTab('library')}
-            onGoToEditor={book => { if (book) loadBookIntoWorkspace(book, 'editor'); else setActiveTab('editor'); }}
           />
         )}
 
         {/* PAGE VIEW 4: DEDICATED BATCH FILE PROCESSING PAGE */}
         {activeTab === 'batch_files' && (
           <BatchProcessingPanel
-            batchTargetFormat={batchTargetFormat}
-            setBatchTargetFormat={setBatchTargetFormat}
-            handleDrop={handleDrop}
-            handleFileSelect={handleFileSelect}
             fileInputRef={fileInputRef}
+            handleFileSelect={handleFileSelect}
+            handleDrop={handleDrop}
             batchFiles={batchFiles}
-            clearBatchFiles={clearBatchFiles}
             removeBatchFile={removeBatchFile}
-            processBatchQueue={processBatchQueue}
+            processBatchQueue={format => { void processBatchQueue(format); }}
             isBatchProcessing={isBatchProcessing}
             isKuromojiLoading={isKuromojiLoading}
             correctionsReady={correctionsReady}
-            batchSaveMode={batchSaveMode}
-            setBatchSaveMode={setBatchSaveMode}
-            alsoSaveToLibrary={alsoSaveToLibrary}
-            setAlsoSaveToLibrary={setAlsoSaveToLibrary}
             t={t}
           />
         )}
@@ -616,15 +518,6 @@ export default function DubbingStudioApp() {
         t={t}
       />
 
-      {/* Dependency Diagnostic Modal */}
-      <DependencyModal
-        isOpen={isDepModalOpen}
-        onClose={() => setIsDepModalOpen(false)}
-        deps={deps}
-        runDependencyRepair={runDependencyRepair}
-        isKuromojiLoading={isKuromojiLoading}
-        t={t}
-      />
 
       {/* Single Script Export Progress Modal */}
       <ExportProgressModal
@@ -650,18 +543,13 @@ export default function DubbingStudioApp() {
       <RubyCorrectionModal
         editingToken={editingToken}
         onClose={() => setEditingToken(null)}
-        annotatedLines={annotatedLines}
-        rubyFontSize={rubyFontSize}
+        needsReview={!!editingToken && !!annotatedLines.find(line => line.id === editingToken.lineId)?.tokens[editingToken.tokenIndex]?.needsReview}
         customRubyInput={customRubyInput}
         setCustomRubyInput={setCustomRubyInput}
-        resizeRubyRange={resizeRubyRange}
         correctionScope={correctionScope}
         setCorrectionScope={setCorrectionScope}
         rubyCompositionRef={rubyCompositionRef}
         saveTokenRuby={saveTokenRuby}
-        restoreAutomaticRuby={restoreAutomaticRuby}
-        saveAndOpenNextReview={saveAndOpenNextReview}
-        isAdvancingReview={isAdvancingReview}
         t={t}
       />
 
@@ -680,7 +568,6 @@ export default function DubbingStudioApp() {
         onChange={handleSelectTab}
         bookCount={Object.keys(libraryDb.books).length}
         hidden={activeTab === 'reader'}
-        renderSettings={renderSettings}
         t={t}
       />
     </main>

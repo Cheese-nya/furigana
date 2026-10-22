@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { loadTypescript } from './loadTypescript.mjs';
 
-// 「恢复自动」 against the real dictionary, driving the database the way app/page.tsx does.
+// restoreAutomaticReading against the real dictionary (database utility; the UI action was removed with the mockup rebuild).
 const { initKuromoji } = loadTypescript('../app/utils/kuromojiEngine.ts');
 const { createAnnotator } = loadTypescript('../app/utils/annotationTask.ts');
 const { emptyDatabase, fingerprintText, resolveScript, setScriptOverrides, learnReading } = loadTypescript('../app/utils/correctionDatabase.ts');
@@ -120,15 +120,4 @@ test('restore on an automatic reading changes nothing, and unknown scripts are i
   const lines = await annotate(state);
   assert.equal(restore(state, openEditor(lines[0], '辛')).database, state.database);
   assert.equal(restoreAutomaticReading(state.database, 'script:missing', lines[0].cleanText, 0, 2), state.database);
-});
-
-test('the correction modal wires 「恢复自动」 to the restore, not to an empty-reading save', () => {
-  const page = readFileSync(fileURLToPath(new URL('../app/page.tsx', import.meta.url)), 'utf8');
-  const modal = readFileSync(fileURLToPath(new URL('../app/components/RubyCorrectionModal.tsx', import.meta.url)), 'utf8');
-  assert.equal(/updateTokenRuby\(\s*''\s*\)/.test(page), false, 'restore must not save an empty reading');
-  assert.match(page, /restoreAutomaticReading\(previous, documentId, line\.cleanText, start, start \+ editingToken\.surface\.length\)/);
-  assert.match(page, /restoreAutomaticRuby=\{restoreAutomaticRuby\}/);
-  assert.match(modal, /onClick=\{restoreAutomaticRuby\}[\s\S]*?\{labelRestoreAuto\}/);
-  // Saving the trimmed custom input (possibly empty) remains the "no ruby" path.
-  assert.match(page, /const saveTokenRuby = \(\) => updateTokenRuby\(customRubyInput\.trim\(\)\);/);
 });
