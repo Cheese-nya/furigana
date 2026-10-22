@@ -110,7 +110,7 @@ npm test
 On a Windows build machine:
 
 ```bash
-pip install pywebview pyinstaller
+pip install -r requirements-desktop.txt
 npm run package:exe
 ```
 

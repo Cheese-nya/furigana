@@ -10,7 +10,36 @@ permissions:
   contents: write
 
 jobs:
+  windows-exe:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - run: npm ci
+
+      - run: pip install -r requirements-desktop.txt
+
+      - name: Build exe
+        run: npm run package:exe
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: UkuFurigana-windows
+          path: UkuFurigana.exe
+          if-no-files-found: error
+
   release:
+    needs: windows-exe
     runs-on: ubuntu-latest
     timeout-minutes: 30
     # Signing secrets live in this environment, which requires a manual approval and
@@ -43,7 +72,7 @@ jobs:
 
       - name: Build web bundle
         run: |
-          bash scripts/build-web.sh
+          npm run build:web
           mkdir -p dist
           (cd out && zip -qr "../dist/Uku-Furigana-web-v${VERSION}.zip" .)
 
@@ -67,6 +96,14 @@ jobs:
           bash scripts/build-apk.sh
           cp UkuFurigana.apk "dist/Uku-Furigana-v${VERSION}.apk"
           rm -f "${ANDROID_KEYSTORE}"
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: UkuFurigana-windows
+          path: windows
+
+      - name: Add Windows exe
+        run: cp windows/UkuFurigana.exe "dist/Uku-Furigana-v${VERSION}-windows.exe"
 
       - name: Checksums
         run: (cd dist && sha256sum * > SHA256SUMS.txt && cat SHA256SUMS.txt)

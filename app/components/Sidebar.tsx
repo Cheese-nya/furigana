@@ -48,7 +48,7 @@ export function Sidebar({ activeTab, onSelectTab, libraryBookCount, batchCount, 
     >
       <div className="flex items-center gap-2.5 px-2 pb-4 pt-1">
         <span aria-hidden className="grid h-[30px] w-[30px] place-items-center rounded-lg bg-[var(--ink)] text-[15px] font-semibold text-[var(--on-ink)] [font-family:var(--font-mincho)]">ふ</span>
-        <span data-testid="app-brand-title" className="text-base font-bold tracking-tight">Furigana</span>
+        <span data-testid="app-brand-title" className="text-base font-bold tracking-tight">{t.appTitle}</span>
       </div>
 
       <LiquidSelector
