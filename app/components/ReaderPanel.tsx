@@ -239,6 +239,8 @@ export function ReaderPanel({
   const lastProgressRef = useRef<number>(-1);
   const lastScrollYRef = useRef<number>(0);
   const travelRef = useRef<number>(0);
+  // Where the reader is in the text right now (0–100), from the scroll position.
+  const [scrollPercent, setScrollPercent] = useState<number | null>(null);
   const prevDarkModeRef = useRef<boolean | undefined>(darkMode);
 
   const applyFullscreen = useCallback((enter: boolean) => {
@@ -341,6 +343,7 @@ export function ReaderPanel({
     setDrawer(null);
     setIsFullscreen(false);
     setHudVisible(true);
+    setScrollPercent(null);
     setHighlightLine(null);
   }
 
@@ -351,7 +354,7 @@ export function ReaderPanel({
   }, [bookId]);
 
   const lineCount = annotatedLines.length;
-  const percent = book ? Math.round(clamp(book.readingProgress.percentage, 0, 100)) : 0;
+  const percent = scrollPercent ?? (book ? Math.round(clamp(book.readingProgress.percentage, 0, 100)) : 0);
 
   const searchHits = (() => {
     if (!book) return [];
@@ -391,6 +394,7 @@ export function ReaderPanel({
 
     const dy = y - lastScrollYRef.current;
     lastScrollYRef.current = y;
+    if (max > 0) setScrollPercent(Math.round(clamp((y / max) * 100, 0, 100)));
     if (dy !== 0) {
       let travel = travelRef.current;
       travel = Math.sign(dy) === Math.sign(travel) ? travel + dy : dy;
