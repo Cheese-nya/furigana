@@ -10,7 +10,7 @@ interface NativeThemeWindow {
   webkit?: {
     messageHandlers?: {
       furiganaTheme?: {
-        postMessage?: (msg: { bg: string; isDark: boolean }) => void;
+        postMessage?: (msg: { bg: string; isDark: boolean; auto?: boolean }) => void;
       };
     };
   };
@@ -22,7 +22,6 @@ interface NativeThemeWindow {
 export type ThemeMode = 'auto' | 'light' | 'dark';
 
 const listeners = new Set<() => void>();
-let memoryFallbackDark = false;
 let memoryFallbackMode: ThemeMode | null = null;
 const SYSTEM_DARK_QUERY = '(prefers-color-scheme: dark)';
 
@@ -67,7 +66,8 @@ function readMode(): ThemeMode {
   } catch {
     // Ignore storage read failures
   }
-  return memoryFallbackMode ?? (memoryFallbackDark ? 'dark' : 'light');
+  // Nothing chosen yet: follow the system appearance, like the mockup.
+  return memoryFallbackMode ?? 'auto';
 }
 
 function resolveDark(mode: ThemeMode): boolean {
@@ -90,11 +90,11 @@ function getServerModeSnapshot(): ThemeMode {
   return 'light';
 }
 
-export function syncThemeSideEffects(isDark: boolean, persist = true): void {
+/** `followsSystem` tells the native shells to stop pinning an appearance ("自动"). */
+export function syncThemeSideEffects(isDark: boolean, persist = true, followsSystem = false): void {
   try {
     const bg = isDark ? DARK_THEME_BG : LIGHT_THEME_BG;
     if (persist) {
-      memoryFallbackDark = isDark;
       memoryFallbackMode = isDark ? 'dark' : 'light';
       if (typeof localStorage !== 'undefined') {
         localStorage.setItem(THEME_STORAGE_KEY, isDark ? '1' : '0');
@@ -115,7 +115,7 @@ export function syncThemeSideEffects(isDark: boolean, persist = true): void {
     }
     if (typeof window !== 'undefined') {
       const win = window as unknown as NativeThemeWindow;
-      win.webkit?.messageHandlers?.furiganaTheme?.postMessage?.({ bg, isDark });
+      win.webkit?.messageHandlers?.furiganaTheme?.postMessage?.({ bg, isDark, auto: followsSystem });
       win.AndroidBridge?.syncTheme?.(bg, isDark);
     }
   } catch {
@@ -128,8 +128,8 @@ export function useThemeMode() {
   const themeMode = useSyncExternalStore(subscribe, getModeSnapshot, getServerModeSnapshot);
 
   useEffect(() => {
-    syncThemeSideEffects(darkMode, false);
-  }, [darkMode]);
+    syncThemeSideEffects(darkMode, false, themeMode === 'auto');
+  }, [darkMode, themeMode]);
 
   const setDarkMode = useCallback((value: boolean | ((prev: boolean) => boolean)) => {
     const next = typeof value === 'function' ? value(getSnapshot()) : value;
@@ -147,7 +147,7 @@ export function useThemeMode() {
     memoryFallbackMode = mode;
     if (mode === 'auto') {
       // Apply the system appearance without pinning it, then remember "auto".
-      syncThemeSideEffects(systemPrefersDark(), false);
+      syncThemeSideEffects(systemPrefersDark(), false, true);
       try {
         if (typeof localStorage !== 'undefined') localStorage.setItem(THEME_STORAGE_KEY, 'auto');
       } catch {
