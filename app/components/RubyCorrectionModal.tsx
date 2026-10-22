@@ -44,10 +44,13 @@ export function RubyCorrectionModal({
           <div className="text-center text-xs font-semibold text-[var(--label-2)]">
             {t.rubySheetTitle}{needsReview ? ` · ${t.needsReviewBadge}` : ''}
           </div>
-          <ruby lang="ja" className="mb-0.5 mt-1 block text-center text-[40px] leading-[1.4] text-[var(--label)] [font-family:var(--font-mincho)]">
-            {editingToken.surface}
-            <rt className="text-[16px]" style={{ color: needsReview ? 'var(--review)' : 'var(--ruby)' }}>{customRubyInput || editingToken.currentRuby}</rt>
-          </ruby>
+          {/* The ruby must stay inline: WebKit drops or misplaces <rt> when <ruby> is display:block. */}
+          <div lang="ja" className="mb-0.5 mt-2 text-center text-[40px] leading-[1.5] text-[var(--label)] [font-family:var(--font-mincho)]">
+            <ruby className="[ruby-align:center]">
+              {editingToken.surface}
+              <rt className="text-[16px] leading-none" style={{ color: needsReview ? 'var(--review)' : 'var(--ruby)' }}>{customRubyInput || editingToken.currentRuby}</rt>
+            </ruby>
+          </div>
           {context && (
             <p lang="ja" className="text-[13px] leading-relaxed text-[var(--label-2)] text-center [font-family:var(--font-mincho)] px-2">
               {context.before}

@@ -224,3 +224,12 @@ test('复合词基字不被宽读音撑开：globals.css 全局设置 ruby-align
     'app/globals.css must keep the scoped .script-line ruby rule',
   );
 });
+
+test('<ruby> 永远保持行内（WebKit 对块级 ruby 会丢失或错位 <rt>）', () => {
+  for (const file of ['RubyCorrectionModal.tsx', 'EditorWorkspace.tsx', 'ReaderPanel.tsx']) {
+    const component = readFileSync(fileURLToPath(new URL(`../app/components/${file}`, import.meta.url)), 'utf8');
+    for (const match of component.matchAll(/<ruby\b[^>]*className="([^"]*)"/g)) {
+      assert.doesNotMatch(match[1], /(^|\s)(block|inline-block|flex|grid)(\s|$)/, `${file}: <ruby> must not be block-level`);
+    }
+  }
+});
