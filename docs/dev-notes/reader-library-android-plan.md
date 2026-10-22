@@ -121,7 +121,7 @@ flowchart LR
 
 ### Step 3 派发指令（内置振假名阅读器 `app/components/ReaderPanel.tsx`）
 ```bash
-pi --no-mcp --no-extensions -a -p 'Execute Step 3 of docs/reader-library-android-plan.md in /home/cheese/project/furigana:
+pi --no-mcp --no-extensions -a -p 'Execute Step 3 of docs/dev-notes/reader-library-android-plan.md in the repository root:
 Create `app/components/ReaderPanel.tsx`:
 - Export types:
   - `ReaderTheme = "light" | "sepia" | "mint" | "dark"`
@@ -185,7 +185,7 @@ Verify with `npx tsc --noEmit` and `npm test`.'
 
 ### Step 4 派发指令（主工作台闭环整合与移动端导航 `app/page.tsx` + `Sidebar.tsx` + `MobileNavBar.tsx`）
 ```bash
-pi --no-mcp --no-extensions -a -p 'Execute Step 4 of docs/reader-library-android-plan.md in /home/cheese/project/furigana:
+pi --no-mcp --no-extensions -a -p 'Execute Step 4 of docs/dev-notes/reader-library-android-plan.md in the repository root:
 1. Create `app/components/MobileNavBar.tsx`:
    - Fixed bottom navigation bar on mobile (`lg:hidden fixed bottom-0 inset-x-0 z-30 bg-white/95 backdrop-blur border-t border-zinc-200 pb-[env(safe-area-inset-bottom)]`).
    - 4 tabs: `editor` (📝), `library` (📚 with book count badge), `reader` (📖), `batch_files` (📁).
@@ -208,7 +208,7 @@ Verify with `npx tsc --noEmit` and `npm test`.'
 
 ### Step 5 派发指令（安卓端 PWA、文件导出分享兼容与 Capacitor 配置）
 ```bash
-pi --no-mcp --no-extensions -a -p 'Execute Step 5 of docs/reader-library-android-plan.md in /home/cheese/project/furigana:
+pi --no-mcp --no-extensions -a -p 'Execute Step 5 of docs/dev-notes/reader-library-android-plan.md in the repository root:
 1. Create `public/manifest.json` for PWA installation on Android/desktop.
 2. Update `app/layout.tsx` to include mobile-friendly `viewport` export (`width: "device-width", initialScale: 1, viewportFit: "cover", themeColor: "#18181b"`) and `manifest: "/manifest.json"`.
 3. Update `app/utils/fileSave.ts` so that on Android/mobile browsers or Capacitor WebView where `showSaveFilePicker` is unavailable, it optionally supports `navigator.canShare` / Web Share API when triggered on mobile or cleanly falls back to `<a download>` blob download.
@@ -224,22 +224,22 @@ pi --no-mcp --no-extensions -a -p 'Execute Step 5 of docs/reader-library-android
 - **23:12** — 完成项目代码审计与《内置书库、阅读器与安卓端支持策划及实施任务书》编写。
 - **23:13 - 23:19** — 排查发现直接运行 `pi -p` 会因加载全局 `rea` (200+ 工具) 与 `hindsight` MCP 插件而阻塞；切换为 `pi --no-mcp --no-extensions -a -p` 后秒级启动。
 - **23:20 - 23:22** — **Step 1 完成并验收通过**：
-  - `pi` 完成 [`app/utils/libraryDatabase.ts`](file:///home/cheese/project/furigana/app/utils/libraryDatabase.ts)（417 行）、[`app/utils/libraryStorage.ts`](file:///home/cheese/project/furigana/app/utils/libraryStorage.ts)（135 行）、[`tests/libraryDatabase.test.mjs`](file:///home/cheese/project/furigana/tests/libraryDatabase.test.mjs)（181 行）。
+  - `pi` 完成 [`app/utils/libraryDatabase.ts`](../../app/utils/libraryDatabase.ts)（417 行）、[`app/utils/libraryStorage.ts`](../../app/utils/libraryStorage.ts)（135 行）、[`tests/libraryDatabase.test.mjs`](../../tests/libraryDatabase.test.mjs)（181 行）。
   - 验收结果：`npm test` **67/67 全部通过**（含 15 项新增书库引擎与章节切分测试），`npx tsc --noEmit` **0 错误**。
 - **23:23 - 23:26** — **Step 2 完成并验收通过**：
-  - `pi` 完成 [`app/utils/i18n.ts`](file:///home/cheese/project/furigana/app/utils/i18n.ts)（新增书库、阅读器、移动端导航全套中英双语词条）与 [`app/components/LibraryPanel.tsx`](file:///home/cheese/project/furigana/app/components/LibraryPanel.tsx)（344 行，支持 `.txt/.srt/.docx` 导入、粘贴新建、搜索、分类/收藏筛选、书脊主题卡片、阅读进度条、JSON 备份导入导出与示例书恢复）。
+  - `pi` 完成 [`app/utils/i18n.ts`](../../app/utils/i18n.ts)（新增书库、阅读器、移动端导航全套中英双语词条）与 [`app/components/LibraryPanel.tsx`](../../app/components/LibraryPanel.tsx)（344 行，支持 `.txt/.srt/.docx` 导入、粘贴新建、搜索、分类/收藏筛选、书脊主题卡片、阅读进度条、JSON 备份导入导出与示例书恢复）。
   - 验收结果：`npx tsc --noEmit` **0 错误**，`npm test` **67/67 全部通过**。
 - **23:28（断电关机安全存档点）** — 所有后台任务已正常退出，无残留子进程；下次开机从 **Step 3**（`app/components/ReaderPanel.tsx`）继续执行。
 - **Step 3 完成并验收通过（由 pi Agent 执行）**：
-  - 新增 [`app/components/ReaderPanel.tsx`](file:///home/cheese/project/furigana/app/components/ReaderPanel.tsx)（714 行）：支持四大纸张主题（Light / Sepia / Mint / Dark）、四种假名显隐模式（全显 / 轻触显音 / 仅待校对 / 隐藏）、无衬线/明朝体切换、目录/书签/书内高亮搜索/外观四大抽屉、单行与整章连续日语 TTS 朗读（0.75x / 1.0x / 1.25x）、角色名气泡与汉字点按校对联动。
+  - 新增 [`app/components/ReaderPanel.tsx`](../../app/components/ReaderPanel.tsx)（714 行）：支持四大纸张主题（Light / Sepia / Mint / Dark）、四种假名显隐模式（全显 / 轻触显音 / 仅待校对 / 隐藏）、无衬线/明朝体切换、目录/书签/书内高亮搜索/外观四大抽屉、单行与整章连续日语 TTS 朗读（0.75x / 1.0x / 1.25x）、角色名气泡与汉字点按校对联动。
 - **Step 4 完成并验收通过（由 pi Agent 执行）**：
-  - 新增 [`app/components/MobileNavBar.tsx`](file:///home/cheese/project/furigana/app/components/MobileNavBar.tsx)（导出 `AppTab` 与 `MobileNavBar`，移动端底部四 Tab 导航，含安全区域与书库数量角标）。
-  - 更新 [`app/components/Sidebar.tsx`](file:///home/cheese/project/furigana/app/components/Sidebar.tsx)：页脚新增方形 X (`https://x.com/beimisama`) / GitHub (`https://github.com/Cheese-nya/furigana`) 快捷按钮，作者徽章 `チーズ@beimisama` 改为跳转 X 的链接。
-  - 更新 [`app/page.tsx`](file:///home/cheese/project/furigana/app/page.tsx)：`activeTab` 扩展为 `editor | library | reader | batch_files`；桌面端四 Tab 切换；顶部与侧栏方形社交快捷按钮；接入 `LibraryDatabaseV1`（`loadLibraryWithFallback` / `saveLibraryWithFallback`）；`loadBookIntoWorkspace` 统一加载书籍到工作台/阅读器；编辑器新增「存入书库」「在阅读器打开」；渲染 `LibraryPanel`（`.txt/.md/.srt/.vtt/.docx` 导入、JSON 备份、示例书恢复）与 `ReaderPanel`；`RubyCorrectionModal` 在编辑器与阅读器均可点词校对；移动端底部导航 + `pb-24 md:pb-12`。
-  - 新增 `loadLibraryWithFallback` / `saveLibraryWithFallback` 至 [`app/utils/libraryStorage.ts`](file:///home/cheese/project/furigana/app/utils/libraryStorage.ts)，并扩展 i18n 词条。
+  - 新增 [`app/components/MobileNavBar.tsx`](../../app/components/MobileNavBar.tsx)（导出 `AppTab` 与 `MobileNavBar`，移动端底部四 Tab 导航，含安全区域与书库数量角标）。
+  - 更新 [`app/components/Sidebar.tsx`](../../app/components/Sidebar.tsx)：页脚新增方形 X (`https://x.com/beimisama`) / GitHub (`https://github.com/Cheese-nya/furigana`) 快捷按钮，作者徽章 `チーズ@beimisama` 改为跳转 X 的链接。
+  - 更新 [`app/page.tsx`](../../app/page.tsx)：`activeTab` 扩展为 `editor | library | reader | batch_files`；桌面端四 Tab 切换；顶部与侧栏方形社交快捷按钮；接入 `LibraryDatabaseV1`（`loadLibraryWithFallback` / `saveLibraryWithFallback`）；`loadBookIntoWorkspace` 统一加载书籍到工作台/阅读器；编辑器新增「存入书库」「在阅读器打开」；渲染 `LibraryPanel`（`.txt/.md/.srt/.vtt/.docx` 导入、JSON 备份、示例书恢复）与 `ReaderPanel`；`RubyCorrectionModal` 在编辑器与阅读器均可点词校对；移动端底部导航 + `pb-24 md:pb-12`。
+  - 新增 `loadLibraryWithFallback` / `saveLibraryWithFallback` 至 [`app/utils/libraryStorage.ts`](../../app/utils/libraryStorage.ts)，并扩展 i18n 词条。
 - **Step 5 + Loop 2 (Open Design UI/UX & ESLint 精修) 完成并验收通过**：
-  - 新增 [`public/manifest.json`](file:///home/cheese/project/furigana/public/manifest.json)、[`capacitor.config.ts`](file:///home/cheese/project/furigana/capacitor.config.ts)，更新 [`app/layout.tsx`](file:///home/cheese/project/furigana/app/layout.tsx) 视口安全区与 PWA 元信息、[`app/utils/fileSave.ts`](file:///home/cheese/project/furigana/app/utils/fileSave.ts)（新增移动端 Web Share API Level 2 系统分享面板支持）及 [`desktop_runner.py`](file:///home/cheese/project/furigana/desktop_runner.py)（新增 `load_library_database` 与原子写入 `save_library_database`）。
-  - 依据 Open Design 规范（`anti-ai-slop.md`、`typography-hierarchy-editorial.md`、`state-coverage.md`、`accessibility-baseline.md`、`laws-of-ux.md`）对 [`ReaderPanel.tsx`](file:///home/cheese/project/furigana/app/components/ReaderPanel.tsx) 与 [`LibraryPanel.tsx`](file:///home/cheese/project/furigana/app/components/LibraryPanel.tsx) 完成深度打磨：日式布纹纯色书封、次级维护操作渐进式折叠（Hick's Law）、65ch 阅读版心与章节扉页头、紧凑水平行号栏与 1.6px 单线 SVG 图标、`<rt>` 假名主题化二级墨色（仅手动/词典/待校对高亮）、汉字词元完整键盘无障碍（`tabIndex={0}`、`role="button"`、`aria-expanded`、`Enter/Space` 触发），并清零全部 ESLint 告警。
+  - 新增 [`public/manifest.json`](../../public/manifest.json)、[`capacitor.config.ts`](../../capacitor.config.ts)，更新 [`app/layout.tsx`](../../app/layout.tsx) 视口安全区与 PWA 元信息、[`app/utils/fileSave.ts`](../../app/utils/fileSave.ts)（新增移动端 Web Share API Level 2 系统分享面板支持）及 [`desktop_runner.py`](../../desktop_runner.py)（新增 `load_library_database` 与原子写入 `save_library_database`）。
+  - 依据 Open Design 规范（`anti-ai-slop.md`、`typography-hierarchy-editorial.md`、`state-coverage.md`、`accessibility-baseline.md`、`laws-of-ux.md`）对 [`ReaderPanel.tsx`](../../app/components/ReaderPanel.tsx) 与 [`LibraryPanel.tsx`](../../app/components/LibraryPanel.tsx) 完成深度打磨：日式布纹纯色书封、次级维护操作渐进式折叠（Hick's Law）、65ch 阅读版心与章节扉页头、紧凑水平行号栏与 1.6px 单线 SVG 图标、`<rt>` 假名主题化二级墨色（仅手动/词典/待校对高亮）、汉字词元完整键盘无障碍（`tabIndex={0}`、`role="button"`、`aria-expanded`、`Enter/Space` 触发），并清零全部 ESLint 告警。
 - **Loop 3 (跨栏状态同步加固、新手引导胶囊与集成测试) 完成并验收通过**：
-  - 在 [`app/page.tsx`](file:///home/cheese/project/furigana/app/page.tsx) 中将 `editorBookId` 与 `activeBookId` 解耦，新增 `handleSelectTab` 统一标签切换器（首次直接点击“阅读器”时自动同步最近阅读书籍的分词管线，避免编辑器示例台本串台；编辑器新建/导入/清空时自动解绑 `editorBookId` 防止误覆盖内置书籍），并在编辑器横幅新增「内置书库 / 沉浸阅读器」快捷引导胶囊与标题栏关联书目徽章。
-  - 新增 [`tests/libraryStorageAndIntegration.test.mjs`](file:///home/cheese/project/furigana/tests/libraryStorageAndIntegration.test.mjs)，全套验证结果：`npx tsc --noEmit` **0 错误**、`npm run lint` **0 错误 0 警告**、`npm test` **81/81 全部通过**、`python3 -m unittest tests/test_desktop_storage.py` **7/7 全部通过**、`npm run build` 静态导出成功。
+  - 在 [`app/page.tsx`](../../app/page.tsx) 中将 `editorBookId` 与 `activeBookId` 解耦，新增 `handleSelectTab` 统一标签切换器（首次直接点击“阅读器”时自动同步最近阅读书籍的分词管线，避免编辑器示例台本串台；编辑器新建/导入/清空时自动解绑 `editorBookId` 防止误覆盖内置书籍），并在编辑器横幅新增「内置书库 / 沉浸阅读器」快捷引导胶囊与标题栏关联书目徽章。
+  - 新增 [`tests/libraryStorageAndIntegration.test.mjs`](../../tests/libraryStorageAndIntegration.test.mjs)，全套验证结果：`npx tsc --noEmit` **0 错误**、`npm run lint` **0 错误 0 警告**、`npm test` **81/81 全部通过**、`python3 -m unittest tests/test_desktop_storage.py` **7/7 全部通过**、`npm run build` 静态导出成功。

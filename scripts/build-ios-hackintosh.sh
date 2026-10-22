@@ -3,7 +3,7 @@
 # Furigana Dubbing Studio — Hackintosh Remote iOS Production Build Script
 # ==============================================================================
 # Builds the static Next.js export (`out/`), syncs the workspace to the remote
-# Hackintosh (`hackintosh` / cheese@192.168.18.188), runs `npx cap sync ios`,
+# Mac build host (ssh alias from $HACKINTOSH_HOST, default `hackintosh`), runs `npx cap sync ios`,
 # and compiles the iOS App via `xcodebuild` (Simulator + Generic iOS Device).
 # ==============================================================================
 
@@ -76,13 +76,11 @@ echo "=================================================================="
 echo "3. Running Capacitor iOS Sync & Xcode Production Build on Hackintosh..."
 echo "=================================================================="
 
-ssh "$REMOTE_HOST" 'bash -se' <<'EOF'
+ssh "$REMOTE_HOST" "cd $REMOTE_DIR && bash -se" <<'EOF'
 set -euo pipefail
 export PATH="/usr/local/bin:/opt/homebrew/bin:$HOME/.nvm/versions/node/$(ls $HOME/.nvm/versions/node 2>/dev/null | tail -n 1)/bin:$PATH"
 export LANG=en_US.UTF-8
 export LC_ALL=en_US.UTF-8
-
-cd ~/project/furigana
 
 echo "--> Node: $(node -v), NPM: $(npm -v)"
 echo "--> Xcode: $(xcodebuild -version | tr '\n' ' ')"

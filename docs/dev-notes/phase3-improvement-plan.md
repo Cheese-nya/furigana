@@ -1,7 +1,7 @@
 # Phase 3 — 统筹改进计划（Leader: Claude）
 
 > 基线快照：`refs/baselines/pre-goal`（132/132 测试通过，tsc / eslint 干净）
-> 所有 worker 必须先阅读 `docs/worker-shared-context.md` 第 1 节的「测试契约」，不得破坏既有 data-testid / class 断言。
+> 所有 worker 必须先阅读 `docs/dev-notes/worker-shared-context.md` 第 1 节的「测试契约」，不得破坏既有 data-testid / class 断言。
 > 每个 worker 只能修改自己「拥有」的文件；完成后必须运行 `npm test`、`npx tsc --noEmit`、`npx eslint app` 并全部通过。
 > 禁止：git commit / push、修改他人文件、删除测试、引入 emoji、新增 npm 依赖。
 

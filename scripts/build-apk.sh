@@ -6,12 +6,34 @@ ANDROID_DIR="$ROOT_DIR/android"
 BUILD_DIR="$ANDROID_DIR/build"
 ASSETS_WWW="$ANDROID_DIR/assets/www"
 
-export JAVA_HOME="/usr/lib/jvm/java-17-openjdk"
+export JAVA_HOME="${JAVA_HOME:-/usr/lib/jvm/java-17-openjdk}"
 export PATH="$JAVA_HOME/bin:$PATH"
 
-SDK_DIR="/home/cheese/Android/Sdk"
-BUILD_TOOLS="$SDK_DIR/build-tools/33.0.2"
-ANDROID_JAR="$SDK_DIR/platforms/android-33/android.jar"
+SDK_DIR="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-$HOME/Android/Sdk}}"
+BUILD_TOOLS="$SDK_DIR/build-tools/${ANDROID_BUILD_TOOLS_VERSION:-33.0.2}"
+ANDROID_JAR="$SDK_DIR/platforms/android-${ANDROID_PLATFORM_VERSION:-33}/android.jar"
+
+APP_VERSION="$(node -p "require('$ROOT_DIR/package.json').version")"
+
+# Release signing. Passwords come from the environment so they never live in the repo:
+#   ANDROID_KEYSTORE_PASSWORD  (required)
+#   ANDROID_KEY_PASSWORD       (defaults to ANDROID_KEYSTORE_PASSWORD)
+#   ANDROID_KEYSTORE / ANDROID_KEY_ALIAS to point at an existing key.
+KEYSTORE="${ANDROID_KEYSTORE:-$ANDROID_DIR/keystore/furigana-release.jks}"
+KEY_ALIAS="${ANDROID_KEY_ALIAS:-furigana}"
+if [ -z "${ANDROID_KEYSTORE_PASSWORD:-}" ]; then
+  echo "ERROR: set ANDROID_KEYSTORE_PASSWORD (and ANDROID_KEY_PASSWORD if it differs) before building." >&2
+  exit 1
+fi
+export ANDROID_KEYSTORE_PASSWORD
+export ANDROID_KEY_PASSWORD="${ANDROID_KEY_PASSWORD:-$ANDROID_KEYSTORE_PASSWORD}"
+# A release key must never be created by accident: APKs signed with a different
+# key cannot update existing installs.
+if [ ! -f "$KEYSTORE" ] && [ "${ANDROID_KEYSTORE_GENERATE:-0}" != "1" ]; then
+  echo "ERROR: keystore not found at $KEYSTORE." >&2
+  echo "       Point ANDROID_KEYSTORE at your existing release key, or set ANDROID_KEYSTORE_GENERATE=1 to create a new one." >&2
+  exit 1
+fi
 
 AAPT2="$BUILD_TOOLS/aapt2"
 D8="$BUILD_TOOLS/d8"
@@ -48,11 +70,13 @@ cat > "$ANDROID_DIR/res/values/strings.xml" <<'EOF'
 EOF
 
 echo "==> Building fresh Next.js static export (out/)..."
-rm -rf "$ROOT_DIR/out" /tmp/furigana_api_backup
-mv "$ROOT_DIR/app/api" /tmp/furigana_api_backup
+rm -rf "$ROOT_DIR/out"
+API_BACKUP_DIR="$(mktemp -d "${TMPDIR:-/tmp}/furigana-apk-api-backup.XXXXXX")"
+mv "$ROOT_DIR/app/api" "$API_BACKUP_DIR/api"
 restore_api() {
-  if [ -d /tmp/furigana_api_backup ] && [ ! -d "$ROOT_DIR/app/api" ]; then
-    mv /tmp/furigana_api_backup "$ROOT_DIR/app/api"
+  if [ -d "$API_BACKUP_DIR/api" ] && [ ! -d "$ROOT_DIR/app/api" ]; then
+    mv "$API_BACKUP_DIR/api" "$ROOT_DIR/app/api"
+    rmdir "$API_BACKUP_DIR" 2>/dev/null || true
   fi
 }
 trap restore_api EXIT
@@ -104,30 +128,30 @@ echo "==> [6/7] Packaging classes.dex and aligning APK..."
 (cd "$BUILD_DIR/dex" && zip -q -u "$BUILD_DIR/unaligned.apk" classes.dex)
 "$ZIPALIGN" -f -p 4 "$BUILD_DIR/unaligned.apk" "$BUILD_DIR/aligned.apk"
 
-KEYSTORE="$ANDROID_DIR/keystore/furigana-release.jks"
 if [ ! -f "$KEYSTORE" ]; then
-  echo "==> Generating signing keystore..."
+  echo "==> Generating signing keystore at $KEYSTORE (back it up: losing it blocks future updates)..."
+  mkdir -p "$(dirname "$KEYSTORE")"
   "$JAVA_HOME/bin/keytool" -genkeypair \
     -v \
     -keystore "$KEYSTORE" \
-    -alias furigana \
+    -alias "$KEY_ALIAS" \
     -keyalg RSA \
-    -keysize 2048 \
+    -keysize 4096 \
     -validity 10000 \
-    -storepass furigana123 \
-    -keypass furigana123 \
-    -dname "CN=Furigana Studio, OU=Dubbing, O=Cheese, L=Tokyo, S=Tokyo, C=JP"
+    -storepass:env ANDROID_KEYSTORE_PASSWORD \
+    -keypass:env ANDROID_KEY_PASSWORD \
+    -dname "CN=Furigana Studio, O=Cheese"
 fi
 
 echo "==> [7/7] Signing and verifying APK..."
 FINAL_APK="$ROOT_DIR/FuriganaStudio.apk"
-VERSIONED_APK="$BUILD_DIR/FuriganaStudio-v1.2.0.apk"
+VERSIONED_APK="$BUILD_DIR/FuriganaStudio-v$APP_VERSION.apk"
 
 "$APKSIGNER" sign \
   --ks "$KEYSTORE" \
-  --ks-key-alias furigana \
-  --ks-pass pass:furigana123 \
-  --key-pass pass:furigana123 \
+  --ks-key-alias "$KEY_ALIAS" \
+  --ks-pass env:ANDROID_KEYSTORE_PASSWORD \
+  --key-pass env:ANDROID_KEY_PASSWORD \
   --v1-signing-enabled true \
   --v2-signing-enabled true \
   --v3-signing-enabled true \
