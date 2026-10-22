@@ -317,6 +317,9 @@ export interface Translations {
   libraryRead: string;
   libraryOpenInEditor: string;
   libraryInfoAndCategory: string;
+  libraryCoverLabel: string;
+  libraryChooseCover: string;
+  libraryDefaultCover: string;
   libraryDelete: string;
   libraryEmptyTitle: string;
   libraryEmptyBody: string;
@@ -705,6 +708,9 @@ export const translations: Record<Locale, Translations> = {
     libraryRead: '阅读',
     libraryOpenInEditor: '在工作台打开',
     libraryInfoAndCategory: '信息与分类',
+    libraryCoverLabel: '封面',
+    libraryChooseCover: '选择图片',
+    libraryDefaultCover: '使用默认封面',
     libraryDelete: '删除',
     libraryEmptyTitle: '还没有台本',
     libraryEmptyBody: '导入 TXT、DOCX 或 SRT，也可以粘贴 Pixiv 链接。',
@@ -1089,6 +1095,9 @@ export const translations: Record<Locale, Translations> = {
     libraryRead: 'Read',
     libraryOpenInEditor: 'Open in Workbench',
     libraryInfoAndCategory: 'Info & Category',
+    libraryCoverLabel: 'Cover',
+    libraryChooseCover: 'Choose Image',
+    libraryDefaultCover: 'Use Default Cover',
     libraryDelete: 'Delete',
     libraryEmptyTitle: 'No scripts yet',
     libraryEmptyBody: 'Import TXT, DOCX or SRT, or paste a Pixiv link.',

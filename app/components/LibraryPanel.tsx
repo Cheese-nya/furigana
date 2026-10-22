@@ -58,6 +58,35 @@ function countLines(content: string): number {
   return content ? content.replace(/\r\n?/g, '\n').split('\n').length : 0;
 }
 
+function downscaleCover(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error('Failed to read image'));
+    reader.onload = () => {
+      const dataUrl = String(reader.result ?? '');
+      const img = new Image();
+      img.onerror = () => reject(new Error('Failed to decode image'));
+      img.onload = () => {
+        const w = img.naturalWidth || img.width || 600;
+        const h = img.naturalHeight || img.height || 600;
+        const scale = Math.min(1, 600 / Math.max(w, h));
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.max(1, Math.round(w * scale));
+        canvas.height = Math.max(1, Math.round(h * scale));
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          resolve(dataUrl);
+          return;
+        }
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        resolve(canvas.toDataURL('image/jpeg', 0.85));
+      };
+      img.src = dataUrl;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
 const fill = (template: string, values: Record<string, string | number>) =>
   template.replace(/\{(\w+)\}/g, (_, key: string) => String(values[key] ?? ''));
 
@@ -77,7 +106,7 @@ export function LibraryPanel({
   const [menu, setMenu] = useState<{ book: BookItem; point: { x: number; y: number } } | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [infoBook, setInfoBook] = useState<BookItem | null>(null);
-  const [infoDraft, setInfoDraft] = useState({ title: '', author: '', category: 'script' as BookCategory });
+  const [infoDraft, setInfoDraft] = useState({ title: '', author: '', category: 'script' as BookCategory, coverUrl: '' });
   const [composerOpen, setComposerOpen] = useState(false);
   const [draft, setDraft] = useState({ title: '', author: '', category: 'script' as BookCategory, content: '' });
   const [pixivOpen, setPixivOpen] = useState(false);
@@ -85,6 +114,7 @@ export function LibraryPanel({
   const [pixivBusy, setPixivBusy] = useState(false);
   const [pixivError, setPixivError] = useState('');
   const fileRef = useRef<HTMLInputElement | null>(null);
+  const coverInputRef = useRef<HTMLInputElement | null>(null);
   const searchRef = useGlass<HTMLLabelElement>();
 
   const categoryLabel: Record<Filter, string> = {
@@ -112,7 +142,7 @@ export function LibraryPanel({
   }, [books, category, favoritesOnly, query, sortBy]);
 
   const openInfo = (book: BookItem) => {
-    setInfoDraft({ title: book.title, author: book.author || '', category: book.category });
+    setInfoDraft({ title: book.title, author: book.author || '', category: book.category, coverUrl: book.coverUrl || '' });
     setInfoBook(book);
   };
   const deleteTarget = books.find(book => book.bookId === confirmDeleteId) || null;
@@ -308,7 +338,12 @@ export function LibraryPanel({
             className="flex flex-col gap-3"
             onSubmit={event => {
               event.preventDefault();
-              onUpdateBookMetadata(infoBook.bookId, { title: infoDraft.title.trim() || infoBook.title, author: infoDraft.author.trim(), category: infoDraft.category });
+              onUpdateBookMetadata(infoBook.bookId, {
+                title: infoDraft.title.trim() || infoBook.title,
+                author: infoDraft.author.trim(),
+                category: infoDraft.category,
+                coverUrl: infoDraft.coverUrl,
+              });
               setInfoBook(null);
             }}
           >
@@ -323,6 +358,46 @@ export function LibraryPanel({
               onChange={value => setInfoDraft(d => ({ ...d, category: value }))}
               options={(['script', 'novel', 'subtitle', 'other'] as BookCategory[]).map(value => ({ value, label: categoryLabel[value] }))}
             />
+            <div className="flex flex-col gap-1.5">
+              <span className="text-xs font-semibold text-[var(--label-2)]">{t.libraryCoverLabel}</span>
+              <div className="flex items-center gap-3">
+                {infoDraft.coverUrl.trim() ? (
+                  <img
+                    src={infoDraft.coverUrl}
+                    alt=""
+                    className="h-[78px] w-[56px] shrink-0 rounded-[3px_7px_7px_3px] object-cover"
+                    style={{ background: coverColour(infoBook) }}
+                  />
+                ) : (
+                  <div
+                    aria-hidden
+                    className="h-[78px] w-[56px] shrink-0 rounded-[3px_7px_7px_3px]"
+                    style={{ background: coverColour(infoBook) }}
+                  />
+                )}
+                <input
+                  ref={coverInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={event => {
+                    const file = event.target.files?.[0];
+                    if (file) {
+                      void downscaleCover(file).then(coverUrl => setInfoDraft(d => ({ ...d, coverUrl }))).catch(() => undefined);
+                    }
+                    event.target.value = '';
+                  }}
+                />
+                <button type="button" className="btn" onClick={() => coverInputRef.current?.click()}>
+                  {t.libraryChooseCover}
+                </button>
+                {infoDraft.coverUrl.trim() && (
+                  <button type="button" className="btn btn-plain" onClick={() => setInfoDraft(d => ({ ...d, coverUrl: '' }))}>
+                    {t.libraryDefaultCover}
+                  </button>
+                )}
+              </div>
+            </div>
             <div className="mt-1 flex gap-2">
               <button type="button" className="btn h-11 flex-1" onClick={() => setInfoBook(null)}>{t.cancel}</button>
               <button type="submit" className="btn btn-ink h-11 flex-1">{t.applyButton}</button>
@@ -430,6 +505,7 @@ function BookCover({ book, t, categoryText, lifted, onOpen, onMenu }: {
   const timer = useRef<number | null>(null);
   const longPressed = useRef(false);
   const origin = useRef<{ x: number; y: number } | null>(null);
+  const [failedCoverUrl, setFailedCoverUrl] = useState<string | null>(null);
   const cancel = () => {
     if (timer.current !== null) window.clearTimeout(timer.current);
     timer.current = null;
@@ -441,6 +517,7 @@ function BookCover({ book, t, categoryText, lifted, onOpen, onMenu }: {
   const ink = colour === LIGHT_COVER ? '#2a2418' : '#F6F1E6';
   const subtitle = book.category === 'subtitle';
   const lines = countLines(book.content);
+  const hasCover = Boolean(book.coverUrl?.trim()) && failedCoverUrl !== book.coverUrl;
 
   return (
     <div className="min-w-0 select-none [-webkit-touch-callout:none]">
@@ -478,22 +555,28 @@ function BookCover({ book, t, categoryText, lifted, onOpen, onMenu }: {
         }`}
         style={{ background: colour, color: ink }}
       >
-        <span aria-hidden className="pointer-events-none absolute inset-0 bg-[linear-gradient(90deg,rgba(0,0,0,.22)_0,rgba(255,255,255,.14)_3%,rgba(0,0,0,.06)_6%,transparent_12%),linear-gradient(160deg,rgba(255,255,255,.12),transparent_40%)]" />
-        <span className="absolute left-4 top-4 text-[10px] font-bold tracking-[0.1em] opacity-70">{categoryText}</span>
-        {subtitle ? (
-          <span className="absolute bottom-[30px] left-4 right-4 font-mono text-[15px] font-semibold leading-snug">{book.title}</span>
+        {hasCover ? (
+          <img src={book.coverUrl} alt="" className="absolute inset-0 h-full w-full object-cover" draggable={false} onError={() => setFailedCoverUrl(book.coverUrl || '')} />
         ) : (
           <>
-            <span className="absolute right-4 top-4 max-h-[calc(100%-32px)] overflow-hidden text-[19px] font-semibold leading-[1.35] tracking-[0.08em] [font-family:var(--font-mincho)] [writing-mode:vertical-rl]">
-              {book.title}
-            </span>
-            {book.author?.trim() && (
-              <span className="absolute bottom-4 left-[18px] max-h-[45%] overflow-hidden text-[11px] tracking-[0.12em] opacity-[0.78] [font-family:var(--font-mincho)] [writing-mode:vertical-rl]">
-                {book.author}
-              </span>
+            <span className="absolute left-4 top-4 text-[10px] font-bold tracking-[0.1em] opacity-70">{categoryText}</span>
+            {subtitle ? (
+              <span className="absolute bottom-[30px] left-4 right-4 font-mono text-[15px] font-semibold leading-snug">{book.title}</span>
+            ) : (
+              <>
+                <span className="absolute right-4 top-4 max-h-[calc(100%-32px)] overflow-hidden text-[19px] font-semibold leading-[1.35] tracking-[0.08em] [font-family:var(--font-mincho)] [writing-mode:vertical-rl]">
+                  {book.title}
+                </span>
+                {book.author?.trim() && (
+                  <span className="absolute bottom-4 left-[18px] max-h-[45%] overflow-hidden text-[11px] tracking-[0.12em] opacity-[0.78] [font-family:var(--font-mincho)] [writing-mode:vertical-rl]">
+                    {book.author}
+                  </span>
+                )}
+              </>
             )}
           </>
         )}
+        <span aria-hidden className="pointer-events-none absolute inset-0 bg-[linear-gradient(90deg,rgba(0,0,0,.22)_0,rgba(255,255,255,.14)_3%,rgba(0,0,0,.06)_6%,transparent_12%),linear-gradient(160deg,rgba(255,255,255,.12),transparent_40%)]" />
         <span
           role="progressbar"
           aria-valuemin={0}

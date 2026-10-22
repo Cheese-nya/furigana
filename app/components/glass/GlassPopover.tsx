@@ -38,7 +38,7 @@ export function GlassPopover({ open, onClose, anchor, point, placement = 'below'
     }
     const panel = panelRef.current;
     if (!panel || prefersReducedMotion()) { setMounted(false); return; }
-    const out = panel.animate([{ opacity: 1, transform: 'scale(1)' }, { opacity: 0, transform: 'scale(0.6)' }], { duration: 170, easing: 'cubic-bezier(.4,0,1,1)' });
+    const out = panel.animate([{ opacity: 1, transform: 'scale(1)' }, { opacity: 0, transform: 'scale(0.6)' }], { duration: 170, easing: 'cubic-bezier(.4,0,1,1)', fill: 'forwards' });
     out.onfinish = () => setMounted(false);
     return () => out.cancel();
   }, [open]);

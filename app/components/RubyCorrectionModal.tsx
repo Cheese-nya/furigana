@@ -18,6 +18,7 @@ export type CorrectionScope = 'occurrence' | 'document' | 'glossary';
 
 interface RubyCorrectionModalProps {
   editingToken: EditingTokenState | null;
+  context: { before: string; word: string; after: string } | null;
   onClose: () => void;
   needsReview: boolean;
   customRubyInput: string;
@@ -31,7 +32,7 @@ interface RubyCorrectionModalProps {
 
 /** Mockup "修改读音" sheet: the word, candidate readings, a custom reading, scope, cancel / apply. */
 export function RubyCorrectionModal({
-  editingToken, onClose, needsReview, customRubyInput, setCustomRubyInput, correctionScope, setCorrectionScope,
+  editingToken, context, onClose, needsReview, customRubyInput, setCustomRubyInput, correctionScope, setCorrectionScope,
   rubyCompositionRef, saveTokenRuby, t,
 }: RubyCorrectionModalProps) {
   const candidates = editingToken ? [...new Set([editingToken.currentRuby, ...editingToken.alternatives].filter(Boolean))] : [];
@@ -47,6 +48,13 @@ export function RubyCorrectionModal({
             {editingToken.surface}
             <rt className="text-[16px]" style={{ color: needsReview ? 'var(--review)' : 'var(--ruby)' }}>{customRubyInput || editingToken.currentRuby}</rt>
           </ruby>
+          {context && (
+            <p lang="ja" className="text-[13px] leading-relaxed text-[var(--label-2)] text-center [font-family:var(--font-mincho)] px-2">
+              {context.before}
+              <b className={`font-semibold ${needsReview ? 'text-[var(--review)]' : 'text-[var(--label)]'}`}>{context.word}</b>
+              {context.after}
+            </p>
+          )}
 
           {candidates.length > 0 && (
             <div className="my-3.5 flex flex-wrap justify-center gap-2">

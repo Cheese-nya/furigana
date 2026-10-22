@@ -356,7 +356,7 @@ function PreviewCard({
         <span className="text-xs text-[var(--label-3)]">{t.tapKanjiHint}</span>
       </div>
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b-[0.5px] border-[color:var(--sep)] px-5 pb-3 pt-1.5 text-xs text-[var(--label-2)]">
-        {loading ? (
+        {loading && annotatedLines.length === 0 ? (
           <span>{t.dictLoading}</span>
         ) : failed ? (
           <span className="text-[var(--danger)]">{annotationError || reviewError || correctionError || t.dictErrorTitle}</span>
@@ -375,7 +375,7 @@ function PreviewCard({
       </div>
 
       <div lang="ja" className="flex-1 overflow-auto px-5 pb-5 pt-1" style={{ fontFamily: PREVIEW_FONT_STACK[previewFontFamily] }}>
-        {loading ? (
+        {loading && annotatedLines.length === 0 ? (
           <div aria-label={t.annotatingProgress}>
             {[92, 70, 84, 58].map(width => (
               <div key={width} className="my-[22px] h-3.5 animate-pulse rounded-full bg-[var(--fill)]" style={{ width: `${width}%` }} />
@@ -391,7 +391,7 @@ function PreviewCard({
             </div>
           </div>
         ) : (
-          <>
+          <div className={isAnnotating ? 'opacity-60' : undefined}>
             {annotatedLines.slice(previewStart, previewStart + PAGE_SIZE).map(line => (
               <div
                 key={line.id}
@@ -438,7 +438,7 @@ function PreviewCard({
                 <button type="button" disabled={previewStart + PAGE_SIZE >= annotatedLines.length} className="btn h-8 text-xs" onClick={() => setPreviewPage(previewStart / PAGE_SIZE + 1)}>{t.nextPage}</button>
               </div>
             )}
-          </>
+          </div>
         )}
       </div>
     </div>

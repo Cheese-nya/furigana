@@ -63,11 +63,14 @@ test('LibraryPanel.tsx 不含任何 Extended_Pictographic emoji', () => {
   assert.equal(source.includes('☆'), false, 'no outline star glyph; use SVG star');
 });
 
-test('台本库：Pixiv 导入、信息与分类只编辑标题/作者/分类（无封面图片与简介、无手选封面颜色）', () => {
+test('台本库：Pixiv 导入沿用原封面，信息与分类可自定义封面', () => {
   for (const id of ['pixiv-import-toggle-btn', 'pixiv-url-input', 'pixiv-import-submit-btn', 'book-meta-modal', 'book-settings-gear-btn']) {
     assert.ok(source.includes(`"${id}"`), `${id} required`);
   }
-  for (const removed of ['coverUrl', 'description', 'book-cover-image', 'coverTheme', 'resizeCoverImageToDataUrl']) {
+  assert.ok(source.includes('book.coverUrl'), 'cover image shown when the book has one (Pixiv imports carry it)');
+  assert.ok(source.includes('coverUrl: infoDraft.coverUrl'), 'info & category saves a custom cover');
+  assert.ok(source.includes('t.libraryChooseCover') && source.includes('t.libraryDefaultCover'), 'choose / reset cover controls');
+  for (const removed of ['description', 'coverTheme']) {
     assert.equal(source.includes(removed), false, `LibraryPanel must not contain ${removed}`);
   }
 });

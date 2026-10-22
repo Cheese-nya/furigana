@@ -542,6 +542,18 @@ export default function DubbingStudioApp() {
       {/* Interactive Modal for Editing / Disambiguating Ruby */}
       <RubyCorrectionModal
         editingToken={editingToken}
+        context={(() => {
+          if (!editingToken) return null;
+          const line = annotatedLines.find(l => l.id === editingToken.lineId);
+          if (!line) return null;
+          const start = line.tokens.slice(0, editingToken.tokenIndex).reduce((sum, token) => sum + token.surface.length, 0);
+          const word = editingToken.surface;
+          return {
+            before: line.cleanText.slice(0, start).slice(-40),
+            word,
+            after: line.cleanText.slice(start + word.length).slice(0, 40),
+          };
+        })()}
         onClose={() => setEditingToken(null)}
         needsReview={!!editingToken && !!annotatedLines.find(line => line.id === editingToken.lineId)?.tokens[editingToken.tokenIndex]?.needsReview}
         customRubyInput={customRubyInput}
