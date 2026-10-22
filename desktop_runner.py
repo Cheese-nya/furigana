@@ -1,5 +1,5 @@
 """
-Furigana Dubbing Studio - Native Standalone Windows Desktop Launcher
+Uku Furigana (浮く) - Native Standalone Windows Desktop Launcher
 Bundles static Next.js export with built-in HTTP server & PyWebView Window mode.
 """
 
@@ -67,12 +67,25 @@ import base64
 LIBRARY_VERSIONS = (1, 2)
 
 
+def default_data_dir(base=None):
+    base = Path(base) if base else Path(os.environ.get('LOCALAPPDATA') or Path.home() / '.local' / 'share')
+    root = base / 'UkuFurigana'
+    # Carry over data saved before the app was renamed from Furigana Dubbing Studio.
+    legacy = base / 'FuriganaDubbingStudio'
+    if not root.exists() and legacy.is_dir():
+        try:
+            legacy.rename(root)
+        except OSError:
+            return legacy
+    return root
+
+
 class Api:
     def __init__(self, data_dir=None):
         self._window = None
         # The HTTP port changes on every launch, so browser localStorage alone
         # cannot retain corrections. Store them outside the temporary EXE bundle.
-        root = Path(data_dir) if data_dir else Path(os.environ.get('LOCALAPPDATA') or Path.home() / '.local' / 'share') / 'FuriganaDubbingStudio'
+        root = Path(data_dir) if data_dir else default_data_dir()
         self._corrections_path = root / 'corrections.json'
         self._database_path = root / 'corrections-v2.json'
         self._library_path = root / 'library-v1.json'
@@ -239,7 +252,7 @@ def main():
 
     # Use PyWebView for a stable, dedicated application window with Native Save Dialog API bridge
     api = Api()
-    window = webview.create_window('Furigana Dubbing Studio', url, width=1280, height=830, js_api=api)
+    window = webview.create_window('浮く Uku Furigana', url, width=1280, height=830, js_api=api)
     api.set_window(window)
     webview.start(private_mode=False)
 

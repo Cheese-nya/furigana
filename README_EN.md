@@ -1,8 +1,8 @@
 <div align="center">
 
-  <img src="public/logo.png" alt="Furigana Dubbing Studio Logo" width="100" height="100" style="border-radius: 20px;" />
+  <img src="public/logo.png" alt="Uku Furigana Logo" width="100" height="100" style="border-radius: 20px;" />
 
-  # Furigana Dubbing Studio
+  # Uku Furigana (浮く)
 
   An offline Japanese furigana (ruby) annotation and typesetting tool tailored for Japanese learners.  
   Eliminates homograph misreadings, counter sound changes, compound word splits, and Word ruby misalignment.
@@ -12,10 +12,10 @@
   </p>
 
   [![License: PolyForm Noncommercial](https://img.shields.io/badge/License-PolyForm_Noncommercial_1.0.0-orange.svg)](LICENSE)
-  [![Version](https://img.shields.io/github/package-json/v/Cheese-nya/furigana?label=Version&color=10b981)](RELEASE_NOTES.md)
+  [![Version](https://img.shields.io/github/package-json/v/Cheese-nya/uku-furigana?label=Version&color=10b981)](RELEASE_NOTES.md)
   [![Next.js](https://img.shields.io/badge/Next.js-16-black?logo=next.js)](https://nextjs.org/)
   [![TailwindCSS](https://img.shields.io/badge/Tailwind-v4-38bdf8?logo=tailwindcss)](https://tailwindcss.com/)
-  [![Desktop](https://img.shields.io/badge/Desktop-Windows_EXE-3776ab?logo=windows)](https://github.com/Cheese-nya/furigana)
+  [![Desktop](https://img.shields.io/badge/Desktop-Windows_EXE-3776ab?logo=windows)](https://github.com/Cheese-nya/uku-furigana)
 
 </div>
 
@@ -91,8 +91,8 @@ Drop multiple `.txt`, `.srt`, or `.docx` files into the queue. Automatically ext
 ### Installation & Development
 
 ```bash
-git clone https://github.com/Cheese-nya/furigana.git
-cd furigana
+git clone https://github.com/Cheese-nya/uku-furigana.git
+cd uku-furigana
 npm install
 npm run dev
 ```
@@ -114,7 +114,7 @@ pip install pywebview pyinstaller
 npm run package:exe
 ```
 
-Outputs a self-contained portable executable `FuriganaDubbingStudio.exe` in the project root.
+Outputs a self-contained portable executable `UkuFurigana.exe` in the project root.
 
 ---
 

@@ -2,13 +2,13 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Furigana Dubbing Studio — 日语假名注音与台本排版工具",
+  title: "浮く Uku Furigana — 日语假名注音与台本排版工具",
   description: "面向日语学习者与声优配音的离线振假名（ルビ）注音与排版系统。支持多音字消歧、数量词音变、专名词典与原生 Word / SRT 导出。",
   manifest: "./manifest.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "Furigana",
+    title: "浮く",
   },
 };
 

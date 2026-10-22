@@ -155,7 +155,7 @@ test('上下滑动到底防黑条：Web/iOS/Android 全链路同步画布底色�
     'utf8',
   );
   const mainActivity = readFileSync(
-    fileURLToPath(new URL('../android/src/com/cheese/furiganastudio/MainActivity.java', import.meta.url)),
+    fileURLToPath(new URL('../android/src/com/cheese/uku/MainActivity.java', import.meta.url)),
     'utf8',
   );
 

@@ -1,6 +1,6 @@
 """
 launch_desktop.py
-Furigana Dubbing Studio 独立桌面窗口启动器 (PyWebView / App Mode)
+浮く Uku Furigana 独立桌面窗口启动器 (PyWebView / App Mode)
 """
 
 import sys
@@ -21,7 +21,7 @@ def launch_standalone_window():
     try:
         import webview
         webview.create_window(
-            title='Furigana Dubbing Studio',
+            title='浮く Uku Furigana',
             url='http://localhost:3000',
             width=1280,
             height=830,

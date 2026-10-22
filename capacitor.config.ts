@@ -17,8 +17,8 @@ interface CapacitorConfig {
 }
 
 const config: CapacitorConfig = {
-  appId: 'com.cheese.furiganastudio',
-  appName: 'Furigana Studio',
+  appId: 'com.cheese.uku',
+  appName: 'Uku Furigana',
   webDir: 'out',
   bundledWebRuntime: false,
   server: {

@@ -96,5 +96,23 @@ class DesktopLibraryTest(unittest.TestCase):
             self.assertFalse((Path(directory) / 'library-v1.tmp').exists())
 
 
+class DefaultDataDirTest(unittest.TestCase):
+    def test_migrates_legacy_directory_once(self):
+        with tempfile.TemporaryDirectory() as directory:
+            legacy = Path(directory) / 'FuriganaDubbingStudio'
+            legacy.mkdir()
+            (legacy / 'library-v1.json').write_text('{}', encoding='utf-8')
+            root = launcher.default_data_dir(directory)
+            self.assertEqual(root, Path(directory) / 'UkuFurigana')
+            self.assertEqual((root / 'library-v1.json').read_text(encoding='utf-8'), '{}')
+            self.assertFalse(legacy.exists())
+
+    def test_existing_new_directory_wins(self):
+        with tempfile.TemporaryDirectory() as directory:
+            (Path(directory) / 'UkuFurigana').mkdir()
+            (Path(directory) / 'FuriganaDubbingStudio').mkdir()
+            self.assertEqual(launcher.default_data_dir(directory), Path(directory) / 'UkuFurigana')
+            self.assertTrue((Path(directory) / 'FuriganaDubbingStudio').exists())
+
 if __name__ == '__main__':
     unittest.main()
