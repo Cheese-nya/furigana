@@ -109,7 +109,7 @@ npm test
 在 Windows 环境下执行：
 
 ```bash
-pip install pywebview pyinstaller
+pip install -r requirements-desktop.txt
 npm run package:exe
 ```
 

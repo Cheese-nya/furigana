@@ -12,6 +12,7 @@
    git tag v1.3.0 && git push origin v1.3.0
    ```
 4. GitHub Actions（`.github/workflows/release.yml`）会运行测试、构建，并把文件发布到 Releases：
+   - `Uku-Furigana-vX.Y.Z-windows.exe`：Windows 桌面版（由 GitHub 的 Windows 云端机器构建，**未做代码签名**，首次运行可能出现 SmartScreen 提示）
    - `Uku-Furigana-web-vX.Y.Z.zip`：静态网页包
    - `Uku-Furigana-vX.Y.Z.apk`：已签名 APK（需要下面的两个 Secret）
    - `SHA256SUMS.txt`：校验值
@@ -48,6 +49,7 @@ https://github.com/Cheese-nya/uku-furigana/releases/latest/download/<文件名>
 ## 本地打包
 
 ```bash
-bash scripts/build-web.sh                                         # out/
+npm run build:web                                         # out/
+pip install -r requirements-desktop.txt && npm run package:exe   # Windows 上生成 UkuFurigana.exe
 ANDROID_KEYSTORE=~/keys/uku-release.jks bash scripts/build-apk.sh # UkuFurigana.apk（会提示输入密码）
 ```
