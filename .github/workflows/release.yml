@@ -1,0 +1,78 @@
+name: Release
+
+# Pushing a tag such as v1.3.0 builds the release files and publishes them to GitHub
+# Releases, where the website's download buttons point (…/releases/latest/download/<file>).
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      # Optional. Without them the release still ships the web bundle, just no APK.
+      HAVE_ANDROID_KEY: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' && secrets.ANDROID_KEYSTORE_PASSWORD != '' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Tag matches package.json version
+        run: |
+          version="$(node -p "require('./package.json').version")"
+          if [ "${GITHUB_REF_NAME}" != "v${version}" ]; then
+            echo "Tag ${GITHUB_REF_NAME} does not match package.json version ${version}" >&2
+            exit 1
+          fi
+          echo "VERSION=${version}" >> "$GITHUB_ENV"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Test
+        run: npm test
+
+      - name: Build web bundle
+        run: |
+          bash scripts/build-web.sh
+          mkdir -p dist
+          (cd out && zip -qr "../dist/Uku-Furigana-web-v${VERSION}.zip" .)
+
+      - uses: actions/setup-java@v4
+        if: env.HAVE_ANDROID_KEY == 'true'
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Build and sign APK
+        if: env.HAVE_ANDROID_KEY == 'true'
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+        run: |
+          yes | "${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager" --licenses >/dev/null || true
+          "${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager" "build-tools;33.0.2" "platforms;android-33" >/dev/null
+          export ANDROID_KEYSTORE="${RUNNER_TEMP}/uku-release.jks"
+          echo "${ANDROID_KEYSTORE_BASE64}" | base64 -d > "${ANDROID_KEYSTORE}"
+          export JAVA_HOME="${JAVA_HOME_17_X64:-$JAVA_HOME}"
+          bash scripts/build-apk.sh
+          cp UkuFurigana.apk "dist/Uku-Furigana-v${VERSION}.apk"
+          rm -f "${ANDROID_KEYSTORE}"
+
+      - name: Checksums
+        run: (cd dist && sha256sum * > SHA256SUMS.txt && cat SHA256SUMS.txt)
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" dist/* \
+            --title "浮く Uku Furigana ${GITHUB_REF_NAME}" \
+            --generate-notes \
+            --verify-tag
