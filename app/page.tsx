@@ -425,7 +425,7 @@ export default function DubbingStudioApp() {
   );
 
   return (
-    <main className="relative min-h-screen text-[var(--label)] pb-28 md:pb-12 [@media(max-height:520px)_and_(orientation:landscape)]:pb-20 transition-colors">
+    <main className="fixed inset-0 overflow-hidden text-[var(--label)] transition-colors">
       {libraryToast && (
         <div role="status" className="fixed left-1/2 top-4 z-50 -translate-x-1/2 rounded-full bg-slate-900/90 dark:bg-slate-800/95 backdrop-blur-xl px-4 py-2 text-xs font-medium text-white shadow-[0_12px_30px_-8px_rgba(15,23,42,0.35)] border border-white/20">
           {libraryToast}
@@ -441,7 +441,7 @@ export default function DubbingStudioApp() {
         t={t}
       />
 
-      <div className={`min-h-screen flex flex-col max-w-7xl mx-auto px-3 sm:px-4 pt-[max(0.75rem,env(safe-area-inset-top))] sm:pt-[max(1rem,env(safe-area-inset-top))] md:pt-[max(10px,env(safe-area-inset-top))] transition-[padding] duration-[620ms] [transition-timing-function:var(--spring-smooth)] ${activeTab === 'reader' ? 'md:px-6' : 'md:pl-[244px] md:pr-5'}`}>
+      <div className={`h-full min-h-0 flex flex-col max-w-7xl mx-auto px-3 sm:px-4 pt-[max(0.75rem,env(safe-area-inset-top))] sm:pt-[max(1rem,env(safe-area-inset-top))] md:pt-[max(10px,env(safe-area-inset-top))] transition-[padding] duration-[620ms] [transition-timing-function:var(--spring-smooth)] ${activeTab === 'reader' ? 'pb-0 md:px-6' : 'pb-[calc(76px+max(24px,env(safe-area-inset-bottom)))] md:pb-2.5 md:pl-[244px] md:pr-5'}`}>
         {/* PAGE VIEW 1: EDITOR PAGE */}
         {activeTab === 'editor' && (
           <EditorWorkspace

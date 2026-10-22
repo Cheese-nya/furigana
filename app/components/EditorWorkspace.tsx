@@ -126,11 +126,9 @@ export function EditorWorkspace(props: EditorWorkspaceProps) {
   );
 
   return (
-    <section className="relative flex min-w-0 flex-1 flex-col pb-5">
-      <div className="scroll-edge sticky top-0 z-10 -mx-3 -mb-[76px] h-[76px] shrink-0" aria-hidden />
-
+    <section className="relative flex min-h-0 flex-1 flex-col">
       {/* Floating toolbar — glass capsules over the scrolling content */}
-      <div className="pointer-events-none sticky top-[max(14px,env(safe-area-inset-top))] z-20 mb-3 flex items-center gap-2.5 [&>*]:pointer-events-auto">
+      <div className="pointer-events-none relative z-20 mb-3 flex items-center gap-2.5 [&>*]:pointer-events-auto">
         <GlassButton
           ref={setSettingsAnchor}
           variant="glass"
@@ -235,7 +233,7 @@ export function EditorWorkspace(props: EditorWorkspaceProps) {
       {isImporting && <p role="status" className="mb-3 text-xs text-[var(--label-2)]">{t.readingScriptProgress}</p>}
       {importError && <p role="alert" className="mb-3 text-xs font-medium text-[var(--danger)]">{importError}</p>}
 
-      <div className="grid grid-cols-1 gap-3 md:min-h-[calc(100dvh-96px)] md:grid-cols-2">
+      <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 md:grid-cols-2">
         <SourceCard {...props} hidden={pane !== 'source'} />
         <PreviewCard {...props} hidden={pane !== 'preview'} />
       </div>
@@ -297,7 +295,7 @@ export function EditorWorkspace(props: EditorWorkspaceProps) {
   );
 }
 
-const CARD = 'flex min-h-[520px] flex-col overflow-hidden rounded-[18px] bg-[var(--surface)] shadow-[var(--card-shadow)]';
+const CARD = 'flex min-h-0 flex-col overflow-hidden rounded-[18px] bg-[var(--surface)] shadow-[var(--card-shadow)]';
 
 function SourceCard({ t, hidden, docTitle, setDocTitle, rawText, setRawText, setEditingToken, correctionsReady, isImporting }: EditorWorkspaceProps & { hidden: boolean }) {
   const lineCount = rawText ? rawText.split('\n').length : 0;
@@ -322,7 +320,7 @@ function SourceCard({ t, hidden, docTitle, setDocTitle, rawText, setRawText, set
         disabled={!correctionsReady || isImporting}
         onChange={event => { setEditingToken(null); setRawText(event.target.value); }}
         placeholder={t.inputPlaceholder}
-        className="w-full flex-1 resize-none border-0 bg-transparent px-5 pb-5 pt-1 text-base leading-[1.95] text-[var(--label)] outline-none placeholder:text-[var(--label-3)] disabled:opacity-50"
+        className="min-h-0 w-full flex-1 resize-none overflow-y-auto overscroll-contain border-0 bg-transparent px-5 pb-5 pt-1 text-base leading-[1.95] text-[var(--label)] outline-none placeholder:text-[var(--label-3)] disabled:opacity-50"
       />
     </div>
   );
@@ -374,7 +372,7 @@ function PreviewCard({
         )}
       </div>
 
-      <div lang="ja" className="flex-1 overflow-auto px-5 pb-5 pt-1" style={{ fontFamily: PREVIEW_FONT_STACK[previewFontFamily] }}>
+      <div lang="ja" className="min-h-0 flex-1 overflow-auto overscroll-contain px-5 pb-5 pt-1" style={{ fontFamily: PREVIEW_FONT_STACK[previewFontFamily] }}>
         {loading && annotatedLines.length === 0 ? (
           <div aria-label={t.annotatingProgress}>
             {[92, 70, 84, 58].map(width => (

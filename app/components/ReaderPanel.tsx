@@ -70,6 +70,7 @@ export function ReaderPanel({ t, book, annotatedLines, isProcessing, rubyType, o
   const [scrollPercent, setScrollPercent] = useState(0);
   const [aaAnchor, setAaAnchor] = useState<HTMLButtonElement | null>(null);
   const [aaOpen, setAaOpen] = useState(false);
+  const scrollerRef = useRef<HTMLDivElement | null>(null);
   const articleRef = useRef<HTMLElement | null>(null);
   const lastYRef = useRef(0);
   const travelRef = useRef(0);
@@ -100,16 +101,18 @@ export function ReaderPanel({ t, book, annotatedLines, isProcessing, rubyType, o
 
   const processScroll = useCallback(() => {
     const article = articleRef.current;
+    const scroller = scrollerRef.current;
     let y: number;
     let max: number;
     if (isVertical && article) {
       // vertical-rl scrolls horizontally (scrollLeft runs negative toward the end)
       y = Math.abs(article.scrollLeft);
       max = Math.max(0, article.scrollWidth - article.clientWidth);
+    } else if (scroller) {
+      y = scroller.scrollTop;
+      max = Math.max(0, scroller.scrollHeight - scroller.clientHeight);
     } else {
-      const doc = document.documentElement;
-      y = window.scrollY || doc.scrollTop;
-      max = Math.max(0, doc.scrollHeight - window.innerHeight);
+      return;
     }
     if (max > 0) setScrollPercent(Math.round(Math.min(100, Math.max(0, (y / max) * 100))));
 
@@ -147,9 +150,7 @@ export function ReaderPanel({ t, book, annotatedLines, isProcessing, rubyType, o
   useEffect(() => {
     lastYRef.current = 0;
     travelRef.current = 0;
-    window.addEventListener('scroll', handleScroll, { passive: true });
     return () => {
-      window.removeEventListener('scroll', handleScroll);
       if (frameRef.current !== null) window.cancelAnimationFrame(frameRef.current);
       frameRef.current = null;
     };
@@ -163,7 +164,7 @@ export function ReaderPanel({ t, book, annotatedLines, isProcessing, rubyType, o
 
   if (!book) {
     return (
-      <section className="grid min-h-[70vh] flex-1 place-items-center px-6 text-center">
+      <section className="grid min-h-0 flex-1 place-items-center px-6 text-center">
         <div className="max-w-sm rounded-[18px] bg-[var(--surface)] p-8 shadow-[var(--card-shadow)]">
           <IconRead size={46} className="mx-auto text-[var(--label-3)]" />
           <h3 className="mb-1.5 mt-3.5 text-xl font-semibold">{t.readerEmptyTitle}</h3>
@@ -177,72 +178,72 @@ export function ReaderPanel({ t, book, annotatedLines, isProcessing, rubyType, o
   const lineCount = annotatedLines.length;
 
   return (
-    <section className="relative flex min-w-0 flex-1 flex-col">
+    <section className="relative flex h-full min-h-0 flex-1 flex-col">
       <div className="scroll-edge fixed inset-x-0 top-0 z-10 h-[76px]" aria-hidden />
 
-      <article
-        ref={articleRef}
-        lang="ja"
-        data-testid="reader-script-canvas"
-        data-writing-mode={prefs.writingMode}
-        onClick={handleCanvasClick}
-        onScroll={isVertical ? handleScroll : undefined}
-        className={
-          isVertical
-            ? 'vertical-script-flow w-full overflow-x-auto px-6 pb-[110px] pt-[70px] md:px-12'
-            : 'mx-auto w-full max-w-[34em] px-6 pb-[140px] pt-[70px]'
-        }
-        style={{
-          fontFamily: FONT_STACK[prefs.fontFamily],
-          fontSize: `${prefs.fontSize}px`,
-          lineHeight: 2.35,
-          letterSpacing: '0.02em',
-          ...(isVertical ? { height: 'calc(100dvh - 20px)' } : {}),
-        }}
-      >
-        <header className={isVertical ? 'ml-9' : 'mb-9'}>
-          <h2 className="text-[26px] font-semibold leading-snug">{book.title}</h2>
-          <p className="mt-1 font-sans text-[13px] tracking-normal text-[var(--label-2)]">
-            {book.author?.trim() ? `${book.author.trim()} · ` : ''}{fill(t.libraryBookLines, { count: lineCount })}
-          </p>
-        </header>
-
-        {isProcessing && <p className="mb-4 font-sans text-xs text-[var(--label-2)]">{t.annotatingProgress}</p>}
-
-        {annotatedLines.map((line, lineIndex) => {
-          const speakerMatch = (line.rawText || line.cleanText || '').match(SPEAKER);
-          const speaker = line.speaker || speakerMatch?.[1];
-          // Strip "名前：" from the token stream; the speaker is shown as a label instead.
-          let skip = 0;
-          if (speaker) {
-            const joined = line.tokens.map(token => token.surface).join('');
-            const afterName = joined.startsWith(speaker) ? joined.slice(speaker.length) : joined;
-            const delimiter = afterName.match(/^[：:]\s*/);
-            skip = (joined.startsWith(speaker) ? speaker.length : 0) + (delimiter ? delimiter[0].length : 0);
+      <div ref={scrollerRef} onScroll={isVertical ? undefined : handleScroll} onClick={handleCanvasClick} className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+        <article
+          ref={articleRef}
+          lang="ja"
+          data-testid="reader-script-canvas"
+          data-writing-mode={prefs.writingMode}
+          onScroll={isVertical ? handleScroll : undefined}
+          className={
+            isVertical
+              ? 'vertical-script-flow h-full w-full overflow-x-auto px-6 pb-[110px] pt-[70px] md:px-12'
+              : 'mx-auto w-full max-w-[34em] px-6 pb-[140px] pt-[70px]'
           }
-          return (
-            <p key={`${line.id}-${lineIndex}`} data-line={lineIndex} className={isVertical ? 'ml-4' : 'mb-[0.6em]'}>
-              {speaker && <span className="mr-[0.4em] font-sans text-[0.72em] font-semibold tracking-normal text-[var(--label-2)]">{speaker}</span>}
-              {line.tokens.length === 0 && <br />}
-              {line.tokens.map((token, tokenIndex) => {
-                let surface = token.surface;
-                if (skip > 0) {
-                  if (surface.length <= skip) { skip -= surface.length; return null; }
-                  surface = surface.slice(skip);
-                  skip = 0;
-                }
-                if (!token.ruby) return <span key={tokenIndex}>{surface}</span>;
-                return (
-                  <ruby key={tokenIndex}>
-                    {surface}
-                    <rt className="text-[0.5em]" style={{ color: 'var(--ruby)', visibility: prefs.showRuby ? 'visible' : 'hidden' }}>{token.ruby}</rt>
-                  </ruby>
-                );
-              })}
+          style={{
+            fontFamily: FONT_STACK[prefs.fontFamily],
+            fontSize: `${prefs.fontSize}px`,
+            lineHeight: 2.35,
+            letterSpacing: '0.02em',
+          }}
+        >
+          <header className={isVertical ? 'ml-9' : 'mb-9'}>
+            <h2 className="text-[26px] font-semibold leading-snug">{book.title}</h2>
+            <p className="mt-1 font-sans text-[13px] tracking-normal text-[var(--label-2)]">
+              {book.author?.trim() ? `${book.author.trim()} · ` : ''}{fill(t.libraryBookLines, { count: lineCount })}
             </p>
-          );
-        })}
-      </article>
+          </header>
+
+          {isProcessing && <p className="mb-4 font-sans text-xs text-[var(--label-2)]">{t.annotatingProgress}</p>}
+
+          {annotatedLines.map((line, lineIndex) => {
+            const speakerMatch = (line.rawText || line.cleanText || '').match(SPEAKER);
+            const speaker = line.speaker || speakerMatch?.[1];
+            // Strip "名前：" from the token stream; the speaker is shown as a label instead.
+            let skip = 0;
+            if (speaker) {
+              const joined = line.tokens.map(token => token.surface).join('');
+              const afterName = joined.startsWith(speaker) ? joined.slice(speaker.length) : joined;
+              const delimiter = afterName.match(/^[：:]\s*/);
+              skip = (joined.startsWith(speaker) ? speaker.length : 0) + (delimiter ? delimiter[0].length : 0);
+            }
+            return (
+              <p key={`${line.id}-${lineIndex}`} data-line={lineIndex} className={isVertical ? 'ml-4' : 'mb-[0.6em]'}>
+                {speaker && <span className="mr-[0.4em] font-sans text-[0.72em] font-semibold tracking-normal text-[var(--label-2)]">{speaker}</span>}
+                {line.tokens.length === 0 && <br />}
+                {line.tokens.map((token, tokenIndex) => {
+                  let surface = token.surface;
+                  if (skip > 0) {
+                    if (surface.length <= skip) { skip -= surface.length; return null; }
+                    surface = surface.slice(skip);
+                    skip = 0;
+                  }
+                  if (!token.ruby) return <span key={tokenIndex}>{surface}</span>;
+                  return (
+                    <ruby key={tokenIndex}>
+                      {surface}
+                      <rt className="text-[0.5em]" style={{ color: 'var(--ruby)', visibility: prefs.showRuby ? 'visible' : 'hidden' }}>{token.ruby}</rt>
+                    </ruby>
+                  );
+                })}
+              </p>
+            );
+          })}
+        </article>
+      </div>
 
       {/* Bottom glass capsule */}
       <div

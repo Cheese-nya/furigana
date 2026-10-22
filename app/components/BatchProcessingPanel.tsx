@@ -45,11 +45,10 @@ export function BatchProcessingPanel({
   const canExport = batchFiles.some(file => file.status === 'pending') && !isBatchProcessing && !isKuromojiLoading && correctionsReady;
 
   return (
-    <section className="relative flex min-w-0 flex-1 flex-col pb-6" onDragOver={event => event.preventDefault()} onDrop={handleDrop}>
-      <div className="scroll-edge sticky top-0 z-10 -mx-3 -mb-[76px] h-[76px] shrink-0" aria-hidden />
+    <section className="relative flex min-h-0 flex-1 flex-col" onDragOver={event => event.preventDefault()} onDrop={handleDrop}>
       <input ref={fileInputRef} type="file" multiple accept=".txt,.srt,.docx" className="hidden" onChange={event => { handleFileSelect(event); event.target.value = ''; }} />
 
-      <div className="pointer-events-none sticky top-[max(14px,env(safe-area-inset-top))] z-20 mb-3 flex items-center gap-2.5 [&>*]:pointer-events-auto">
+      <div className="pointer-events-none relative z-20 mb-3 flex items-center gap-2.5 [&>*]:pointer-events-auto">
         <GlassCapsule>
           <GlassButton disabled={isBatchProcessing} onClick={() => fileInputRef.current?.click()}>
             <IconPlus />
@@ -71,7 +70,7 @@ export function BatchProcessingPanel({
 
       <h1 className="mx-1 mb-3.5 mt-1.5 text-[34px] font-bold tracking-[-0.02em] md:hidden">{t.mobileNavBatch}</h1>
 
-      <div className="overflow-hidden rounded-[18px] bg-[var(--surface)] shadow-[var(--card-shadow)]">
+      <div className="flex min-h-0 flex-col overflow-hidden rounded-[18px] bg-[var(--surface)] shadow-[var(--card-shadow)]">
         {batchFiles.length === 0 ? (
           <div className="grid min-h-[260px] place-items-center px-6 text-center text-[var(--label-2)]">
             <div>
@@ -82,7 +81,7 @@ export function BatchProcessingPanel({
             </div>
           </div>
         ) : (
-          <ul>
+          <ul className="min-h-0 overflow-y-auto overscroll-contain">
             {batchFiles.map(file => (
               <li key={file.id} className="flex min-h-[62px] items-center gap-3 border-b-[0.5px] border-[color:var(--sep)] px-[18px] py-[13px] last:border-0 max-md:px-3.5">
                 <IconDoc className="text-[var(--label-2)]" />

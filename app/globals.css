@@ -82,7 +82,9 @@ html.dark,
   html {
     background-color: var(--bg);
     color: var(--label);
+    height: 100%;
     min-height: 100%;
+    overflow: hidden;
     overscroll-behavior: none;
   }
 
@@ -91,8 +93,10 @@ html.dark,
     background-color: var(--bg);
     color: var(--label);
     font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Hiragino Sans", "PingFang SC", "Segoe UI", Roboto, "Noto Sans CJK SC", "Noto Sans JP", sans-serif;
+    height: 100%;
     min-height: 100vh;
     min-height: 100dvh;
+    overflow: hidden;
     overflow-x: hidden;
     overscroll-behavior: none;
     -webkit-font-smoothing: antialiased;

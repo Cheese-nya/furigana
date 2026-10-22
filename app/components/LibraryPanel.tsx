@@ -185,9 +185,7 @@ export function LibraryPanel({
   );
 
   return (
-    <section className="relative flex min-w-0 flex-1 flex-col pb-6">
-      <div className="scroll-edge sticky top-0 z-10 -mx-3 -mb-[76px] h-[76px] shrink-0" aria-hidden />
-
+    <section className="relative flex min-h-0 flex-1 flex-col">
       <input
         ref={fileRef}
         type="file"
@@ -201,7 +199,7 @@ export function LibraryPanel({
       />
 
       {/* Floating toolbar */}
-      <div className="pointer-events-none sticky top-[max(14px,env(safe-area-inset-top))] z-20 mb-3 flex items-center gap-2.5 [&>*]:pointer-events-auto">
+      <div className="pointer-events-none relative z-20 mb-3 flex items-center gap-2.5 [&>*]:pointer-events-auto">
         <label ref={searchRef} className="glass !hidden h-[42px] w-[230px] items-center gap-2 rounded-full px-3.5 text-[var(--label-2)] md:!flex">
           <IconSearch />
           <input
@@ -267,35 +265,37 @@ export function LibraryPanel({
         />
       </div>
 
-      {visible.length === 0 ? (
-        <div className="grid min-h-[60vh] place-items-center text-center text-[var(--label-2)]">
-          <div>
-            <IconBooks size={46} className="mx-auto text-[var(--label-3)]" />
-            <h3 className="mb-1.5 mt-3.5 text-xl font-semibold text-[var(--label)]">{books.length ? t.libraryFilteredEmptyTitle : t.libraryEmptyTitle}</h3>
-            <p className="mx-auto mb-[18px] max-w-[280px] text-sm leading-relaxed">{books.length ? t.libraryFilteredEmptyBody : t.libraryEmptyBody}</p>
-            {!books.length && (
-              <div className="flex justify-center gap-2">
-                <button type="button" className="btn btn-ink" onClick={() => fileRef.current?.click()}><IconImport size={17} />{t.libraryImportBook}</button>
-                <button type="button" className="btn" onClick={() => setPixivOpen(true)}><IconLink size={17} />{t.libPixivImportBtn}</button>
-              </div>
-            )}
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain -mx-1 px-1">
+        {visible.length === 0 ? (
+          <div className="grid min-h-full place-items-center text-center text-[var(--label-2)]">
+            <div>
+              <IconBooks size={46} className="mx-auto text-[var(--label-3)]" />
+              <h3 className="mb-1.5 mt-3.5 text-xl font-semibold text-[var(--label)]">{books.length ? t.libraryFilteredEmptyTitle : t.libraryEmptyTitle}</h3>
+              <p className="mx-auto mb-[18px] max-w-[280px] text-sm leading-relaxed">{books.length ? t.libraryFilteredEmptyBody : t.libraryEmptyBody}</p>
+              {!books.length && (
+                <div className="flex justify-center gap-2">
+                  <button type="button" className="btn btn-ink" onClick={() => fileRef.current?.click()}><IconImport size={17} />{t.libraryImportBook}</button>
+                  <button type="button" className="btn" onClick={() => setPixivOpen(true)}><IconLink size={17} />{t.libPixivImportBtn}</button>
+                </div>
+              )}
+            </div>
           </div>
-        </div>
-      ) : (
-        <div data-testid="apple-books-shelf" className="grid grid-cols-2 gap-x-4 gap-y-[22px] px-1 pb-8 pt-1.5 sm:grid-cols-3 md:grid-cols-4 md:gap-x-5 md:gap-y-[26px] lg:grid-cols-5 xl:grid-cols-6">
-          {visible.map(book => (
-            <BookCover
-              key={book.bookId}
-              book={book}
-              t={t}
-              categoryText={categoryLabel[book.category]}
-              lifted={menu?.book.bookId === book.bookId}
-              onOpen={() => onOpenInReader(book)}
-              onMenu={point => setMenu({ book, point })}
-            />
-          ))}
-        </div>
-      )}
+        ) : (
+          <div data-testid="apple-books-shelf" className="grid grid-cols-2 gap-x-4 gap-y-[22px] px-1 pb-8 pt-1.5 sm:grid-cols-3 md:grid-cols-4 md:gap-x-5 md:gap-y-[26px] lg:grid-cols-5 xl:grid-cols-6">
+            {visible.map(book => (
+              <BookCover
+                key={book.bookId}
+                book={book}
+                t={t}
+                categoryText={categoryLabel[book.category]}
+                lifted={menu?.book.bookId === book.bookId}
+                onOpen={() => onOpenInReader(book)}
+                onMenu={point => setMenu({ book, point })}
+              />
+            ))}
+          </div>
+        )}
+      </div>
 
       <GlassPopover open={sortOpen !== null} onClose={() => setSortOpen(null)} anchor={sortOpen === 'phone' ? phoneSortAnchor : sortAnchor} ariaLabel={t.librarySortLabel}>
         {sortMenu}
