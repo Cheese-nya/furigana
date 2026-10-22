@@ -61,7 +61,7 @@ test('默认正文字体为ゴシック体（sans）', () => {
 
 test('排版设置持久化于 furigana_reader_prefs_v2', () => {
   assert.match(source, /const PREFS_KEY = 'furigana_reader_prefs_v2';/);
-  assert.match(source, /window\.localStorage\.setItem\(PREFS_KEY[\s\S]*writingMode/);
+  assert.match(source, /window\.localStorage\.setItem\(\s*PREFS_KEY[\s\S]*writingMode/);
 });
 
 test('支持 writingMode horizontal / vertical 切换', () => {
@@ -81,8 +81,8 @@ test('竖向排版应用 vertical-script-flow 与 data-writing-mode', () => {
   assert.match(source, /height: 'calc\(100vh - 180px\)'/);
 });
 
-test('横向排版使用加宽画布 max-w-5xl xl:max-w-6xl', () => {
-  assert.match(source, /mx-auto max-w-5xl xl:max-w-6xl px-5 sm:px-10 md:px-14 py-8/);
+test('横向排版使用 34em 阅读栏宽', () => {
+  assert.match(source, /max-w-\[34em\]/);
 });
 
 test('交互词组使用 ruby-interactive-token 柔和暖黄辉光', () => {
@@ -121,9 +121,8 @@ test('ReaderPanel Aa 外观面板支持手机端底部浮层与桌面端弹出�
     fileURLToPath(new URL('../app/components/RubyCorrectionModal.tsx', import.meta.url)),
     'utf8',
   );
-  assert.ok(source.includes('DRAWER_GLASS_CLASS'), 'ReaderPanel must define DRAWER_GLASS_CLASS');
+  assert.ok(source.includes('<GlassPopover'), 'ReaderPanel Aa panel must be a glass popover');
   assert.ok(source.includes('CANVAS_PAPER_CLASS'), 'ReaderPanel must define CANVAS_PAPER_CLASS');
-  assert.ok(source.includes('max-sm:fixed'), 'ReaderPanel Aa drawer must anchor as bottom sheet on mobile');
 
   assert.ok(rubyModalSource.includes('liquid-glass-btn'), 'RubyCorrectionModal must use liquid-glass-btn');
   assert.ok(rubyModalSource.includes('liquid-glass-inset'), 'RubyCorrectionModal must use liquid-glass-inset');
@@ -131,22 +130,19 @@ test('ReaderPanel Aa 外观面板支持手机端底部浮层与桌面端弹出�
   assert.deepEqual(emojis, [], `RubyCorrectionModal 发现 Emoji: ${emojis.join(' ')}`);
 });
 
-test('顶部导航栏与阅读器顶栏不跟随页面滚动（移除 sticky 定位）', () => {
-  const pageSource = readPageSplitSource();
-  assert.equal(pageSource.includes('sticky top-'), false, 'app/page.tsx top header must not use sticky top-');
-  assert.equal(source.includes('sticky top-0'), false, 'ReaderPanel header must not use sticky top-0');
+test('阅读器没有吸顶顶栏（沉浸式）', () => {
+  assert.equal(source.includes('sticky top-0'), false, 'ReaderPanel must not have a sticky top header');
 });
 
-test('阅读器支持沉浸式全屏与单击屏幕呼出四角交互按钮 HUD', () => {
+test('阅读器：底部玻璃胶囊下滑隐藏、上滑/点按出现，隐藏时显示底部进度线', () => {
   assert.ok(source.includes('data-testid="reader-fullscreen-btn"'), 'reader-fullscreen-btn required');
   assert.ok(source.includes('data-testid="reader-exit-fullscreen-btn"'), 'reader-exit-fullscreen-btn required');
-  assert.ok(source.includes('data-testid="reader-fullscreen-hud"'), 'reader-fullscreen-hud required');
-  assert.ok(source.includes('data-testid="reader-corner-top-left"'), 'reader-corner-top-left required');
-  assert.ok(source.includes('data-testid="reader-corner-top-right"'), 'reader-corner-top-right required');
-  assert.ok(source.includes('data-testid="reader-corner-bottom-left"'), 'reader-corner-bottom-left required');
-  assert.ok(source.includes('data-testid="reader-corner-bottom-right"'), 'reader-corner-bottom-right required');
-  assert.ok(source.includes('handleCanvasClick'), 'handleCanvasClick single-click handler required');
-  assert.ok(source.includes('setHudVisible(prev => !prev)'), 'single-click must toggle 4-corner HUD visibility');
+  assert.equal(source.includes('reader-corner-top-left'), false, 'four-corner HUD must be gone');
+  assert.ok(source.includes('handleCanvasClick'), 'tap handler required');
+  assert.ok(source.includes('setHudVisible(prev => !prev)'), 'tap toggles the capsule');
+  assert.ok(/travel\s*>\s*24/.test(source) && /travel\s*<\s*-12/.test(source), 'hide/show by distance travelled in one direction');
+  assert.ok(source.includes('bottom-1 left-[22px] right-[22px]'), 'bottom progress line required');
+  assert.ok(source.includes('useGlass'), 'capsule uses the refracting glass material');
 });
 
 test('阅读器内对待复核假名不进行标黄和虚线装饰', () => {

@@ -173,6 +173,7 @@ html[data-refract="on"] .glass.glass-prominent { background: var(--prominent); c
   border-radius: 999px;
   background: transparent;
   color: var(--label);
+  font-size: 14px;
   font-weight: 500;
   white-space: nowrap;
   cursor: pointer;
@@ -268,7 +269,7 @@ html[data-refract="on"] .gbtn.gbtn-prominent:hover:not(:disabled) { background: 
 .sel.moving .sel-ind { scale: 1.03 1.05; }
 
 .seg { padding: 3px; border-radius: 999px; }
-.seg > [data-opt] { height: 30px; padding: 0 13px; border-radius: 999px; font-weight: 500; color: var(--label-2); white-space: nowrap; transition: color 200ms; }
+.seg > [data-opt] { height: 30px; padding: 0 13px; border-radius: 999px; font-size: 14px; font-weight: 500; color: var(--label-2); white-space: nowrap; transition: color 200ms; }
 .seg > [data-opt][aria-selected="true"] { color: var(--label); font-weight: 600; }
 .seg.seg-solid { background: var(--fill); }
 .seg.seg-solid .sel-ind { background: var(--seg-solid-ind); box-shadow: 0 3px 8px rgba(0, 0, 0, 0.10), 0 0 0 0.5px rgba(0, 0, 0, 0.04); }
