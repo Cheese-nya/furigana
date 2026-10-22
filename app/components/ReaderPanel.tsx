@@ -339,7 +339,7 @@ export function ReaderPanel({
     win.webkit?.messageHandlers?.furiganaTheme?.postMessage?.({ bg: canvasBackground, isDark: isReaderDark });
     win.AndroidBridge?.syncTheme?.(canvasBackground, isReaderDark);
     return () => {
-      const restoreBg = darkMode ? '#0b0d13' : '#eef2f9';
+      const restoreBg = darkMode ? '#000000' : '#F2F2F7';
       root.style.setProperty('--bg-primary', restoreBg);
       root.style.backgroundColor = restoreBg;
       body.style.backgroundColor = restoreBg;

@@ -30,7 +30,7 @@ private final class FuriganaThemeMessageHandler: NSObject, WKScriptMessageHandle
 
     func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
         guard let body = message.body as? [String: Any] else { return }
-        let bgHex = (body["bg"] as? String) ?? "#eef2f9"
+        let bgHex = (body["bg"] as? String) ?? "#F2F2F7"
         let isDark = (body["isDark"] as? Bool) ?? false
         DispatchQueue.main.async { [weak self] in
             self?.controller?.applyCanvasTheme(bgHex: bgHex, isDark: isDark)
@@ -114,7 +114,7 @@ class FuriganaBridgeViewController: CAPBridgeViewController {
         let earlyThemeSyncScript = """
         try {
             var isDark = localStorage.getItem('furigana_dark_mode') === '1';
-            var bg = isDark ? '#0b0d13' : '#eef2f9';
+            var bg = isDark ? '#000000' : '#F2F2F7';
             document.documentElement.classList.toggle('dark', isDark);
             document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
             document.documentElement.style.setProperty('--bg-primary', bg);

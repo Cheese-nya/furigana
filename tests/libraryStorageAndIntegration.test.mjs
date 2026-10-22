@@ -148,17 +148,15 @@ test('manifest.json declares standalone display, relative start_url and valid ic
   assert.ok(manifest.icons.some(icon => parseInt(icon.sizes, 10) >= 192), 'manifest must include a 192px+ icon');
 });
 
-test('Navbar and Sidebar quick links are square anchors with safe rel attributes', () => {
+test('Settings menu quick links are square anchors with safe rel attributes', () => {
   const pagePath = fileURLToPath(new URL('../app/page.tsx', import.meta.url));
-  const appHeaderPath = fileURLToPath(new URL('../app/components/AppHeader.tsx', import.meta.url));
-  const sidebarPath = fileURLToPath(new URL('../app/components/Sidebar.tsx', import.meta.url));
-  const pageSrc = `${readFileSync(pagePath, 'utf8')}\n${readFileSync(appHeaderPath, 'utf8')}`;
-  const sidebarSrc = readFileSync(sidebarPath, 'utf8');
+  const settingsPath = fileURLToPath(new URL('../app/components/SettingsMenu.tsx', import.meta.url));
+  const pageSrc = `${readFileSync(pagePath, 'utf8')}\n${readFileSync(settingsPath, 'utf8')}`;
 
   const anchorPattern = /<a\s+href="https:\/\/x\.com\/beimisama"([\s\S]*?)<\/a>/g;
   const githubPattern = /<a\s+href="https:\/\/github\.com\/Cheese-nya\/furigana"([\s\S]*?)<\/a>/g;
 
-  for (const [name, source] of [['app/page.tsx', pageSrc], ['app/components/Sidebar.tsx', sidebarSrc]]) {
+  for (const [name, source] of [['app/components/SettingsMenu.tsx', pageSrc]]) {
     for (const [pattern, url] of [[anchorPattern, 'https://x.com/beimisama'], [githubPattern, 'https://github.com/Cheese-nya/furigana']]) {
       const matches = [...source.matchAll(pattern)];
       assert.ok(matches.length > 0, `${name} must render an anchor to ${url}`);

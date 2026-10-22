@@ -94,7 +94,7 @@ const pageSource = `${readFileSync(
   fileURLToPath(new URL('../app/page.tsx', import.meta.url)),
   'utf8',
 )}\n${readFileSync(
-  fileURLToPath(new URL('../app/components/AppHeader.tsx', import.meta.url)),
+  fileURLToPath(new URL('../app/components/SettingsMenu.tsx', import.meta.url)),
   'utf8',
 )}`;
 
@@ -112,11 +112,10 @@ test('台本库渲染 Pixiv URL 导入控件、封面艺术画与故事简介', 
   assert.ok(source.includes('data-testid="book-cover-description"'), 'book-cover-description required');
 });
 
-test('页面包含深色模式切换按钮与 ASCII 日月斜杠图标 (☼ / ☾)', () => {
-  assert.ok(pageSource.includes('data-testid="dark-mode-toggle"'), 'dark-mode-toggle required');
-  assert.ok(pageSource.includes('☼'), 'Sun glyph ☼ required');
-  assert.ok(pageSource.includes('/'), 'Slash / required');
-  assert.ok(pageSource.includes('☾'), 'Moon glyph ☾ required');
+test('设置菜单包含浅色/深色外观切换（日月图标）', () => {
+  assert.ok(pageSource.includes('testId="dark-mode-toggle"'), 'dark-mode-toggle required');
+  assert.ok(pageSource.includes('<IconSun'), 'sun icon required');
+  assert.ok(pageSource.includes('<IconMoon'), 'moon icon required');
 });
 
 const cssSource = readFileSync(
@@ -160,8 +159,8 @@ test('移动端与桌面端自适应 iOS 26 液态玻璃导航与 Bottom Sheet �
   );
 
   assert.ok(mobileNavSource.includes('data-testid="mobile-nav-bar"'), 'MobileNavBar must include mobile-nav-bar testid');
-  assert.ok(mobileNavSource.includes('liquid-glass-nav'), 'MobileNavBar must use liquid-glass-nav');
-  assert.ok(mobileNavSource.includes('rounded-[28px]'), 'MobileNavBar must be a floating pill capsule');
+  assert.ok(mobileNavSource.includes('className="glass'), 'MobileNavBar must use the glass material');
+  assert.ok(mobileNavSource.includes('rounded-full'), 'MobileNavBar must be a floating pill capsule');
   assert.ok(mobileNavSource.includes('safe-area-inset-bottom'), 'MobileNavBar must respect safe-area-inset-bottom');
 
   assert.ok(modalSource.includes('max-sm:rounded-t-[32px]'), 'Modal must render as bottom sheet on mobile screens');
@@ -214,8 +213,7 @@ test('dark mode adapts book covers, removes white top borders, and eliminates ov
     /dark:shadow-\[inset_0_1px_2px_rgba\(0,0,0,0\.45\)\]/,
     'LibraryPanel.tsx should override bright white inset shadows on top search/control boxes in dark mode',
   );
-  assert.match(globalsSource, /overscroll-behavior-y:\s*none/, 'globals.css should prevent vertical rubber-band white edge exposure');
-  assert.match(globalsSource, /body::before/, 'globals.css should render ambient background on fixed body::before layer');
+  assert.match(globalsSource, /overscroll-behavior:\s*none/, 'globals.css should prevent rubber-band white edge exposure');
   assert.doesNotMatch(
     layoutSource,
     /<body[^>]*bg-zinc-50/,

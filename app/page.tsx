@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Sidebar } from './components/Sidebar';
-import AppHeader from './components/AppHeader';
+import { SettingsMenu } from './components/SettingsMenu';
 import { MobileNavBar, type AppTab } from './components/MobileNavBar';
 import { LibraryPanel } from './components/LibraryPanel';
 import { ReaderPanel } from './components/ReaderPanel';
@@ -14,7 +14,6 @@ import { LearnedReadingsModal } from './components/LearnedReadingsModal';
 import { RubyCorrectionModal, type EditingTokenState } from './components/RubyCorrectionModal';
 import { BatchProcessingPanel } from './components/BatchProcessingPanel';
 import { EditorWorkspace } from './components/EditorWorkspace';
-import { buildSidebarItems } from './components/sidebarNavItems';
 import type { ScriptLine } from './utils/furigana';
 import { useFuriganaWorker } from './hooks/useFuriganaWorker';
 import { useThemeMode } from './hooks/useThemeMode';
@@ -36,7 +35,7 @@ import { translations, type Locale } from './utils/i18n';
 export default function DubbingStudioApp() {
   // Locale & Theme State
   const [locale, setLocale] = useState<Locale>('zh-CN');
-  const { darkMode, toggleDarkMode: handleToggleDarkMode } = useThemeMode();
+  const { darkMode, setDarkMode } = useThemeMode();
 
   useEffect(() => {
     try {
@@ -59,7 +58,6 @@ export default function DubbingStudioApp() {
   const t = translations[locale];
 
   // Navigation & UI states
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isDepModalOpen, setIsDepModalOpen] = useState(false);
   const [isGlossaryOpen, setIsGlossaryOpen] = useState(false);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
@@ -87,7 +85,7 @@ export default function DubbingStudioApp() {
   const [fontSize, setFontSize] = useState<number>(16); // 默认小四 (16px)
   const [rubyFontSize, setRubyFontSize] = useState<number>(10); // 假名字号 (10px)
   const [lineSpacing, setLineSpacing] = useState<number>(1.8);  // 行距 (1.8x)
-  const [rubyColor, setRubyColor] = useState<string>('#4f46e5'); // 振假名颜色
+  const [rubyColor, setRubyColor] = useState<string>('#8a8a8e'); // 振假名颜色（中性灰）
   const [previewWritingMode, setPreviewWritingMode] = useState<'horizontal' | 'vertical'>('horizontal');
   const [mobileEditorPane, setMobileEditorPane] = useState<'split' | 'input' | 'preview'>('split');
   const [previewFontFamily, setPreviewFontFamily] = useState<'sans' | 'serif'>('sans');
@@ -476,44 +474,40 @@ export default function DubbingStudioApp() {
   };
 
   // Sidebar navigation items
-  const sidebarItems = buildSidebarItems(t, activeTab, handleSelectTab, setIsDepModalOpen);
+  const renderSettings = (anchor: HTMLElement | null, open: boolean, close: () => void) => (
+    <SettingsMenu
+      open={open}
+      onClose={close}
+      anchor={anchor}
+      locale={locale}
+      onLocaleChange={handleLocaleChange}
+      darkMode={darkMode}
+      onDarkModeChange={setDarkMode}
+      dictionaryStatus={dictionaryStatus}
+      dictionaryLabel={dictionaryLabel}
+      onOpenDepModal={() => setIsDepModalOpen(true)}
+      onReloadDict={runDependencyRepair}
+      t={t}
+    />
+  );
 
   return (
-    <main className="relative min-h-screen text-slate-900 dark:text-slate-100 pb-28 md:pb-12 [@media(max-height:520px)_and_(orientation:landscape)]:pb-20 transition-colors">
+    <main className="relative min-h-screen text-[var(--label)] pb-28 md:pb-12 [@media(max-height:520px)_and_(orientation:landscape)]:pb-20 transition-colors">
       {libraryToast && (
         <div role="status" className="fixed left-1/2 top-4 z-50 -translate-x-1/2 rounded-full bg-slate-900/90 dark:bg-slate-800/95 backdrop-blur-xl px-4 py-2 text-xs font-medium text-white shadow-[0_12px_30px_-8px_rgba(15,23,42,0.35)] border border-white/20">
           {libraryToast}
         </div>
       )}
-      {/* Sidebar Component */}
       <Sidebar
-        isOpen={isSidebarOpen}
-        onToggle={() => setIsSidebarOpen(!isSidebarOpen)}
-        items={sidebarItems}
-        title={t.sidebarTitle}
-        locale={locale}
-        onLocaleChange={handleLocaleChange}
+        activeTab={activeTab}
+        onSelectTab={handleSelectTab}
+        libraryBookCount={libraryBookCount}
+        batchCount={batchFiles.length}
+        renderSettings={renderSettings}
         t={t}
       />
 
-      <div className="min-h-screen flex flex-col max-w-7xl mx-auto px-3 sm:px-4 md:px-6 pt-[max(0.75rem,env(safe-area-inset-top))] sm:pt-[max(1rem,env(safe-area-inset-top))]">
-        {/* Top Liquid Glass Navigation Header (non-sticky per user preference) */}
-        <AppHeader
-          activeTab={activeTab}
-          onSelectTab={handleSelectTab}
-          locale={locale}
-          onLocaleChange={handleLocaleChange}
-          darkMode={darkMode}
-          onToggleDarkMode={handleToggleDarkMode}
-          dictionaryStatus={dictionaryStatus}
-          dictionaryLabel={dictionaryLabel}
-          isKuromojiLoading={isKuromojiLoading}
-          onOpenDepModal={() => setIsDepModalOpen(true)}
-          onReloadDict={runDependencyRepair}
-          libraryBookCount={libraryBookCount}
-          t={t}
-        />
-
+      <div className="min-h-screen flex flex-col max-w-7xl mx-auto px-3 sm:px-4 md:pl-[244px] md:pr-5 pt-[max(0.75rem,env(safe-area-inset-top))] sm:pt-[max(1rem,env(safe-area-inset-top))] md:pt-[max(10px,env(safe-area-inset-top))]">
         {/* PAGE VIEW 1: EDITOR PAGE */}
         {activeTab === 'editor' && (
           <EditorWorkspace
@@ -684,6 +678,7 @@ export default function DubbingStudioApp() {
         activeTab={activeTab}
         onChange={handleSelectTab}
         bookCount={Object.keys(libraryDb.books).length}
+        renderSettings={renderSettings}
         t={t}
       />
     </main>

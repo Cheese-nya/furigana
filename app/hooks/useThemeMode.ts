@@ -3,8 +3,8 @@
 import { useCallback, useEffect, useSyncExternalStore } from 'react';
 
 export const THEME_STORAGE_KEY = 'furigana_dark_mode';
-export const DARK_THEME_BG = '#0b0d13';
-export const LIGHT_THEME_BG = '#eef2f9';
+export const DARK_THEME_BG = '#000000';
+export const LIGHT_THEME_BG = '#F2F2F7';
 
 interface NativeThemeWindow {
   webkit?: {

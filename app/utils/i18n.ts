@@ -305,6 +305,11 @@ export interface Translations {
 
   // Dark mode
   navDarkModeToggle: string;
+  settingsTitle: string;
+  appearanceLabel: string;
+  themeLight: string;
+  themeDark: string;
+  dictDiagnose: string;
 
   // Pixiv Import
   libPixivImportBtn: string;
@@ -637,6 +642,11 @@ export const translations: Record<Locale, Translations> = {
 
     // Dark mode
     navDarkModeToggle: '切换日间/黑夜模式',
+    settingsTitle: '设置',
+    appearanceLabel: '外观',
+    themeLight: '浅色',
+    themeDark: '深色',
+    dictDiagnose: '诊断',
 
     // Pixiv Import
     libPixivImportBtn: 'Pixiv 导入',
@@ -965,6 +975,11 @@ export const translations: Record<Locale, Translations> = {
 
     // Dark mode
     navDarkModeToggle: 'Toggle Light/Dark Mode',
+    settingsTitle: 'Settings',
+    appearanceLabel: 'Appearance',
+    themeLight: 'Light',
+    themeDark: 'Dark',
+    dictDiagnose: 'Diagnose',
 
     // Pixiv Import
     libPixivImportBtn: 'Import Pixiv',

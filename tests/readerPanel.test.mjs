@@ -13,7 +13,7 @@ const source = readFileSync(
 const readPageSplitSource = () => [
   '../app/page.tsx',
   '../app/components/EditorWorkspace.tsx',
-  '../app/components/sidebarNavItems.tsx',
+  '../app/components/Sidebar.tsx',
   '../app/hooks/useLibraryController.ts',
   '../app/hooks/useBatchProcessing.ts',
 ].map(path => readFileSync(fileURLToPath(new URL(path, import.meta.url)), 'utf8')).join('\n');
@@ -133,12 +133,7 @@ test('ReaderPanel Aa 外观面板支持手机端底部浮层与桌面端弹出�
 
 test('顶部导航栏与阅读器顶栏不跟随页面滚动（移除 sticky 定位）', () => {
   const pageSource = readPageSplitSource();
-  const appHeaderSource = readFileSync(
-    fileURLToPath(new URL('../app/components/AppHeader.tsx', import.meta.url)),
-    'utf8',
-  );
   assert.equal(pageSource.includes('sticky top-'), false, 'app/page.tsx top header must not use sticky top-');
-  assert.equal(appHeaderSource.includes('sticky top-'), false, 'AppHeader.tsx top header must not use sticky top-');
   assert.equal(source.includes('sticky top-0'), false, 'ReaderPanel header must not use sticky top-0');
 });
 
@@ -185,11 +180,15 @@ test('v1.2.0 顶部栏重排、工作台三区均衡布局与可切换格式+独
     fileURLToPath(new URL('../app/page.tsx', import.meta.url)),
     'utf8',
   );
-  const appHeaderSource = readFileSync(
-    fileURLToPath(new URL('../app/components/AppHeader.tsx', import.meta.url)),
+  const sidebarSource = readFileSync(
+    fileURLToPath(new URL('../app/components/Sidebar.tsx', import.meta.url)),
     'utf8',
   );
-  const shellHeaderSource = `${pageSource}\n${appHeaderSource}`;
+  const settingsSource = readFileSync(
+    fileURLToPath(new URL('../app/components/SettingsMenu.tsx', import.meta.url)),
+    'utf8',
+  );
+  const shellHeaderSource = `${pageSource}\n${sidebarSource}\n${settingsSource}`;
   const mobileNavSource = readFileSync(
     fileURLToPath(new URL('../app/components/MobileNavBar.tsx', import.meta.url)),
     'utf8',
@@ -205,16 +204,12 @@ test('v1.2.0 顶部栏重排、工作台三区均衡布局与可切换格式+独
 
   // 1. Version v1.2.0 and brand title Furigana
   assert.equal(pkg.version, '1.2.0', 'package.json version must be 1.2.0');
-  assert.ok(pageSource.includes('<AppHeader'), 'page.tsx must render AppHeader');
+  assert.ok(pageSource.includes('<Sidebar'), 'page.tsx must render the glass Sidebar');
+  assert.ok(pageSource.includes('<SettingsMenu'), 'page.tsx must render SettingsMenu');
   assert.ok(shellHeaderSource.includes('data-testid="app-brand-title"'), 'app-brand-title required');
   assert.ok(shellHeaderSource.includes('data-testid="app-version-badge"'), 'app-version-badge required');
-  assert.ok(shellHeaderSource.includes('v1.2.0'), 'page.tsx / AppHeader.tsx must display v1.2.0');
-  const headerBlock = shellHeaderSource.slice(shellHeaderSource.indexOf('<header'), shellHeaderSource.indexOf('</header>'));
-  assert.equal(
-    headerBlock.includes('setIsSidebarOpen'),
-    false,
-    'mobile top-left hamburger button must be removed from header',
-  );
+  assert.ok(shellHeaderSource.includes('v1.2.0'), 'settings menu must display v1.2.0');
+  assert.equal(pageSource.includes('setIsSidebarOpen'), false, 'the hamburger drawer must be gone');
 
   // 2. Workbench 3-zone balanced layout & Export capsule with selectable format + standalone Export button
   const workbenchSource = readPageSplitSource();
@@ -223,10 +218,10 @@ test('v1.2.0 顶部栏重排、工作台三区均衡布局与可切换格式+独
   assert.ok(workbenchSource.includes('data-testid="workbench-export-submit-btn"'), 'standalone export button required');
   assert.ok(workbenchSource.includes('handleExport(exportFormat)'), 'standalone export button must trigger handleExport(exportFormat)');
 
-  // 3. Slimmer MobileNavBar dock with iOS 26 Liquid Glass
-  assert.ok(mobileNavSource.includes('min-h-[34px]'), 'MobileNavBar buttons must use slimmer min-h-[34px]');
-  assert.ok(mobileNavSource.includes('h-3.5 w-3.5'), 'MobileNavBar icons must use compact h-3.5 w-3.5');
-  assert.ok(mobileNavSource.includes('lg-container'), 'MobileNavBar must use lg-container');
+  // 3. Liquid Glass v2 tab bar: 52px glass capsule with a liquid selector
+  assert.ok(mobileNavSource.includes('h-[52px]'), 'MobileNavBar must be the 52px tab bar');
+  assert.ok(mobileNavSource.includes('className="glass'), 'MobileNavBar must use the glass material');
+  assert.ok(mobileNavSource.includes('<LiquidSelector'), 'MobileNavBar tabs must use LiquidSelector');
 
   // 4. iPhone portrait-only orientation lock
   const iphoneOrientationBlock = infoPlist.slice(
@@ -283,10 +278,10 @@ test('上下滑动到底防黑条：Web/iOS/Android 全链路同步画布底色�
   assert.equal(
     source.includes('previousRootBackground'),
     false,
-    'ReaderPanel must not restore stale previousRootBackground which leaves #0b0d13 black after theme switch',
+    'ReaderPanel must not restore stale previousRootBackground which leaves #000000 black after theme switch',
   );
   assert.ok(
-    source.includes("const restoreBg = darkMode ? '#0b0d13' : '#eef2f9'"),
+    source.includes("const restoreBg = darkMode ? '#000000' : '#F2F2F7'"),
     'ReaderPanel cleanup must restore background from current darkMode',
   );
   assert.ok(
@@ -296,14 +291,14 @@ test('上下滑动到底防黑条：Web/iOS/Android 全链路同步画布底色�
 
   // 2. iOS Capacitor configures backgroundColor & disables outer UIScrollView bounce and syncs furiganaTheme
   assert.ok(
-    capacitorConfigSource.includes("backgroundColor: '#eef2f9'"),
-    'capacitor.config.ts must set ios.backgroundColor to #eef2f9',
+    capacitorConfigSource.includes("backgroundColor: '#F2F2F7'"),
+    'capacitor.config.ts must set ios.backgroundColor to #F2F2F7',
   );
   if (iosCapConfig) {
     assert.equal(
       iosCapConfig.ios?.backgroundColor,
-      '#eef2f9',
-      'ios/App/App/capacitor.config.json must set ios.backgroundColor to #eef2f9 (re-run cap sync)',
+      '#F2F2F7',
+      'ios/App/App/capacitor.config.json must set ios.backgroundColor to #F2F2F7 (re-run cap sync)',
     );
   }
   assert.ok(
