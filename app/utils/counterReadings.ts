@@ -15,21 +15,27 @@ const COUNTERS: Record<string, Endings> = {
   '冊': ['じゅっさつ', 'いっさつ', 'にさつ', 'さんさつ', 'よんさつ', 'ごさつ', 'ろくさつ', 'ななさつ', 'はっさつ', 'きゅうさつ'],
   '階': ['じゅっかい', 'いっかい', 'にかい', 'さんがい', 'よんかい', 'ごかい', 'ろっかい', 'ななかい', 'はっかい', 'きゅうかい'],
   '分': ['じゅっぷん', 'いっぷん', 'にふん', 'さんぷん', 'よんぷん', 'ごふん', 'ろっぷん', 'ななふん', 'はっぷん', 'きゅうふん'],
-  '時': { 4: 'よじ', 9: 'くじ' },
+  '時': { 4: 'よじ', 7: 'しちじ', 9: 'くじ' },
+  '日': { 7: 'しちにち', 9: 'くにち' },
   '歳': { 0: 'じゅっさい', 1: 'いっさい', 8: 'はっさい' },
   '週間': { 1: 'いっしゅうかん' },
-  '軒': { 1: 'いっけん', 3: 'さんげん' },
-  '歩': { 1: 'いっぽ' },
+  '軒': { 1: 'いっけん', 3: 'さんげん', 8: 'はっけん' },
+  '歩': { 0: 'じゅっぽ', 1: 'いっぽ', 6: 'ろっぽ', 8: 'はっぽ' },
   '件': { 1: 'いっけん' },
-  '点': { 1: 'いってん' },
+  '点': { 0: 'じゅってん', 1: 'いってん' },
   '着': { 1: 'いっちゃく' },
   '通': { 1: 'いっつう' },
-  '頭': { 1: 'いっとう' },
+  '頭': { 0: 'じゅっとう', 1: 'いっとう', 8: 'はっとう' },
   '足': { 3: 'さんぞく' },
 };
 // Whole counts whose reading is not built from the digits.
 const FIXED_READINGS: Record<string, Readonly<Record<number, string>>> = {
   '歳': { 20: 'はたち' },
+  '通り': { 1: 'ひととおり', 2: 'ふたとおり' },
+  '月': {
+    1: 'いちがつ', 2: 'にがつ', 3: 'さんがつ', 4: 'しがつ', 5: 'ごがつ', 6: 'ろくがつ',
+    7: 'しちがつ', 8: 'はちがつ', 9: 'くがつ', 10: 'じゅうがつ', 11: 'じゅういちがつ', 12: 'じゅうにがつ',
+  },
   '日': {
     2: 'ふつか', 3: 'みっか', 4: 'よっか', 5: 'いつか', 6: 'むいか', 7: 'なのか', 8: 'ようか', 9: 'ここのか', 10: 'とおか',
     14: 'じゅうよっか', 20: 'はつか', 24: 'にじゅうよっか',
@@ -42,6 +48,7 @@ const AMBIGUOUS_READINGS: Record<string, Readonly<Record<number, readonly string
 // The dictionary fuses some counters with the following morpheme (四 + 時半, 三 + 日間).
 const FUSED_COUNTERS: Record<string, { counter: string; tail: string }> = {
   '時半': { counter: '時', tail: 'はん' },
+  '時間': { counter: '時', tail: 'かん' },
   '日間': { counter: '日', tail: 'かん' },
 };
 // Round hundreds geminate (ひゃっぽん) and round thousands take these endings (せんぼん);
@@ -134,12 +141,18 @@ export function findCounterCompound(tokens: KuromojiToken[], index: number): Cou
   }
   if (end === index || !tokens[end]) return null;
   const counter = tokens[end].surface_form;
-  // Check POS as well as surface: 本 can be a book noun outside a count.
-  if (tokens[end].pos_detail_1 !== '接尾') return null;
+  // Check POS as well as surface: 本 can be a book noun outside a count (月 is 名詞-一般).
+  if (tokens[end].pos_detail_1 !== '接尾' && counter !== '月') return null;
   const length = end - index + 1;
   const value = parseNumber(number);
   const choices = value === null ? undefined : AMBIGUOUS_READINGS[counter]?.[value];
-  if (choices) return { length, surface: number + counter, reading: choices[0], alternatives: [...choices] };
-  const reading = counterReading(number, counter);
-  return reading ? { length, surface: number + counter, reading } : null;
+  const reading = choices?.[0] ?? counterReading(number, counter);
+  if (!reading) return null;
+  if ((counter === '日' || counter === '時間' || counter === '週間') &&
+      tokens[end + 1]?.surface_form === '中' && tokens[end + 1].pos_detail_1 === '接尾') {
+    return { length: length + 1, surface: number + counter + '中', reading: reading + 'じゅう' };
+  }
+  return choices
+    ? { length, surface: number + counter, reading, alternatives: [...choices] }
+    : { length, surface: number + counter, reading };
 }

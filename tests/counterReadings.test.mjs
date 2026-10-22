@@ -34,29 +34,40 @@ test('unsupported larger or invalid numbers are left to the tokenizer', () => {
 
 test('partial counter rows fix only the readings the dictionary gets wrong', () => {
   for (const [number, counter, expected] of [
-    ['四', '時', 'よじ'], ['九', '時', 'くじ'], ['十四', '時', 'じゅうよじ'], ['二十四', '時', 'にじゅうよじ'], ['19', '時', 'じゅうくじ'],
+    ['四', '時', 'よじ'], ['七', '時', 'しちじ'], ['九', '時', 'くじ'],
+    ['十四', '時', 'じゅうよじ'], ['十七', '時', 'じゅうしちじ'], ['二十四', '時', 'にじゅうよじ'], ['19', '時', 'じゅうくじ'],
     ['四', '時半', 'よじはん'], ['九', '時半', 'くじはん'],
+    ['四', '時間', 'よじかん'], ['七', '時間', 'しちじかん'], ['九', '時間', 'くじかん'],
     ['一', '歳', 'いっさい'], ['八', '歳', 'はっさい'], ['十', '歳', 'じゅっさい'], ['二十', '歳', 'はたち'], ['20', '歳', 'はたち'],
     ['二十一', '歳', 'にじゅういっさい'], ['十八', '歳', 'じゅうはっさい'], ['三十', '歳', 'さんじゅっさい'],
     ['二', '日', 'ふつか'], ['三', '日', 'みっか'], ['四', '日', 'よっか'], ['五', '日', 'いつか'], ['六', '日', 'むいか'],
     ['七', '日', 'なのか'], ['八', '日', 'ようか'], ['九', '日', 'ここのか'], ['十', '日', 'とおか'],
-    ['十四', '日', 'じゅうよっか'], ['二十', '日', 'はつか'], ['二十四', '日', 'にじゅうよっか'], ['４', '日', 'よっか'],
+    ['十四', '日', 'じゅうよっか'], ['十七', '日', 'じゅうしちにち'], ['十九', '日', 'じゅうくにち'],
+    ['二十', '日', 'はつか'], ['二十四', '日', 'にじゅうよっか'], ['４', '日', 'よっか'],
     ['三', '日間', 'みっかかん'], ['十', '日間', 'とおかかん'],
-    ['一', '週間', 'いっしゅうかん'], ['一', '軒', 'いっけん'], ['一', '歩', 'いっぽ'], ['一', '件', 'いっけん'],
-    ['一', '点', 'いってん'], ['一', '着', 'いっちゃく'], ['一', '通', 'いっつう'], ['一', '頭', 'いっとう'],
+    ['一', '通り', 'ひととおり'], ['二', '通り', 'ふたとおり'],
+    ['1', '月', 'いちがつ'], ['2', '月', 'にがつ'], ['3', '月', 'さんがつ'], ['4', '月', 'しがつ'],
+    ['5', '月', 'ごがつ'], ['6', '月', 'ろくがつ'], ['7', '月', 'しちがつ'], ['8', '月', 'はちがつ'],
+    ['9', '月', 'くがつ'], ['10', '月', 'じゅうがつ'], ['11', '月', 'じゅういちがつ'], ['12', '月', 'じゅうにがつ'],
+    ['一', '週間', 'いっしゅうかん'], ['一', '軒', 'いっけん'], ['八', '軒', 'はっけん'],
+    ['一', '歩', 'いっぽ'], ['六', '歩', 'ろっぽ'], ['八', '歩', 'はっぽ'], ['十', '歩', 'じゅっぽ'],
+    ['一', '件', 'いっけん'], ['一', '点', 'いってん'], ['十', '点', 'じゅってん'],
+    ['一', '着', 'いっちゃく'], ['一', '通', 'いっつう'],
+    ['一', '頭', 'いっとう'], ['八', '頭', 'はっとう'], ['十', '頭', 'じゅっとう'],
     ['十一', '軒', 'じゅういっけん'], ['二十一', '点', 'にじゅういってん'], ['百一', '歩', 'ひゃくいっぽ'],
     ['三', '軒', 'さんげん'], ['三', '足', 'さんぞく'],
   ]) assert.equal(counterReading(number, counter), expected, number + counter);
   // Digits outside a partial row, the other days of the month, and round hundreds stay with the dictionary.
   for (const [number, counter] of [
-    ['七', '時'], ['十', '時'], ['三', '歳'], ['百', '歳'], ['十一', '日'], ['三十', '日'], ['百十四', '日'],
-    ['一', '日間'], ['六', '軒'], ['十', '点'], ['一', '足'], ['百', '軒'], ['千', '歩'],
+    ['十', '時'], ['二', '時間'], ['三', '歳'], ['百', '歳'], ['十一', '日'], ['三十', '日'], ['百十四', '日'],
+    ['一', '日間'], ['13', '月'], ['六', '軒'], ['一', '足'], ['百', '軒'], ['千', '歩'],
   ]) assert.equal(counterReading(number, counter), null, number + counter);
 });
 
 test('counts with two common readings keep the dictionary reading and offer the other', () => {
   const numeric = surface_form => ({ surface_form, pos_detail_1: '数' });
   const suffix = surface_form => ({ surface_form, pos_detail_1: '接尾' });
+  const noun = surface_form => ({ surface_form, pos_detail_1: '一般' });
   for (const number of ['一', '1', '１']) {
     assert.deepEqual(findCounterCompound([numeric(number), suffix('日')], 0),
       { length: 2, surface: `${number}日`, reading: 'いちにち', alternatives: ['いちにち', 'ついたち'] });
@@ -66,6 +77,16 @@ test('counts with two common readings keep the dictionary reading and offer the 
   assert.equal(findCounterCompound([numeric('十'), numeric('一'), suffix('日')], 1), null);
   assert.equal(findCounterCompound([numeric('一'), suffix('日間')], 0), null);
   assert.deepEqual(findCounterCompound([numeric('二'), suffix('日')], 0), { length: 2, surface: '二日', reading: 'ふつか' });
+  // Months accept 名詞-一般 for 月 only in 1..12.
+  assert.deepEqual(findCounterCompound([numeric('3'), noun('月')], 0), { length: 2, surface: '3月', reading: 'さんがつ' });
+  assert.equal(findCounterCompound([numeric('13'), noun('月')], 0), null);
+  // Trailing 中 extends 日, 時間, and 週間 compounds and resolves 一日 ambiguity.
+  assert.deepEqual(findCounterCompound([numeric('一'), suffix('日'), suffix('中')], 0),
+    { length: 3, surface: '一日中', reading: 'いちにちじゅう' });
+  assert.deepEqual(findCounterCompound([numeric('四'), suffix('時間'), suffix('中')], 0),
+    { length: 3, surface: '四時間中', reading: 'よじかんじゅう' });
+  assert.deepEqual(findCounterCompound([numeric('一'), suffix('週間'), suffix('中')], 0),
+    { length: 3, surface: '一週間中', reading: 'いっしゅうかんじゅう' });
 });
 
 test('何 follows the 三 form only where that form is known', () => {
