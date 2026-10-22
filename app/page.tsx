@@ -503,11 +503,12 @@ export default function DubbingStudioApp() {
         onSelectTab={handleSelectTab}
         libraryBookCount={libraryBookCount}
         batchCount={batchFiles.length}
+        hidden={activeTab === 'reader'}
         renderSettings={renderSettings}
         t={t}
       />
 
-      <div className="min-h-screen flex flex-col max-w-7xl mx-auto px-3 sm:px-4 md:pl-[244px] md:pr-5 pt-[max(0.75rem,env(safe-area-inset-top))] sm:pt-[max(1rem,env(safe-area-inset-top))] md:pt-[max(10px,env(safe-area-inset-top))]">
+      <div className={`min-h-screen flex flex-col max-w-7xl mx-auto px-3 sm:px-4 pt-[max(0.75rem,env(safe-area-inset-top))] sm:pt-[max(1rem,env(safe-area-inset-top))] md:pt-[max(10px,env(safe-area-inset-top))] transition-[padding] duration-[620ms] [transition-timing-function:var(--spring-smooth)] ${activeTab === 'reader' ? 'md:px-6' : 'md:pl-[244px] md:pr-5'}`}>
         {/* PAGE VIEW 1: EDITOR PAGE */}
         {activeTab === 'editor' && (
           <EditorWorkspace
@@ -678,6 +679,7 @@ export default function DubbingStudioApp() {
         activeTab={activeTab}
         onChange={handleSelectTab}
         bookCount={Object.keys(libraryDb.books).length}
+        hidden={activeTab === 'reader'}
         renderSettings={renderSettings}
         t={t}
       />
