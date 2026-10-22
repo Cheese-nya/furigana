@@ -26,7 +26,10 @@ let memoryFallbackMode: ThemeMode | null = null;
 const SYSTEM_DARK_QUERY = '(prefers-color-scheme: dark)';
 
 function systemPrefersDark(): boolean {
-  return typeof window !== 'undefined' && !!window.matchMedia?.(SYSTEM_DARK_QUERY).matches;
+  if (typeof window === 'undefined') return false;
+  const nativeDark = (window as unknown as { __furiganaSystemDark?: unknown }).__furiganaSystemDark;
+  if (typeof nativeDark === 'boolean') return nativeDark;
+  return !!window.matchMedia?.(SYSTEM_DARK_QUERY).matches;
 }
 
 function emitChange(): void {
@@ -49,10 +52,12 @@ function subscribe(listener: () => void): () => void {
   // 'auto' follows the system appearance live.
   const media = window.matchMedia?.(SYSTEM_DARK_QUERY);
   media?.addEventListener?.('change', listener);
+  window.addEventListener('furigana-system-theme', listener);
   return () => {
     listeners.delete(listener);
     window.removeEventListener('storage', handleStorage);
     media?.removeEventListener?.('change', listener);
+    window.removeEventListener('furigana-system-theme', listener);
   };
 }
 
