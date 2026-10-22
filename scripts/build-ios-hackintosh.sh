@@ -68,6 +68,8 @@ rsync -az --delete \
 if [[ -d "$ROOT_DIR/ios/App/App" ]]; then
   ssh "$REMOTE_HOST" "mkdir -p $REMOTE_DIR/ios/App/App"
   rsync -az --exclude 'public' "$ROOT_DIR/ios/App/App/" "$REMOTE_HOST:$REMOTE_DIR/ios/App/App/"
+  # Version and build settings live in the project file, not under ios/App/App.
+  rsync -az "$ROOT_DIR/ios/App/App.xcodeproj/project.pbxproj" "$REMOTE_HOST:$REMOTE_DIR/ios/App/App.xcodeproj/"
 fi
 
 echo "=================================================================="
