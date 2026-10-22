@@ -13,6 +13,9 @@ jobs:
   release:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    # Signing secrets live in this environment, which requires a manual approval and
+    # only accepts v* tags (configure both under Settings → Environments → release).
+    environment: release
     env:
       # Optional. Without them the release still ships the web bundle, just no APK.
       HAVE_ANDROID_KEY: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' && secrets.ANDROID_KEYSTORE_PASSWORD != '' }}

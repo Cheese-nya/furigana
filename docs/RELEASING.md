@@ -31,16 +31,19 @@ https://github.com/Cheese-nya/uku-furigana/releases/latest/download/<文件名>
 
 ## 让 Actions 签名 APK（可选）
 
-不配置也能发布，只是 Release 里没有 APK。要配置，在仓库 Settings → Secrets and variables → Actions 添加：
+不配置也能发布，只是 Release 里没有 APK。发布任务运行在名为 `release` 的 Environment 里，签名用的 Secret 也放在这个环境中（而不是仓库级别）。
 
-| Secret | 内容 |
-| :--- | :--- |
-| `ANDROID_KEYSTORE_BASE64` | 正式密钥的 base64：`base64 -w0 ~/keys/uku-release.jks` |
-| `ANDROID_KEYSTORE_PASSWORD` | 密钥库密码（别名固定为 `uku`） |
+1. 仓库 Settings → Environments → New environment，名字填 `release`：
+   - 勾选 **Required reviewers**，选自己：每次发布都要手动批准，工作流才能读取密钥。
+   - **Deployment branches and tags** 选 *Selected branches and tags*，只允许 `v*`。
+2. 在自己的终端里存入 Secret（密码要用键盘输入，不要经过聊天或脚本）：
+   ```bash
+   base64 -w0 ~/keys/uku-release.jks | gh secret set ANDROID_KEYSTORE_BASE64 --env release --repo Cheese-nya/uku-furigana
+   gh secret set ANDROID_KEYSTORE_PASSWORD --env release --repo Cheese-nya/uku-furigana
+   ```
+   密钥别名固定为 `uku`。
 
-注意：把签名密钥交给 GitHub 保管，意味着任何能修改工作流并推送标签的人都有机会取走它。
-只有你自己有仓库写权限、并开启了分支保护时才适合这样做；否则继续在本机打包（`scripts/build-apk.sh`），
-再手动把 APK 上传到 Release。
+没有配置这两个 Secret 时，Release 只含网页包。想完全避免把密钥交给 GitHub，可以改在本机打包（`scripts/build-apk.sh`），再手动把 APK 上传到 Release。
 
 ## 本地打包
 
