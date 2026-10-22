@@ -33,6 +33,6 @@ echo "==> 安装到 iPad"
 xcrun devicectl device install app --device "$DEVICE_ID" "$APP"
 
 echo "==> 启动应用"
-if ! xcrun devicectl device process launch --device "$DEVICE_ID" com.cheese.furiganastudio; then
-  echo "已安装但未能自动启动：首次安装请在 iPad「设置 > 通用 > VPN 与设备管理」中信任开发者证书，然后点开 Furigana Studio。"
+if ! xcrun devicectl device process launch --device "$DEVICE_ID" com.cheese.uku; then
+  echo "已安装但未能自动启动：首次安装请在 iPad「设置 > 通用 > VPN 与设备管理」中信任开发者证书，然后点开「浮く」。"
 fi

@@ -416,7 +416,7 @@ export async function createStarterBooks(now = Date.now()): Promise<LibraryDatab
     {
       bookId: 'book:starter-dubbing',
       title: '声優アフレコ練習台本：放課後の約束',
-      author: 'Furigana Dubbing Studio',
+      author: '浮く',
       category: 'script',
       format: 'txt',
       coverTheme: 'indigo',

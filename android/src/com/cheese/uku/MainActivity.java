@@ -1,4 +1,4 @@
-package com.cheese.furiganastudio;
+package com.cheese.uku;
 
 import android.app.Activity;
 import android.content.ActivityNotFoundException;
@@ -68,7 +68,7 @@ public class MainActivity extends Activity {
                     ContentValues values = new ContentValues();
                     values.put(MediaStore.Downloads.DISPLAY_NAME, safeName);
                     values.put(MediaStore.Downloads.MIME_TYPE, mimeType);
-                    values.put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS + "/FuriganaStudio");
+                    values.put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS + "/UkuFurigana");
 
                     ContentResolver resolver = getContentResolver();
                     Uri uri = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values);
@@ -82,9 +82,9 @@ public class MainActivity extends Activity {
                         out.write(bytes);
                         out.flush();
                     }
-                    savedLocation = "Download/FuriganaStudio/" + safeName;
+                    savedLocation = "Download/UkuFurigana/" + safeName;
                 } else {
-                    File dir = new File(getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS), "FuriganaStudio");
+                    File dir = new File(getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS), "UkuFurigana");
                     if (!dir.exists()) {
                         dir.mkdirs();
                     }

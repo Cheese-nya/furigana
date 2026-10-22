@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# Furigana Dubbing Studio — Hackintosh Remote iOS Production Build Script
+# Uku Furigana — Hackintosh Remote iOS Production Build Script
 # ==============================================================================
 # Builds the static Next.js export (`out/`), syncs the workspace to the remote
 # Mac build host (ssh alias from $HACKINTOSH_HOST, default `hackintosh`), runs `npx cap sync ios`,

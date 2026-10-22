@@ -19,8 +19,8 @@ APP_VERSION="$(node -p "require('$ROOT_DIR/package.json').version")"
 #   ANDROID_KEYSTORE_PASSWORD  (required)
 #   ANDROID_KEY_PASSWORD       (defaults to ANDROID_KEYSTORE_PASSWORD)
 #   ANDROID_KEYSTORE / ANDROID_KEY_ALIAS to point at an existing key.
-KEYSTORE="${ANDROID_KEYSTORE:-$ANDROID_DIR/keystore/furigana-release.jks}"
-KEY_ALIAS="${ANDROID_KEY_ALIAS:-furigana}"
+KEYSTORE="${ANDROID_KEYSTORE:-$ANDROID_DIR/keystore/uku-release.jks}"
+KEY_ALIAS="${ANDROID_KEY_ALIAS:-uku}"
 if [ -z "${ANDROID_KEYSTORE_PASSWORD:-}" ]; then
   echo "ERROR: set ANDROID_KEYSTORE_PASSWORD (and ANDROID_KEY_PASSWORD if it differs) before building." >&2
   exit 1
@@ -65,7 +65,7 @@ PYEOF
 cat > "$ANDROID_DIR/res/values/strings.xml" <<'EOF'
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Furigana Studio</string>
+    <string name="app_name">Uku Furigana</string>
 </resources>
 EOF
 
@@ -140,12 +140,12 @@ if [ ! -f "$KEYSTORE" ]; then
     -validity 10000 \
     -storepass:env ANDROID_KEYSTORE_PASSWORD \
     -keypass:env ANDROID_KEY_PASSWORD \
-    -dname "CN=Furigana Studio, O=Cheese"
+    -dname "CN=Uku Furigana, O=Cheese"
 fi
 
 echo "==> [7/7] Signing and verifying APK..."
-FINAL_APK="$ROOT_DIR/FuriganaStudio.apk"
-VERSIONED_APK="$BUILD_DIR/FuriganaStudio-v$APP_VERSION.apk"
+FINAL_APK="$ROOT_DIR/UkuFurigana.apk"
+VERSIONED_APK="$BUILD_DIR/UkuFurigana-v$APP_VERSION.apk"
 
 "$APKSIGNER" sign \
   --ks "$KEYSTORE" \

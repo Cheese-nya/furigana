@@ -1,6 +1,6 @@
 {
-  "name": "Furigana Dubbing Studio",
-  "short_name": "Furigana",
+  "name": "浮く Uku Furigana",
+  "short_name": "浮く",
   "description": "面向日语学习者与声优配音的离线振假名（ルビ）注音与排版系统。支持多音字消歧、数量词音变、专名词典与原生 Word / SRT 导出。",
   "id": "./",
   "start_url": "./",

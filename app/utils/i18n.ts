@@ -413,7 +413,7 @@ export interface Translations {
 
 export const translations: Record<Locale, Translations> = {
   'zh-CN': {
-    appTitle: 'Furigana Dubbing Studio',
+    appTitle: '浮く',
     scriptMode: '台本模式',
     editorTab: '台本编辑器',
     batchTab: '批量处理中心',
@@ -421,7 +421,7 @@ export const translations: Record<Locale, Translations> = {
     closeSidebar: '关闭侧边栏',
     languageLabel: '语言 / Language',
 
-    sidebarTitle: '假名标注工具',
+    sidebarTitle: '浮く',
     sidebarEditor: '台本在线编辑器',
     sidebarBatch: '批量文件处理中心',
     sidebarDeps: '依赖诊断与修复',
@@ -800,7 +800,7 @@ export const translations: Record<Locale, Translations> = {
     suppressedRubyTitle: '主动不注音',
   },
   'en': {
-    appTitle: 'Furigana Dubbing Studio',
+    appTitle: 'Uku Furigana',
     scriptMode: 'Script Mode',
     editorTab: 'Script Editor',
     batchTab: 'Batch Center',
@@ -808,7 +808,7 @@ export const translations: Record<Locale, Translations> = {
     closeSidebar: 'Close sidebar',
     languageLabel: 'Language / 语言',
 
-    sidebarTitle: 'Furigana Studio',
+    sidebarTitle: 'Uku Furigana',
     sidebarEditor: 'Online Script Editor',
     sidebarBatch: 'Batch File Processing',
     sidebarDeps: 'Diagnostics & Repair',
@@ -816,7 +816,7 @@ export const translations: Record<Locale, Translations> = {
     supportAuthorTitle: 'Support Author',
     supportAuthorDesc: 'Collect cheese slices for the creator',
 
-    bannerTitle: 'Japanese Furigana Dubbing Studio',
+    bannerTitle: 'Japanese Furigana Dubbing Workbench',
     bannerSubtitle: 'High-density workbench • 16px standard font • Context-aware reading disambiguation',
 
     rubyModeLabel: 'Ruby Type:',

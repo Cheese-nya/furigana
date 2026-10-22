@@ -9,7 +9,7 @@ const manifestSource = readFileSync(
 );
 
 const mainActivitySource = readFileSync(
-  fileURLToPath(new URL('../android/src/com/cheese/furiganastudio/MainActivity.java', import.meta.url)),
+  fileURLToPath(new URL('../android/src/com/cheese/uku/MainActivity.java', import.meta.url)),
   'utf8',
 );
 

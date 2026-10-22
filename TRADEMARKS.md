@@ -2,7 +2,7 @@
 
 [LICENSE](LICENSE) 只授予**源代码**的著作权许可，**不包括**以下名称与标识的使用权：
 
-- 「浮く」「Uku」及原名「Furigana Dubbing Studio」「Furigana Studio」
+- 「浮く」「Uku」「Uku Furigana」及原名「Furigana Dubbing Studio」「Furigana Studio」
 - 应用图标、Logo（`public/logo.png`、`app_icon.ico`、`public/cheese_icon.jpg` 等）及宣传图
 
 ## 允许
@@ -20,6 +20,6 @@
 
 ---
 
-The [LICENSE](LICENSE) covers the source code only. It grants **no rights** to the names "浮く", "Uku", "Furigana Dubbing Studio", "Furigana Studio", or the app icons and logos. You may refer to the project by name factually, but you may not ship forks or repackaged builds under these names or icons, publish them to any app store, or imply official endorsement without written permission. Forks must use their own name, icon, and application ID.
+The [LICENSE](LICENSE) covers the source code only. It grants **no rights** to the names "浮く", "Uku", "Uku Furigana", "Furigana Dubbing Studio", "Furigana Studio", or the app icons and logos. You may refer to the project by name factually, but you may not ship forks or repackaged builds under these names or icons, publish them to any app store, or imply official endorsement without written permission. Forks must use their own name, icon, and application ID.
 
 联系 / Contact: <https://github.com/Cheese-nya>
