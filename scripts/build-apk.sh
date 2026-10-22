@@ -15,23 +15,55 @@ ANDROID_JAR="$SDK_DIR/platforms/android-${ANDROID_PLATFORM_VERSION:-33}/android.
 
 APP_VERSION="$(node -p "require('$ROOT_DIR/package.json').version")"
 
-# Release signing. Passwords come from the environment so they never live in the repo:
-#   ANDROID_KEYSTORE_PASSWORD  (required)
+# Release signing. Passwords never live in the repo:
+#   ANDROID_KEYSTORE_PASSWORD  (prompted on a terminal when unset)
 #   ANDROID_KEY_PASSWORD       (defaults to ANDROID_KEYSTORE_PASSWORD)
 #   ANDROID_KEYSTORE / ANDROID_KEY_ALIAS to point at an existing key.
 KEYSTORE="${ANDROID_KEYSTORE:-$ANDROID_DIR/keystore/uku-release.jks}"
 KEY_ALIAS="${ANDROID_KEY_ALIAS:-uku}"
-if [ -z "${ANDROID_KEYSTORE_PASSWORD:-}" ]; then
-  echo "ERROR: set ANDROID_KEYSTORE_PASSWORD (and ANDROID_KEY_PASSWORD if it differs) before building." >&2
-  exit 1
+GENERATE_KEYSTORE=0
+if [ ! -f "$KEYSTORE" ]; then
+  # A release key must never be created by accident: APKs signed with a different
+  # key cannot update existing installs.
+  if [ "${ANDROID_KEYSTORE_GENERATE:-0}" != "1" ]; then
+    echo "ERROR: keystore not found at $KEYSTORE." >&2
+    echo "       Point ANDROID_KEYSTORE at your existing release key, or set ANDROID_KEYSTORE_GENERATE=1 to create a new one." >&2
+    exit 1
+  fi
+  GENERATE_KEYSTORE=1
+fi
+
+if [ "$GENERATE_KEYSTORE" = "1" ]; then
+  # A new key's password is always typed twice on the terminal, never taken from
+  # the environment, so a stray or leaked value cannot become the release password.
+  if [ ! -t 0 ]; then
+    echo "ERROR: creating a release key needs an interactive terminal to enter its password." >&2
+    exit 1
+  fi
+  read -r -s -p "New keystore password (min 8 chars): " ANDROID_KEYSTORE_PASSWORD; echo
+  read -r -s -p "Repeat password: " CONFIRM_PASSWORD; echo
+  if [ "$ANDROID_KEYSTORE_PASSWORD" != "$CONFIRM_PASSWORD" ]; then
+    echo "ERROR: passwords do not match; no key was created." >&2
+    exit 1
+  fi
+  if [ "${#ANDROID_KEYSTORE_PASSWORD}" -lt 8 ]; then
+    echo "ERROR: password must be at least 8 characters; no key was created." >&2
+    exit 1
+  fi
+  unset CONFIRM_PASSWORD ANDROID_KEY_PASSWORD
+elif [ -z "${ANDROID_KEYSTORE_PASSWORD:-}" ]; then
+  if [ ! -t 0 ]; then
+    echo "ERROR: set ANDROID_KEYSTORE_PASSWORD (and ANDROID_KEY_PASSWORD if it differs) before building." >&2
+    exit 1
+  fi
+  read -r -s -p "Keystore password for $KEYSTORE: " ANDROID_KEYSTORE_PASSWORD; echo
 fi
 export ANDROID_KEYSTORE_PASSWORD
 export ANDROID_KEY_PASSWORD="${ANDROID_KEY_PASSWORD:-$ANDROID_KEYSTORE_PASSWORD}"
-# A release key must never be created by accident: APKs signed with a different
-# key cannot update existing installs.
-if [ ! -f "$KEYSTORE" ] && [ "${ANDROID_KEYSTORE_GENERATE:-0}" != "1" ]; then
-  echo "ERROR: keystore not found at $KEYSTORE." >&2
-  echo "       Point ANDROID_KEYSTORE at your existing release key, or set ANDROID_KEYSTORE_GENERATE=1 to create a new one." >&2
+
+# Fail before the long build if the password does not open an existing key.
+if [ "$GENERATE_KEYSTORE" = "0" ] && ! "$JAVA_HOME/bin/keytool" -list -keystore "$KEYSTORE" -storepass:env ANDROID_KEYSTORE_PASSWORD >/dev/null 2>&1; then
+  echo "ERROR: wrong password for $KEYSTORE." >&2
   exit 1
 fi
 
@@ -128,7 +160,7 @@ echo "==> [6/7] Packaging classes.dex and aligning APK..."
 (cd "$BUILD_DIR/dex" && zip -q -u "$BUILD_DIR/unaligned.apk" classes.dex)
 "$ZIPALIGN" -f -p 4 "$BUILD_DIR/unaligned.apk" "$BUILD_DIR/aligned.apk"
 
-if [ ! -f "$KEYSTORE" ]; then
+if [ "$GENERATE_KEYSTORE" = "1" ]; then
   echo "==> Generating signing keystore at $KEYSTORE (back it up: losing it blocks future updates)..."
   mkdir -p "$(dirname "$KEYSTORE")"
   "$JAVA_HOME/bin/keytool" -genkeypair \
