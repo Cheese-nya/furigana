@@ -108,11 +108,17 @@ jobs:
       - name: Checksums
         run: (cd dist && sha256sum * > SHA256SUMS.txt && cat SHA256SUMS.txt)
 
+      - name: Release notes
+        run: |
+          # The section of RELEASE_NOTES.md headed "…V<version> …", up to the next top-level heading.
+          awk -v v="V${VERSION}" '/^# /{ if (on) exit; on = index($0, v " ") > 0 } on' RELEASE_NOTES.md > notes.md
+          if [ ! -s notes.md ]; then echo "No RELEASE_NOTES.md section for ${VERSION}" >&2; exit 1; fi
+
       - name: Publish release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release create "${GITHUB_REF_NAME}" dist/* \
             --title "浮く Uku Furigana ${GITHUB_REF_NAME}" \
-            --generate-notes \
+            --notes-file notes.md \
             --verify-tag
