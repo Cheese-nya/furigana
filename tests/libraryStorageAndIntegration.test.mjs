@@ -148,27 +148,7 @@ test('manifest.json declares standalone display, relative start_url and valid ic
   assert.ok(manifest.icons.some(icon => parseInt(icon.sizes, 10) >= 192), 'manifest must include a 192px+ icon');
 });
 
-test('Navbar and Sidebar quick links are square anchors with safe rel attributes', () => {
-  const pagePath = fileURLToPath(new URL('../app/page.tsx', import.meta.url));
-  const appHeaderPath = fileURLToPath(new URL('../app/components/AppHeader.tsx', import.meta.url));
-  const sidebarPath = fileURLToPath(new URL('../app/components/Sidebar.tsx', import.meta.url));
-  const pageSrc = `${readFileSync(pagePath, 'utf8')}\n${readFileSync(appHeaderPath, 'utf8')}`;
-  const sidebarSrc = readFileSync(sidebarPath, 'utf8');
-
-  const anchorPattern = /<a\s+href="https:\/\/x\.com\/beimisama"([\s\S]*?)<\/a>/g;
-  const githubPattern = /<a\s+href="https:\/\/github\.com\/Cheese-nya\/furigana"([\s\S]*?)<\/a>/g;
-
-  for (const [name, source] of [['app/page.tsx', pageSrc], ['app/components/Sidebar.tsx', sidebarSrc]]) {
-    for (const [pattern, url] of [[anchorPattern, 'https://x.com/beimisama'], [githubPattern, 'https://github.com/Cheese-nya/furigana']]) {
-      const matches = [...source.matchAll(pattern)];
-      assert.ok(matches.length > 0, `${name} must render an anchor to ${url}`);
-      for (const match of matches) {
-        const attribute = match.input.slice(match.index, match.index + match[0].length);
-        assert.ok(/target="_blank"/.test(attribute), `${name} anchors to ${url} must include target="_blank"`);
-        assert.ok(/rel="noopener noreferrer"/.test(attribute), `${name} anchors to ${url} must include rel="noopener noreferrer"`);
-        // Square quick-link: equal width and height classes w-9 h-9.
-        assert.ok(/w-9 h-9|m-\d+ h-\d+|flex items-center justify-center/.test(attribute), `${name} anchor to ${url} must be a compact square quick-link`);
-      }
-    }
-  }
+test('Settings menu has no external links (removed with the mockup rebuild)', () => {
+  const settings = readFileSync(fileURLToPath(new URL('../app/components/SettingsMenu.tsx', import.meta.url)), 'utf8');
+  assert.equal(/<a\s/.test(settings), false);
 });

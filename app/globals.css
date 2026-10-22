@@ -2,172 +2,409 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 /* =========================================================
-   Apple-Inspired Liquid Glass Design System
-   Translucent refractive layers, specular highlights & depth
+   Furigana — Liquid Glass v2 design system
+   (approved mockup: docs/mockups/liquid-glass-v2.html)
+
+   - Glass is only for the floating layer: sidebar, toolbar
+     capsules, tab bar, popovers, sheets. Content is solid.
+   - Chromium gets real SVG refraction (see
+     app/components/glass/refraction.ts); WebKit falls back to
+     blur + specular rim.
+   - Neutral ink accent. Colour is reserved for state:
+     grey ruby, orange review, green confirmed, red error.
    ========================================================= */
+
+/* Legacy indigo utilities still sprinkled through panels map to the
+   neutral ink scale, so unported screens already read black/white. */
+@theme {
+  --color-indigo-50: #f5f5f7;
+  --color-indigo-100: #ebebef;
+  --color-indigo-200: #d9d9de;
+  --color-indigo-300: #b8b8bf;
+  --color-indigo-400: #8e8e93;
+  --color-indigo-500: #636366;
+  --color-indigo-600: #2c2c2e;
+  --color-indigo-700: #1c1c1e;
+  --color-indigo-800: #161618;
+  --color-indigo-900: #111113;
+  --color-indigo-950: #0b0b0c;
+}
+
+:root {
+  --spring-bouncy: linear(0, 0.0374, 0.1314, 0.2581, 0.3989, 0.5394, 0.6698, 0.7841, 0.879, 0.9536, 1.009, 1.0469, 1.0701, 1.0813, 1.0833, 1.0789, 1.0703, 1.0593, 1.0474, 1.0358, 1.0252, 1.016, 1.0085, 1.0026, 0.9984, 0.9955, 0.9938, 0.9931, 0.9931, 0.9936, 0.9943, 0.9953, 0.9963, 0.9972, 0.9981, 0.9988, 1);
+  --spring-smooth: linear(0, 0.0438, 0.1454, 0.272, 0.4028, 0.5254, 0.6336, 0.7248, 0.799, 0.8576, 0.9025, 0.936, 0.9603, 0.9774, 0.9889, 0.9964, 1.001, 1.0036, 1.0047, 1.005, 1.0048, 1.0043, 1.0036, 1.003, 1.0024, 1.0018, 1.0014, 1.001, 1);
+  --font-mincho: "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif CJK JP", "Noto Serif JP", serif;
+
+  --bg: #F2F2F7; --surface: #FFFFFF; --surface-2: #F7F7F9;
+  --fill: rgba(118, 118, 128, 0.12); --fill-2: rgba(118, 118, 128, 0.07);
+  --sep: rgba(60, 60, 67, 0.13);
+  --label: #0b0b0c; --label-2: rgba(60, 60, 67, 0.66); --label-3: rgba(60, 60, 67, 0.38);
+  --ink: #111113; --on-ink: #FFFFFF;
+  --ruby: rgba(60, 60, 67, 0.58); --review: #FF9500; --ok: #34C759; --danger: #FF3B30;
+  --glass-fill: rgba(255, 255, 255, 0.14); --glass-fill-fb: rgba(250, 250, 252, 0.42);
+  --glass-rim-a: rgba(255, 255, 255, 0.98); --glass-rim-b: rgba(255, 255, 255, 0.22);
+  --glass-shadow: 0 12px 32px -10px rgba(0, 0, 0, 0.20), 0 2px 6px rgba(0, 0, 0, 0.06), inset 0 0 14px rgba(255, 255, 255, 0.18);
+  --sheet-fill: rgba(255, 255, 255, 0.80);
+  --item-hover: rgba(255, 255, 255, 0.42);
+  --seg-ind: rgba(255, 255, 255, 0.92); --seg-ind-shadow: 0 2px 8px -2px rgba(0, 0, 0, 0.16), 0 0 0 0.5px rgba(0, 0, 0, 0.04);
+  --seg-solid-ind: #FFFFFF;
+  --prominent: rgba(17, 17, 19, 0.88);
+  --card-shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 0 0 0.5px rgba(0, 0, 0, 0.05);
+  --edge: rgba(242, 242, 247, 0.86);
+
+  /* kept for useThemeMode / native bridges */
+  --bg-primary: var(--bg);
+  --fg-primary: var(--label);
+}
+
+html.dark,
+[data-theme="dark"] {
+  --bg: #000000; --surface: #1C1C1E; --surface-2: #2C2C2E;
+  --fill: rgba(118, 118, 128, 0.24); --fill-2: rgba(118, 118, 128, 0.14);
+  --sep: rgba(84, 84, 88, 0.55);
+  --label: #FFFFFF; --label-2: rgba(235, 235, 245, 0.64); --label-3: rgba(235, 235, 245, 0.32);
+  --ink: #FFFFFF; --on-ink: #000000;
+  --ruby: rgba(235, 235, 245, 0.56); --review: #FF9F0A; --ok: #30D158; --danger: #FF453A;
+  --glass-fill: rgba(40, 40, 44, 0.18); --glass-fill-fb: rgba(34, 34, 38, 0.48);
+  --glass-rim-a: rgba(255, 255, 255, 0.42); --glass-rim-b: rgba(255, 255, 255, 0.06);
+  --glass-shadow: 0 14px 36px -10px rgba(0, 0, 0, 0.7), 0 2px 6px rgba(0, 0, 0, 0.35), inset 0 0 14px rgba(255, 255, 255, 0.04);
+  --sheet-fill: rgba(30, 30, 32, 0.80);
+  --item-hover: rgba(255, 255, 255, 0.10);
+  --seg-ind: rgba(255, 255, 255, 0.18); --seg-ind-shadow: 0 0 0 0.5px rgba(255, 255, 255, 0.08);
+  --seg-solid-ind: #636366;
+  --prominent: rgba(255, 255, 255, 0.92);
+  --card-shadow: 0 0 0 0.5px rgba(255, 255, 255, 0.06);
+  --edge: rgba(0, 0, 0, 0.82);
+  color-scheme: dark;
+}
 
 @layer base {
   html {
-    background-color: var(--bg-primary);
-    color: var(--fg-primary);
+    background-color: var(--bg);
+    color: var(--label);
+    height: 100%;
     min-height: 100%;
+    overflow: hidden;
     overscroll-behavior: none;
-    overscroll-behavior-y: none;
   }
 
   body {
     position: relative;
-    background-color: var(--bg-primary);
-    color: var(--fg-primary);
-    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Segoe UI", Roboto, "Hiragino Sans", "Noto Sans JP", sans-serif;
+    background-color: var(--bg);
+    color: var(--label);
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Hiragino Sans", "PingFang SC", "Segoe UI", Roboto, "Noto Sans CJK SC", "Noto Sans JP", sans-serif;
+    height: 100%;
     min-height: 100vh;
     min-height: 100dvh;
+    overflow: hidden;
     overflow-x: hidden;
     overscroll-behavior: none;
-    overscroll-behavior-y: none;
     -webkit-font-smoothing: antialiased;
+    transition: background-color 0.3s ease;
   }
 
-  body::before {
-    content: "";
-    position: fixed;
-    inset: -25vh 0;
-    z-index: -1;
-    pointer-events: none;
-    background-color: var(--bg-primary);
-    background-image:
-      radial-gradient(at 10% 8%, rgba(99, 102, 241, 0.13) 0px, transparent 46%),
-      radial-gradient(at 88% 12%, rgba(56, 189, 248, 0.11) 0px, transparent 44%),
-      radial-gradient(at 52% 88%, rgba(168, 85, 247, 0.08) 0px, transparent 50%),
-      radial-gradient(at 24% 72%, rgba(20, 184, 166, 0.05) 0px, transparent 42%);
+  :focus-visible {
+    outline: 2px solid var(--label);
+    outline-offset: 2px;
   }
 }
 
-/* Liquid Glass Surface Primitives (iOS 26 Optical Refraction System) */
+@layer components {
+/* =========================================================
+   Glass material
+   ========================================================= */
+.glass {
+  position: relative;
+  isolation: isolate;
+  background: var(--glass-fill-fb);
+  -webkit-backdrop-filter: blur(12px) saturate(180%);
+  backdrop-filter: blur(12px) saturate(180%);
+  box-shadow: var(--glass-shadow);
+}
+/* refraction.ts sets data-refract on <html> when the SVG path is active */
+html[data-refract="on"] .glass { background: var(--glass-fill); }
+.glass::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  pointer-events: none;
+  z-index: 5;
+  background: linear-gradient(145deg, var(--glass-rim-a), var(--glass-rim-b) 34%, var(--glass-rim-b) 66%, color-mix(in srgb, var(--glass-rim-a) 70%, transparent));
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+}
+.glass.glass-sheet,
+html[data-refract="on"] .glass.glass-sheet { background: var(--sheet-fill); }
+.glass.glass-prominent,
+html[data-refract="on"] .glass.glass-prominent { background: var(--prominent); color: var(--on-ink); }
+
+@media (prefers-reduced-transparency: reduce) {
+  .glass,
+  html[data-refract="on"] .glass {
+    background: var(--surface) !important;
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+  }
+}
+
+/* Soft blur at the top of scrolling content, under the floating toolbar */
+.scroll-edge {
+  pointer-events: none;
+  background: linear-gradient(var(--edge), transparent);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  -webkit-mask: linear-gradient(#000 45%, transparent);
+  mask: linear-gradient(#000 45%, transparent);
+}
+
+/* =========================================================
+   Glass items — press physics driven by usePressPhysics()
+   (expand, follow the finger, spring back)
+   ========================================================= */
+.gbtn {
+  --tx: 0px; --ty: 0px; --sx: 1; --sy: 1;
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--label);
+  font-size: 14px;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+  transform: translate(var(--tx), var(--ty)) scale(var(--sx), var(--sy));
+  transition: transform 640ms var(--spring-bouncy), background-color 180ms ease, color 180ms ease, opacity 180ms ease;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  user-select: none;
+}
+.gbtn:disabled { opacity: 0.4; cursor: default; }
+.gbtn.gbtn-icon { width: 36px; padding: 0; }
+.gbtn:hover:not(:disabled) { background: var(--item-hover); }
+.gbtn.glass:hover:not(:disabled) { background: var(--glass-fill-fb); }
+html[data-refract="on"] .gbtn.glass:hover:not(:disabled) { background: var(--glass-fill); }
+.gbtn.gbtn-prominent,
+.gbtn.gbtn-prominent:hover:not(:disabled),
+html[data-refract="on"] .gbtn.gbtn-prominent,
+html[data-refract="on"] .gbtn.gbtn-prominent:hover:not(:disabled) { background: var(--prominent); color: var(--on-ink); font-weight: 600; }
+.gbtn::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: 0;
+  z-index: 1;
+  background: radial-gradient(90px circle at var(--mx, 50%) var(--my, 50%), rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0) 70%);
+  transition: opacity 420ms ease;
+}
+.dark .gbtn::before { background: radial-gradient(90px circle at var(--mx, 50%) var(--my, 50%), rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0) 70%); }
+.gbtn.is-pressed { transition: transform 220ms var(--spring-smooth), background-color 120ms; }
+.gbtn.is-pressed::before { opacity: 1; transition-duration: 90ms; }
+.gbtn > * { position: relative; z-index: 2; }
+
+/* Solid content buttons: dim + slight shrink (the content layer is not glass) */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--fill);
+  color: var(--label);
+  font-weight: 500;
+  cursor: pointer;
+  transition: scale 520ms var(--spring-bouncy), opacity 160ms, background-color 160ms;
+  -webkit-tap-highlight-color: transparent;
+}
+.btn:disabled { opacity: 0.4; cursor: default; }
+.btn:active:not(:disabled) { scale: 0.96; opacity: 0.72; transition-duration: 120ms, 80ms; }
+.btn.btn-ink { background: var(--ink); color: var(--on-ink); font-weight: 600; }
+.btn.btn-danger { background: color-mix(in srgb, var(--danger) 14%, transparent); color: var(--danger); }
+.btn.btn-plain { background: transparent; }
+
+/* =========================================================
+   Liquid selector (segmented / nav / tab) — see LiquidSelector.tsx
+   ========================================================= */
+.sel { position: relative; display: inline-flex; align-items: center; }
+.sel-ind {
+  position: absolute;
+  left: 0;
+  top: 0;
+  border-radius: 999px;
+  background: var(--seg-ind);
+  box-shadow: var(--seg-ind-shadow);
+  z-index: 0;
+  pointer-events: none;
+  transition: scale 560ms var(--spring-bouncy), background-color 160ms, box-shadow 160ms;
+}
+.sel > [data-opt] {
+  position: relative;
+  z-index: 1;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  touch-action: none;
+}
+.sel.moving .sel-ind,
+.sel.dragging .sel-ind {
+  z-index: 3;
+  background: rgba(255, 255, 255, 0.06);
+  box-shadow: inset 0 0 0 0.5px rgba(255, 255, 255, 0.55), 0 4px 14px -6px rgba(0, 0, 0, 0.18);
+}
+.dark .sel.moving .sel-ind,
+.dark .sel.dragging .sel-ind { box-shadow: inset 0 0 0 0.5px rgba(255, 255, 255, 0.2), 0 4px 14px -6px rgba(0, 0, 0, 0.5); }
+.sel.dragging .sel-ind { scale: 1.06 1.08; }
+.sel.moving .sel-ind { scale: 1.03 1.05; }
+
+.seg { padding: 3px; border-radius: 999px; }
+.seg > [data-opt] { height: 30px; padding: 0 13px; border-radius: 999px; font-size: 14px; font-weight: 500; color: var(--label-2); white-space: nowrap; transition: color 200ms; }
+.seg > [data-opt][aria-selected="true"] { color: var(--label); font-weight: 600; }
+.seg.seg-solid { background: var(--fill); }
+.seg.seg-solid .sel-ind { background: var(--seg-solid-ind); box-shadow: 0 3px 8px rgba(0, 0, 0, 0.10), 0 0 0 0.5px rgba(0, 0, 0, 0.04); }
+
+/* iOS switch with a stretchy knob (mockup) */
+.switch { position: relative; width: 51px; height: 31px; flex: none; border-radius: 999px; background: var(--fill); border: 0; padding: 0; cursor: pointer; transition: background-color 250ms; }
+.switch[aria-checked="true"] { background: var(--ok); }
+.switch > i { position: absolute; top: 2px; left: 2px; width: 27px; height: 27px; border-radius: 999px; background: #fff; box-shadow: 0 3px 8px rgba(0, 0, 0, 0.16), 0 0 0 0.5px rgba(0, 0, 0, 0.04); transition: left 560ms var(--spring-bouncy), width 360ms var(--spring-bouncy); }
+.switch[aria-checked="true"] > i { left: 22px; }
+.switch:active > i { width: 34px; }
+.switch[aria-checked="true"]:active > i { left: 15px; }
+
+/* reduced motion: no stretch, no swell */
+@media (prefers-reduced-motion: reduce) {
+  .gbtn, .btn, .sel-ind { transition-duration: 1ms !important; }
+  .sel.moving .sel-ind, .sel.dragging .sel-ind { scale: 1; }
+}
+
+}
+
+/* =========================================================
+   Legacy class bridge — older call sites (uiTokens.ts and
+   panels not yet ported) render in the new language:
+   panels/cards are solid, nav/containers are glass.
+   ========================================================= */
 .liquid-glass,
 .liquid-glass-panel,
 .neu-flat {
-  background: linear-gradient(160deg, rgba(255, 255, 255, 0.82) 0%, rgba(255, 255, 255, 0.62) 100%);
-  backdrop-filter: blur(32px) saturate(200%);
-  -webkit-backdrop-filter: blur(32px) saturate(200%);
-  border: 1px solid rgba(255, 255, 255, 0.78);
-  box-shadow:
-    0 12px 36px -10px rgba(15, 23, 42, 0.08),
-    0 1px 3px rgba(15, 23, 42, 0.04),
-    inset 0 1px 0.5px rgba(255, 255, 255, 0.96),
-    inset 0 -1px 0.5px rgba(255, 255, 255, 0.48);
+  background: var(--surface);
+  border-color: transparent !important;
+  box-shadow: var(--card-shadow);
 }
 
-.liquid-glass-nav {
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.84) 0%, rgba(255, 255, 255, 0.66) 100%);
-  backdrop-filter: blur(32px) saturate(200%);
-  -webkit-backdrop-filter: blur(32px) saturate(200%);
-  border: 1px solid rgba(255, 255, 255, 0.80);
-  box-shadow:
-    0 10px 32px -8px rgba(15, 23, 42, 0.08),
-    0 2px 6px rgba(15, 23, 42, 0.03),
-    inset 0 1px 0.5px rgba(255, 255, 255, 0.96),
-    inset 0 -1px 0.5px rgba(255, 255, 255, 0.50);
+.liquid-glass-nav,
+.lg-container {
+  position: relative;
+  background: var(--glass-fill-fb);
+  -webkit-backdrop-filter: blur(12px) saturate(180%);
+  backdrop-filter: blur(12px) saturate(180%);
+  border-color: transparent !important;
+  box-shadow: var(--glass-shadow), inset 0 0 0 0.5px var(--glass-rim-b), inset 0 1px 0 var(--glass-rim-a);
+}
+/* no nested blur inside a glass container */
+.lg-container .lg-container,
+.lg-container .liquid-glass-btn,
+.lg-container .liquid-glass-pill-group,
+.lg-container .liquid-glass-inset,
+.liquid-glass-nav .lg-container,
+.liquid-glass-nav .liquid-glass-btn,
+.liquid-glass-nav .liquid-glass-pill-group,
+.glass .lg-container,
+.glass .liquid-glass-btn {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  box-shadow: none;
 }
 
 .liquid-glass-inset,
 .neu-pressed {
-  background: rgba(241, 245, 249, 0.66);
-  backdrop-filter: blur(20px) saturate(180%);
-  -webkit-backdrop-filter: blur(20px) saturate(180%);
-  border: 1px solid rgba(226, 232, 240, 0.82);
-  box-shadow:
-    inset 0 1px 2px rgba(15, 23, 42, 0.05),
-    inset 0 1px 0.5px rgba(255, 255, 255, 0.94),
-    0 1px 0 rgba(255, 255, 255, 0.85);
+  background: var(--fill-2);
+  border-color: transparent !important;
+  box-shadow: none;
 }
 
 .liquid-glass-pill-group {
-  background: rgba(226, 232, 240, 0.58);
-  backdrop-filter: blur(24px) saturate(190%);
-  -webkit-backdrop-filter: blur(24px) saturate(190%);
-  border: 1px solid rgba(255, 255, 255, 0.74);
-  box-shadow:
-    inset 0 1px 2px rgba(15, 23, 42, 0.06),
-    inset 0 1px 0.5px rgba(255, 255, 255, 0.94);
+  background: var(--fill);
+  border-color: transparent !important;
+  box-shadow: none;
 }
 
 .liquid-glass-pill-active {
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(255, 255, 255, 0.86) 100%);
-  box-shadow:
-    0 2px 8px -1px rgba(15, 23, 42, 0.10),
-    0 1px 2px rgba(15, 23, 42, 0.04),
-    inset 0 1px 0.5px rgba(255, 255, 255, 0.96),
-    inset 0 1px 0 #ffffff;
-  color: #312e81;
+  background: var(--seg-solid-ind);
+  color: var(--label);
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.10), 0 0 0 0.5px rgba(0, 0, 0, 0.04);
 }
 
 .liquid-glass-btn,
 .neu-btn {
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.88) 0%, rgba(255, 255, 255, 0.70) 100%);
-  backdrop-filter: blur(24px) saturate(190%);
-  -webkit-backdrop-filter: blur(24px) saturate(190%);
-  border: 1px solid rgba(255, 255, 255, 0.82);
-  box-shadow:
-    0 2px 6px rgba(15, 23, 42, 0.05),
-    inset 0 1px 0.5px rgba(255, 255, 255, 0.94),
-    inset 0 1px 0 rgba(255, 255, 255, 0.95);
-  transition:
-    transform 160ms cubic-bezier(0.22, 1, 0.36, 1),
-    background-color 160ms ease,
-    border-color 160ms ease,
-    box-shadow 160ms ease,
-    color 160ms ease,
-    opacity 160ms ease;
+  background: var(--fill);
+  border-color: transparent !important;
+  box-shadow: none;
+  color: var(--label);
+  transition: scale 520ms var(--spring-bouncy), background-color 160ms ease, color 160ms ease, opacity 160ms ease;
 }
-
 .liquid-glass-btn:hover:not(:disabled),
-.neu-btn:hover:not(:disabled) {
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.96) 0%, rgba(255, 255, 255, 0.84) 100%);
-  border-color: rgba(255, 255, 255, 0.96);
-  box-shadow:
-    0 4px 12px -2px rgba(15, 23, 42, 0.08),
-    inset 0 1px 0.5px rgba(255, 255, 255, 0.98),
-    inset 0 1px 0 #ffffff;
-  transform: translateY(-0.5px);
-}
-
-.liquid-glass-btn:active:not(:disabled),
-.neu-btn:active:not(:disabled) {
-  transform: scale(0.96);
-}
+.neu-btn:hover:not(:disabled) { background: color-mix(in srgb, var(--fill) 100%, var(--fill-2)); filter: brightness(0.97); }
 
 .liquid-glass-btn-primary,
-.neu-btn-primary {
-  background: linear-gradient(135deg, #4f46e5 0%, #6366f1 55%, #4338ca 100%);
-  border: 1px solid rgba(255, 255, 255, 0.34);
-  box-shadow:
-    0 6px 18px -4px rgba(79, 70, 229, 0.42),
-    inset 0 1px 0.5px rgba(255, 255, 255, 0.46),
-    inset 0 1px 0 rgba(255, 255, 255, 0.38);
-  color: #ffffff;
-  transition:
-    transform 160ms cubic-bezier(0.22, 1, 0.36, 1),
-    background-color 160ms ease,
-    border-color 160ms ease,
-    box-shadow 160ms ease,
-    color 160ms ease,
-    opacity 160ms ease;
+.neu-btn-primary,
+.lg-btn-prominent {
+  background: var(--ink);
+  color: var(--on-ink);
+  border-color: transparent !important;
+  box-shadow: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  transition: scale 520ms var(--spring-bouncy), opacity 160ms ease;
 }
-
 .liquid-glass-btn-primary:hover:not(:disabled),
-.neu-btn-primary:hover:not(:disabled) {
-  background: linear-gradient(135deg, #4338ca 0%, #4f46e5 55%, #3730a3 100%);
-  box-shadow:
-    0 8px 22px -4px rgba(79, 70, 229, 0.52),
-    inset 0 1px 0.5px rgba(255, 255, 255, 0.56),
-    inset 0 1px 0 rgba(255, 255, 255, 0.48);
-  transform: translateY(-0.5px);
+.neu-btn-primary:hover:not(:disabled),
+.lg-btn-prominent:hover:not(:disabled) { opacity: 0.88; }
+
+.lg-grouped-card {
+  background: var(--surface-2);
+  border-color: transparent !important;
+  box-shadow: none;
 }
 
+.lg-sheet {
+  background: var(--sheet-fill);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  backdrop-filter: blur(24px) saturate(180%);
+  border-color: transparent !important;
+  box-shadow: 0 30px 70px -20px rgba(0, 0, 0, 0.35), inset 0 0 0 0.5px var(--glass-rim-b), inset 0 1px 0 var(--glass-rim-a);
+}
+
+/* content controls: dim + shrink on press, spring back */
+.lg-pill-interactive {
+  transition: scale 520ms var(--spring-bouncy), background-color 0.18s ease, color 0.18s ease, opacity 0.18s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+.lg-pill-interactive:active:not(:disabled),
+.liquid-glass-btn:active:not(:disabled),
 .liquid-glass-btn-primary:active:not(:disabled),
-.neu-btn-primary:active:not(:disabled) {
-  transform: scale(0.96);
+.lg-btn-prominent:active:not(:disabled) {
+  scale: 0.96;
+  opacity: 0.8;
+  transition-duration: 120ms;
+}
+@media (prefers-reduced-motion: reduce) {
+  .lg-pill-interactive, .liquid-glass-btn, .liquid-glass-btn-primary, .lg-btn-prominent { transition-duration: 1ms; }
 }
 
 /* Modern Minimal Scrollbar */
@@ -216,23 +453,23 @@ ruby {
   text-align: center;
   line-height: 1;
   font-family: -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
-  color: #4f46e5;
-  font-weight: 600;
+  color: var(--ruby);
+  font-weight: 500;
   user-select: none;
 }
 
-/* Translucent warm-yellow hover that never paints over the furigana <rt>. */
+/* Neutral hover tint that never paints over the furigana <rt>. */
 .ruby-interactive-token {
   border-radius: 5px;
   transition: background-color 140ms ease, box-shadow 140ms ease;
 }
 .ruby-interactive-token:hover {
-  background-color: rgba(253, 224, 71, 0.30);
-  box-shadow: 0 0 0 2px rgba(253, 224, 71, 0.30), 0 0 10px rgba(250, 204, 21, 0.28), inset 0 0 0 1px rgba(234, 179, 8, 0.22);
+  background-color: var(--fill-2);
+  box-shadow: 0 0 0 2px var(--fill-2);
 }
 .ruby-interactive-token:active {
-  background-color: rgba(250, 204, 21, 0.42);
-  box-shadow: 0 0 0 2px rgba(250, 204, 21, 0.42);
+  background-color: var(--fill);
+  box-shadow: 0 0 0 2px var(--fill);
 }
 .ruby-interactive-token rt {
   background: transparent !important;
@@ -255,641 +492,7 @@ ruby {
   -webkit-overflow-scrolling: touch;
 }
 
-/* =========================================================
-   Enhanced Apple Books Shelf & 3D Physical Hardcover Leather
-   ========================================================= */
-
-[data-testid="apple-books-shelf"] {
-  contain: layout style;
-  background-image:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.62) 0%, rgba(244, 242, 237, 0.85) 100%);
-  box-shadow:
-    0 22px 48px -14px rgba(15, 23, 42, 0.14),
-    0 6px 16px -4px rgba(15, 23, 42, 0.06),
-    inset 0 1px 0.5px rgba(255, 255, 255, 0.92),
-    inset 0 -1px 0 rgba(15, 23, 42, 0.06);
-  transition: background-color 220ms ease, border-color 220ms ease, box-shadow 220ms ease;
-}
-
-[data-testid="script-book-cover"] {
-  isolation: isolate;
-  contain: layout paint;
-  backface-visibility: hidden;
-  -webkit-backface-visibility: hidden;
-  transform: translateZ(0);
-  border: 1px solid rgba(15, 23, 42, 0.08);
-  box-shadow:
-    -1px 0 3px rgba(15, 23, 42, 0.12),
-    0 14px 26px -6px rgba(15, 23, 42, 0.22),
-    0 5px 10px -3px rgba(15, 23, 42, 0.12),
-    2px 0 0 0 #fafaf9,
-    3px 0 0 0 #d4d4d8,
-    4px 0 0 0 #f4f4f5,
-    5px 0 0 0 #e4e4e7,
-    inset 1px 1px 0 rgba(255, 255, 255, 0.82);
-  transition:
-    transform 240ms cubic-bezier(0.22, 1, 0.36, 1),
-    box-shadow 240ms cubic-bezier(0.22, 1, 0.36, 1),
-    border-color 200ms ease !important;
-}
-
-.group:hover [data-testid="script-book-cover"],
-[data-testid="script-book-cover"]:hover {
-  transform: translate3d(0, -6px, 0) scale(1.025);
-  box-shadow:
-    -3px 6px 14px rgba(15, 23, 42, 0.18),
-    0 22px 40px -8px rgba(15, 23, 42, 0.28),
-    0 8px 16px -4px rgba(15, 23, 42, 0.16),
-    2px 0 0 0 #fafaf9,
-    3px 0 0 0 #d4d4d8,
-    4px 0 0 0 #f4f4f5,
-    5px 0 0 0 #e4e4e7,
-    inset 1px 1px 0 rgba(255, 255, 255, 0.92);
-}
-
-/* =========================================================
-   Apple Books Pure White Plain Leather Binding System (纯白色素皮精装书封与3D光影)
-   ========================================================= */
-
-[data-testid="script-book-cover"].book-leather-cover,
-.book-leather-cover {
-  background: linear-gradient(165deg, #ffffff 0%, #fdfcf9 56%, #f6f4ee 100%);
-  border: 1px solid rgba(15, 23, 42, 0.08);
-  box-shadow:
-    -1px 0 3px rgba(15, 23, 42, 0.08),
-    0 14px 28px -6px rgba(15, 23, 42, 0.15),
-    0 5px 12px -3px rgba(15, 23, 42, 0.09),
-    2px 0 0 0 #fafaf9,
-    3px 0 0 0 #e4e4e7,
-    4px 0 0 0 #f4f4f5,
-    5px 0 0 0 #d4d4d8,
-    inset 0 1px 0.5px rgba(255, 255, 255, 0.98),
-    inset 0 -1px 1px rgba(15, 23, 42, 0.04) !important;
-}
-
-.group:hover [data-testid="script-book-cover"].book-leather-cover,
-[data-testid="script-book-cover"].book-leather-cover:hover,
-.group:hover .book-leather-cover {
-  transform: translate3d(0, -6px, 0) scale(1.025);
-  border-color: rgba(15, 23, 42, 0.12);
-  box-shadow:
-    -3px 6px 14px rgba(15, 23, 42, 0.14),
-    0 22px 40px -8px rgba(15, 23, 42, 0.22),
-    0 8px 16px -4px rgba(15, 23, 42, 0.12),
-    2px 0 0 0 #ffffff,
-    3px 0 0 0 #e4e4e7,
-    4px 0 0 0 #fafaf9,
-    5px 0 0 0 #d4d4d8,
-    inset 0 1px 0.5px #ffffff,
-    inset 0 -1px 1px rgba(15, 23, 42, 0.05) !important;
-}
-
-/* Pure White Plain Leather Base Palettes (iOS Books Ivory/White Plain Leather) */
-[data-testid="script-book-cover"].book-leather-indigo,
-.book-leather-cover.book-leather-indigo,
-.book-leather-indigo,
-.book-leather-theme-indigo,
-[data-leather-theme="indigo"] {
-  background: linear-gradient(165deg, #ffffff 0%, #fcfbf8 58%, #f6f4ee 100%) !important;
-}
-
-[data-testid="script-book-cover"].book-leather-emerald,
-.book-leather-cover.book-leather-emerald,
-.book-leather-emerald,
-.book-leather-theme-emerald,
-[data-leather-theme="emerald"] {
-  background: linear-gradient(165deg, #ffffff 0%, #fcfbf8 58%, #f6f4ee 100%) !important;
-}
-
-[data-testid="script-book-cover"].book-leather-amber,
-.book-leather-cover.book-leather-amber,
-.book-leather-amber,
-.book-leather-theme-amber,
-[data-leather-theme="amber"] {
-  background: linear-gradient(165deg, #ffffff 0%, #fcfbf8 58%, #f6f4ee 100%) !important;
-}
-
-[data-testid="script-book-cover"].book-leather-rose,
-.book-leather-cover.book-leather-rose,
-.book-leather-rose,
-.book-leather-theme-rose,
-[data-leather-theme="rose"] {
-  background: linear-gradient(165deg, #ffffff 0%, #fcfbf8 58%, #f6f4ee 100%) !important;
-}
-
-[data-testid="script-book-cover"].book-leather-slate,
-.book-leather-cover.book-leather-slate,
-.book-leather-slate,
-.book-leather-theme-slate,
-[data-leather-theme="slate"] {
-  background: linear-gradient(165deg, #ffffff 0%, #fcfbf8 58%, #f6f4ee 100%) !important;
-}
-
-/* Subtle White Plain-Leather Micro-Grain Texture (纯白色素皮细腻纹理 - GPU无滤镜轻量版) */
-.book-leather-grain {
-  background-image:
-    repeating-linear-gradient(
-      45deg,
-      rgba(15, 23, 42, 0.015) 0px,
-      rgba(15, 23, 42, 0.015) 1px,
-      transparent 1px,
-      transparent 6px
-    ),
-    repeating-linear-gradient(
-      -45deg,
-      rgba(255, 255, 255, 0.4) 0px,
-      rgba(255, 255, 255, 0.4) 1px,
-      transparent 1px,
-      transparent 6px
-    );
-  opacity: 0.45;
-  pointer-events: none;
-}
-
-/* Subtle Blind-Debossed Inner Frame on White Plain Leather */
-.book-leather-frame {
-  border: 1px solid rgba(15, 23, 42, 0.045);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.92),
-    0 1px 0 rgba(255, 255, 255, 0.85);
-  pointer-events: none;
-}
-
-/* Soft Directional Overhead Grazing Sheen on White Plain Leather */
-.book-leather-sheen {
-  background:
-    linear-gradient(
-      132deg,
-      rgba(255, 255, 255, 0.72) 0%,
-      rgba(255, 255, 255, 0.25) 32%,
-      rgba(255, 255, 255, 0) 60%,
-      rgba(15, 23, 42, 0.025) 100%
-    ),
-    radial-gradient(
-      90% 70% at 22% 14%,
-      rgba(255, 255, 255, 0.55) 0%,
-      transparent 68%
-    );
-  pointer-events: none;
-}
-
-/* iOS Books Left Spine Hinge Crease & Subtle Cylindrical Lighting */
-.book-3d-spine-groove {
-  width: 14px;
-  background: linear-gradient(
-    90deg,
-    rgba(15, 23, 42, 0.10) 0px,
-    rgba(255, 255, 255, 0.90) 2.5px,
-    rgba(255, 255, 255, 0.45) 5.5px,
-    rgba(15, 23, 42, 0.08) 8.5px,
-    rgba(15, 23, 42, 0.03) 10.5px,
-    rgba(255, 255, 255, 0.75) 12px,
-    transparent 14px
-  );
-  border-right: 1px solid rgba(15, 23, 42, 0.04);
-  box-shadow: inset 1px 0 0.5px rgba(255, 255, 255, 0.85);
-}
-
-.dark .book-3d-spine-groove,
-[data-theme="dark"] .book-3d-spine-groove {
-  background: linear-gradient(
-    90deg,
-    rgba(0, 0, 0, 0.48) 0px,
-    rgba(255, 255, 255, 0.14) 2.5px,
-    rgba(255, 255, 255, 0.05) 5.5px,
-    rgba(0, 0, 0, 0.38) 8.5px,
-    rgba(0, 0, 0, 0.18) 10.5px,
-    rgba(255, 255, 255, 0.10) 12px,
-    transparent 14px
-  ) !important;
-  border-right: 1px solid rgba(0, 0, 0, 0.32);
-  box-shadow: inset 1px 0 0.5px rgba(255, 255, 255, 0.12);
-}
-
-/* Crisp Ink Typography & Subtle Pill Accents on Pure White Plain Leather Covers */
-[data-testid="script-book-cover"].book-leather-cover h4:not(.book-cover-obi-title),
-.book-leather-cover h4:not(.book-cover-obi-title) {
-  color: #1d1d1f !important;
-  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.85);
-}
-
-[data-testid="script-book-cover"].book-leather-cover [data-testid="book-cover-author"]:not(.book-cover-obi-author),
-.book-leather-cover [data-testid="book-cover-author"]:not(.book-cover-obi-author) {
-  color: #6e6e73 !important;
-}
-
-[data-testid="script-book-cover"].book-leather-cover [data-testid="book-cover-description"]:not(.book-cover-obi-desc),
-.book-leather-cover [data-testid="book-cover-description"]:not(.book-cover-obi-desc) {
-  color: rgba(110, 110, 115, 0.90) !important;
-}
-
-[data-testid="script-book-cover"].book-leather-cover .book-cover-badge,
-.book-leather-cover .book-cover-badge {
-  background: rgba(15, 23, 42, 0.045) !important;
-  color: #52525b !important;
-  border: 1px solid rgba(15, 23, 42, 0.08) !important;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.85);
-}
-
-.book-cover-obi-title,
-.dark [data-testid="script-book-cover"] .book-cover-obi-title,
-[data-theme="dark"] [data-testid="script-book-cover"] .book-cover-obi-title {
-  color: #ffffff !important;
-  font-size: 0.8125rem;
-  line-height: 1.25;
-  -webkit-line-clamp: 1;
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.88);
-}
-
-.dark [data-testid="script-book-cover"] .book-cover-obi-author,
-[data-theme="dark"] [data-testid="script-book-cover"] .book-cover-obi-author {
-  color: rgba(255, 255, 255, 0.88) !important;
-}
-
-.dark [data-testid="script-book-cover"] .book-cover-obi-desc,
-[data-theme="dark"] [data-testid="script-book-cover"] .book-cover-obi-desc {
-  color: rgba(255, 255, 255, 0.80) !important;
-}
-
-/* Woven Silk / Satin Top Headband Texture */
-.book-silk-band {
-  position: relative;
-  overflow: hidden;
-  border-top-left-radius: inherit;
-  border-top-right-radius: inherit;
-  border-bottom: 1px solid rgba(234, 198, 132, 0.28);
-  box-shadow:
-    inset 0 1px 1px rgba(255, 255, 255, 0.42),
-    inset 0 -1px 2px rgba(0, 0, 0, 0.42),
-    0 1px 3px rgba(0, 0, 0, 0.28);
-}
-
-.book-silk-band::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background-image:
-    repeating-linear-gradient(
-      -45deg,
-      rgba(255, 255, 255, 0.12) 0px,
-      rgba(255, 255, 255, 0.12) 1px,
-      transparent 1px,
-      transparent 3px
-    ),
-    linear-gradient(
-      110deg,
-      rgba(255, 255, 255, 0.06) 0%,
-      rgba(255, 255, 255, 0.34) 24%,
-      rgba(0, 0, 0, 0.14) 48%,
-      rgba(255, 255, 255, 0.40) 72%,
-      rgba(0, 0, 0, 0.20) 100%
-    );
-  pointer-events: none;
-}
-
-.book-silk-indigo {
-  background-image:
-    repeating-linear-gradient(-45deg, rgba(255, 255, 255, 0.12) 0px, rgba(255, 255, 255, 0.12) 1px, transparent 1px, transparent 3px),
-    linear-gradient(112deg, #2d3e5e 0%, #5c7cab 26%, #394f75 49%, #6d8fc0 74%, #283652 100%) !important;
-}
-
-.book-silk-emerald {
-  background-image:
-    repeating-linear-gradient(-45deg, rgba(255, 255, 255, 0.12) 0px, rgba(255, 255, 255, 0.12) 1px, transparent 1px, transparent 3px),
-    linear-gradient(112deg, #1f3a30 0%, #487d68 26%, #2b5042 49%, #59947d 74%, #1a3027 100%) !important;
-}
-
-.book-silk-amber {
-  background-image:
-    repeating-linear-gradient(-45deg, rgba(255, 255, 255, 0.12) 0px, rgba(255, 255, 255, 0.12) 1px, transparent 1px, transparent 3px),
-    linear-gradient(112deg, #4f3f2b 0%, #967a56 26%, #635038 49%, #ad8e66 74%, #403322 100%) !important;
-}
-
-.book-silk-rose {
-  background-image:
-    repeating-linear-gradient(-45deg, rgba(255, 255, 255, 0.12) 0px, rgba(255, 255, 255, 0.12) 1px, transparent 1px, transparent 3px),
-    linear-gradient(112deg, #572c31 0%, #a3565e 26%, #6e393f 49%, #b8666f 74%, #472327 100%) !important;
-}
-
-.book-silk-slate {
-  background-image:
-    repeating-linear-gradient(-45deg, rgba(255, 255, 255, 0.12) 0px, rgba(255, 255, 255, 0.12) 1px, transparent 1px, transparent 3px),
-    linear-gradient(112deg, #32343d 0%, #646878 26%, #434652 49%, #787d8f 74%, #272930 100%) !important;
-}
-
-.book-silk-sky {
-  background-image:
-    repeating-linear-gradient(-45deg, rgba(255, 255, 255, 0.12) 0px, rgba(255, 255, 255, 0.12) 1px, transparent 1px, transparent 3px),
-    linear-gradient(112deg, #1e4b6b 0%, #3d8ab8 26%, #29638a 49%, #52a2d1 74%, #173b54 100%) !important;
-}
-
-.book-silk-violet {
-  background-image:
-    repeating-linear-gradient(-45deg, rgba(255, 255, 255, 0.12) 0px, rgba(255, 255, 255, 0.12) 1px, transparent 1px, transparent 3px),
-    linear-gradient(112deg, #3e2c5e 0%, #7658ab 26%, #503a78 49%, #8b6bc2 74%, #31224a 100%) !important;
-}
-
-/* =========================================================
-   Global Dark Mode (html.dark / [data-theme="dark"] / .dark)
-   ========================================================= */
-
-:root {
-  --bg-primary: #eef2f9;
-  --fg-primary: #0f172a;
-}
-
-html.dark,
-[data-theme="dark"] {
-  --bg-primary: #0b0d13;
-  --fg-primary: #f5f5f7;
-  background-color: var(--bg-primary);
-  color: #f5f5f7;
-  color-scheme: dark;
-}
-
-html.dark body,
-[data-theme="dark"] body {
-  background-color: var(--bg-primary);
-  color: #f5f5f7;
-}
-
-html.dark body::before,
-[data-theme="dark"] body::before {
-  background-color: var(--bg-primary);
-  background-image:
-    radial-gradient(at 14% 12%, rgba(99, 102, 241, 0.16) 0px, transparent 50%),
-    radial-gradient(at 86% 16%, rgba(56, 189, 248, 0.12) 0px, transparent 48%),
-    radial-gradient(at 50% 88%, rgba(139, 92, 246, 0.12) 0px, transparent 54%),
-    linear-gradient(180deg, var(--bg-primary) 0%, var(--bg-primary) 100%);
-}
-
-.dark .liquid-glass-nav,
-[data-theme="dark"] .liquid-glass-nav {
-  background: rgba(18, 20, 28, 0.78);
-  backdrop-filter: blur(32px) saturate(200%);
-  -webkit-backdrop-filter: blur(32px) saturate(200%);
-  border: 1px solid rgba(255, 255, 255, 0.10);
-  box-shadow:
-    0 14px 36px -8px rgba(0, 0, 0, 0.55),
-    0 2px 8px rgba(0, 0, 0, 0.35),
-    inset 0 1px 0.5px rgba(255, 255, 255, 0.18),
-    inset 0 1px 0 rgba(255, 255, 255, 0.08);
-}
-
-.dark .liquid-glass,
-.dark .liquid-glass-panel,
-.dark .neu-flat,
-[data-theme="dark"] .liquid-glass,
-[data-theme="dark"] .liquid-glass-panel,
-[data-theme="dark"] .neu-flat {
-  background: rgba(24, 27, 38, 0.76);
-  backdrop-filter: blur(32px) saturate(200%);
-  -webkit-backdrop-filter: blur(32px) saturate(200%);
-  border: 1px solid rgba(255, 255, 255, 0.09);
-  box-shadow:
-    0 18px 42px -10px rgba(0, 0, 0, 0.60),
-    0 2px 8px rgba(0, 0, 0, 0.35),
-    inset 0 1px 0.5px rgba(255, 255, 255, 0.18),
-    inset 0 1px 0 rgba(255, 255, 255, 0.07);
-}
-
-.dark .liquid-glass-inset,
-.dark .neu-pressed,
-[data-theme="dark"] .liquid-glass-inset,
-[data-theme="dark"] .neu-pressed {
-  background: rgba(10, 12, 18, 0.65);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow:
-    inset 0 2px 5px rgba(0, 0, 0, 0.55),
-    inset 0 1px 0.5px rgba(255, 255, 255, 0.18),
-    0 1px 0 rgba(255, 255, 255, 0.04);
-}
-
-.dark .liquid-glass-pill-group,
-[data-theme="dark"] .liquid-glass-pill-group {
-  background: rgba(15, 18, 26, 0.72);
-  border: 1px solid rgba(255, 255, 255, 0.09);
-  box-shadow:
-    inset 0 1px 3px rgba(0, 0, 0, 0.45),
-    inset 0 1px 0.5px rgba(255, 255, 255, 0.18);
-}
-
-.dark .liquid-glass-pill-active,
-[data-theme="dark"] .liquid-glass-pill-active {
-  background: linear-gradient(180deg, rgba(55, 65, 95, 0.92) 0%, rgba(39, 46, 70, 0.88) 100%);
-  box-shadow:
-    0 2px 8px -1px rgba(0, 0, 0, 0.45),
-    inset 0 1px 0.5px rgba(255, 255, 255, 0.18),
-    inset 0 1px 0 rgba(255, 255, 255, 0.14);
-  color: #e0e7ff;
-}
-
-.dark .liquid-glass-btn,
-.dark .neu-btn,
-[data-theme="dark"] .liquid-glass-btn,
-[data-theme="dark"] .neu-btn {
-  background: linear-gradient(180deg, rgba(34, 39, 54, 0.86) 0%, rgba(24, 28, 40, 0.78) 100%);
-  border: 1px solid rgba(255, 255, 255, 0.10);
-  box-shadow:
-    0 2px 8px rgba(0, 0, 0, 0.38),
-    inset 0 1px 0.5px rgba(255, 255, 255, 0.18),
-    inset 0 1px 0 rgba(255, 255, 255, 0.08);
-  color: #e2e8f0;
-}
-
-.dark .liquid-glass-btn:hover:not(:disabled),
-.dark .neu-btn:hover:not(:disabled),
-[data-theme="dark"] .liquid-glass-btn:hover:not(:disabled),
-[data-theme="dark"] .neu-btn:hover:not(:disabled) {
-  background: linear-gradient(180deg, rgba(45, 52, 72, 0.92) 0%, rgba(32, 37, 52, 0.86) 100%);
-  border-color: rgba(255, 255, 255, 0.18);
-  box-shadow:
-    0 6px 14px -2px rgba(0, 0, 0, 0.50),
-    inset 0 1px 0.5px rgba(255, 255, 255, 0.22),
-    inset 0 1px 0 rgba(255, 255, 255, 0.14);
-}
-
-.dark [data-testid="apple-books-shelf"],
-[data-theme="dark"] [data-testid="apple-books-shelf"] {
-  background: rgba(22, 25, 35, 0.88) !important;
-  border-color: rgba(255, 255, 255, 0.08) !important;
-  box-shadow:
-    0 20px 50px -12px rgba(0, 0, 0, 0.65),
-    inset 0 1px 0.5px rgba(255, 255, 255, 0.12) !important;
-}
-
-/* Dark Mode Shelf with Dark Plain Leather Book Covers (iOS Books Dark Style) */
-.dark [data-testid="script-book-cover"],
-.dark .book-leather-cover,
-.dark .book-leather-indigo,
-.dark .book-leather-emerald,
-.dark .book-leather-amber,
-.dark .book-leather-rose,
-.dark .book-leather-slate,
-.dark [data-leather-theme],
-[data-theme="dark"] [data-testid="script-book-cover"],
-[data-theme="dark"] .book-leather-cover,
-[data-theme="dark"] [data-leather-theme] {
-  background: linear-gradient(165deg, #242a3c 0%, #1b202e 58%, #141824 100%) !important;
-  border-color: rgba(255, 255, 255, 0.10) !important;
-  box-shadow:
-    -2px 0 6px rgba(0, 0, 0, 0.55),
-    0 16px 32px -6px rgba(0, 0, 0, 0.68),
-    0 6px 14px -2px rgba(0, 0, 0, 0.45),
-    2px 0 0 0 #333a4d,
-    3px 0 0 0 #1e2330,
-    4px 0 0 0 #2b3142,
-    5px 0 0 0 #141821,
-    inset 0 1px 0.5px rgba(255, 255, 255, 0.18),
-    inset 0 -1px 1px rgba(0, 0, 0, 0.45) !important;
-}
-
-.dark .group:hover [data-testid="script-book-cover"],
-.dark [data-testid="script-book-cover"]:hover,
-.dark .group:hover .book-leather-cover,
-[data-theme="dark"] .group:hover [data-testid="script-book-cover"],
-[data-theme="dark"] [data-testid="script-book-cover"]:hover,
-[data-theme="dark"] .group:hover .book-leather-cover {
-  border-color: rgba(255, 255, 255, 0.16) !important;
-  box-shadow:
-    -4px 8px 18px rgba(0, 0, 0, 0.62),
-    0 24px 46px -8px rgba(0, 0, 0, 0.78),
-    0 10px 20px -4px rgba(0, 0, 0, 0.54),
-    2px 0 0 0 #3d455c,
-    3px 0 0 0 #232938,
-    4px 0 0 0 #333a4d,
-    5px 0 0 0 #191d28,
-    inset 0 1px 0.5px rgba(255, 255, 255, 0.24),
-    inset 0 -1px 1px rgba(0, 0, 0, 0.50) !important;
-}
-
-.dark .book-leather-grain,
-[data-theme="dark"] .book-leather-grain {
-  background-image:
-    repeating-linear-gradient(
-      45deg,
-      rgba(255, 255, 255, 0.025) 0px,
-      rgba(255, 255, 255, 0.025) 1px,
-      transparent 1px,
-      transparent 6px
-    ),
-    repeating-linear-gradient(
-      -45deg,
-      rgba(0, 0, 0, 0.2) 0px,
-      rgba(0, 0, 0, 0.2) 1px,
-      transparent 1px,
-      transparent 6px
-    );
-  opacity: 0.32;
-}
-
-.dark .book-leather-frame,
-[data-theme="dark"] .book-leather-frame {
-  border: 1px solid rgba(255, 255, 255, 0.07);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.08),
-    0 1px 0 rgba(0, 0, 0, 0.35);
-}
-
-.dark .book-leather-sheen,
-[data-theme="dark"] .book-leather-sheen {
-  background:
-    linear-gradient(
-      132deg,
-      rgba(255, 255, 255, 0.10) 0%,
-      rgba(255, 255, 255, 0.03) 34%,
-      rgba(255, 255, 255, 0) 62%,
-      rgba(0, 0, 0, 0.24) 100%
-    ),
-    radial-gradient(
-      90% 70% at 22% 14%,
-      rgba(255, 255, 255, 0.08) 0%,
-      transparent 68%
-    );
-}
-
-.dark [data-testid="script-book-cover"] h4:not(.book-cover-obi-title),
-.dark .book-leather-cover h4:not(.book-cover-obi-title),
-[data-theme="dark"] [data-testid="script-book-cover"] h4:not(.book-cover-obi-title),
-[data-theme="dark"] .book-leather-cover h4:not(.book-cover-obi-title) {
-  color: #f5f5f7 !important;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.55);
-}
-
-.dark [data-testid="script-book-cover"] [data-testid="book-cover-author"]:not(.book-cover-obi-author),
-.dark .book-leather-cover [data-testid="book-cover-author"]:not(.book-cover-obi-author),
-[data-theme="dark"] [data-testid="script-book-cover"] [data-testid="book-cover-author"]:not(.book-cover-obi-author),
-[data-theme="dark"] .book-leather-cover [data-testid="book-cover-author"]:not(.book-cover-obi-author) {
-  color: #94a3b8 !important;
-}
-
-.dark [data-testid="script-book-cover"] [data-testid="book-cover-description"]:not(.book-cover-obi-desc),
-.dark .book-leather-cover [data-testid="book-cover-description"]:not(.book-cover-obi-desc),
-.dark [data-testid="script-book-cover"]:not(:has([data-testid="book-cover-image"])) .book-cover-meta-stats,
-[data-theme="dark"] [data-testid="script-book-cover"] [data-testid="book-cover-description"]:not(.book-cover-obi-desc),
-[data-theme="dark"] .book-leather-cover [data-testid="book-cover-description"]:not(.book-cover-obi-desc),
-[data-theme="dark"] [data-testid="script-book-cover"]:not(:has([data-testid="book-cover-image"])) .book-cover-meta-stats {
-  color: #94a3b8 !important;
-}
-
-.dark [data-testid="script-book-cover"] .book-cover-badge,
-.dark .book-leather-cover .book-cover-badge,
-[data-theme="dark"] [data-testid="script-book-cover"] .book-cover-badge,
-[data-theme="dark"] .book-leather-cover .book-cover-badge {
-  background: rgba(255, 255, 255, 0.08) !important;
-  color: #cbd5e1 !important;
-  border: 1px solid rgba(255, 255, 255, 0.12) !important;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
-}
-
-.dark [data-testid="shelf-row-divider"],
-[data-theme="dark"] [data-testid="shelf-row-divider"] {
-  background: linear-gradient(
-    90deg,
-    rgba(255, 255, 255, 0.08) 0%,
-    rgba(255, 255, 255, 0.14) 50%,
-    rgba(255, 255, 255, 0.08) 100%
-  ) !important;
-  box-shadow: 0 1px 0 0 rgba(0, 0, 0, 0.5) !important;
-}
-
-.dark [data-testid="script-book-cover"] .book-action-btn,
-[data-theme="dark"] [data-testid="script-book-cover"] .book-action-btn {
-  background: rgba(30, 36, 52, 0.88) !important;
-  color: #cbd5e1 !important;
-  border-color: rgba(255, 255, 255, 0.12) !important;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35) !important;
-}
-
-.dark [data-testid="script-book-cover"] .book-action-primary,
-[data-theme="dark"] [data-testid="script-book-cover"] .book-action-primary {
-  background: #4f46e5 !important;
-  color: #ffffff !important;
-  box-shadow: 0 2px 8px rgba(79, 70, 229, 0.45) !important;
-}
-
-.dark [data-testid="script-book-cover"] .book-action-danger,
-[data-theme="dark"] [data-testid="script-book-cover"] .book-action-danger {
-  background: rgba(30, 36, 52, 0.88) !important;
-  color: #fb7185 !important;
-  border-color: rgba(244, 63, 94, 0.28) !important;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35) !important;
-}
-
-.dark [data-testid="mobile-nav-bar"],
-[data-theme="dark"] [data-testid="mobile-nav-bar"] {
-  background-color: rgba(15, 18, 28, 0.94) !important;
-  border-top-color: rgba(255, 255, 255, 0.08) !important;
-  box-shadow: 0 -8px 28px rgba(0, 0, 0, 0.55) !important;
-}
-
-.dark [data-testid="sidebar-drawer"],
-[data-theme="dark"] [data-testid="sidebar-drawer"] {
-  background-color: rgba(19, 23, 36, 0.96) !important;
-  border-right-color: rgba(255, 255, 255, 0.10) !important;
-  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.72) !important;
-}
-
+/* Dark overrides for legacy utilities in unported panels */
 /* Standard light-colored text & surface overrides in Dark Mode (excluding ReaderPanel paper themes) */
 .dark .text-\[\#1d1d1f\]:not([data-reader-theme] *) {
   color: #f5f5f7 !important;
@@ -934,7 +537,7 @@ html.dark body::before,
 }
 
 .dark .bg-white:not([data-reader-theme] *) {
-  background-color: rgba(34, 40, 58, 0.94) !important;
+  background-color: var(--surface) !important;
 }
 
 .dark .bg-white\/80:not([data-reader-theme] *),
@@ -944,7 +547,7 @@ html.dark body::before,
 .dark .bg-white\/88:not([data-reader-theme] *),
 .dark .bg-white\/90:not([data-reader-theme] *),
 .dark .bg-white\/95:not([data-reader-theme] *) {
-  background-color: rgba(24, 28, 42, 0.92) !important;
+  background-color: var(--surface) !important;
 }
 
 .dark .bg-white\/75:not([data-reader-theme] *),
@@ -953,7 +556,7 @@ html.dark body::before,
 .dark .bg-white\/60:not([data-reader-theme] *),
 .dark .bg-white\/55:not([data-reader-theme] *),
 .dark .bg-white\/45:not([data-reader-theme] *) {
-  background-color: rgba(22, 26, 38, 0.76) !important;
+  background-color: var(--surface-2) !important;
 }
 
 .dark .bg-slate-200\/50:not([data-reader-theme] *),
@@ -963,7 +566,7 @@ html.dark body::before,
 .dark .bg-slate-100\/80:not([data-reader-theme] *),
 .dark .bg-zinc-50:not(body):not([data-reader-theme] *),
 .dark .bg-zinc-100:not([data-reader-theme] *) {
-  background-color: rgba(13, 16, 25, 0.82) !important;
+  background-color: var(--fill) !important;
 }
 
 .dark .bg-black\/\[0\.04\]:not([data-reader-theme] *),
@@ -991,152 +594,9 @@ html.dark body::before,
   border-color: rgba(255, 255, 255, 0.10) !important;
 }
 
+
 .dark .script-line rt {
-  color: #818cf8;
-}
-
-/* =========================================================
-   iOS 26 Liquid Glass Utilities
-   Mirrors Apple's Liquid Glass API: GlassEffectContainer,
-   .glassEffect(), .interactive() and .glassProminent.
-   Grouped controls share ONE glass container (no nested
-   blur stacking), so the material reads as a single sheet.
-   ========================================================= */
-
-/* GlassEffectContainer — unified refraction layer for grouped controls */
-.lg-container {
-  background: linear-gradient(160deg, rgba(255, 255, 255, 0.78) 0%, rgba(255, 255, 255, 0.60) 100%);
-  backdrop-filter: blur(28px) saturate(195%);
-  -webkit-backdrop-filter: blur(28px) saturate(195%);
-  border: 1px solid rgba(255, 255, 255, 0.80);
-  box-shadow:
-    0 10px 28px -8px rgba(15, 23, 42, 0.08),
-    0 1px 3px rgba(15, 23, 42, 0.03),
-    inset 0 1px 0.5px rgba(255, 255, 255, 0.96),
-    inset 0 -1px 0.5px rgba(255, 255, 255, 0.45);
-}
-
-.dark .lg-container,
-[data-theme="dark"] .lg-container {
-  background: linear-gradient(160deg, rgba(22, 26, 40, 0.82) 0%, rgba(16, 20, 32, 0.74) 100%);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  box-shadow:
-    0 14px 34px -8px rgba(0, 0, 0, 0.55),
-    inset 0 1px 0.5px rgba(255, 255, 255, 0.18),
-    inset 0 -1px 0.5px rgba(255, 255, 255, 0.06);
-}
-
-/* Prevent nested backdrop-filter blur stacking inside a GlassEffectContainer */
-.lg-container .lg-container,
-.lg-container .liquid-glass-btn,
-.lg-container .liquid-glass-pill-group,
-.lg-container .liquid-glass-inset,
-.liquid-glass-nav .lg-container,
-.liquid-glass-nav .liquid-glass-btn,
-.liquid-glass-nav .liquid-glass-pill-group {
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
-}
-
-/* iOS 26 Inset Grouped Card & Sheet Primitives */
-.lg-grouped-card {
-  background: rgba(255, 255, 255, 0.68);
-  border: 1px solid rgba(255, 255, 255, 0.82);
-  box-shadow:
-    0 4px 16px -4px rgba(15, 23, 42, 0.05),
-    inset 0 1px 0.5px rgba(255, 255, 255, 0.94);
-}
-
-.dark .lg-grouped-card,
-[data-theme="dark"] .lg-grouped-card {
-  background: rgba(24, 29, 44, 0.74);
-  border: 1px solid rgba(255, 255, 255, 0.09);
-  box-shadow:
-    0 6px 20px -4px rgba(0, 0, 0, 0.45),
-    inset 0 1px 0.5px rgba(255, 255, 255, 0.14);
-}
-
-.lg-sheet {
-  background: linear-gradient(165deg, rgba(255, 255, 255, 0.90) 0%, rgba(248, 250, 252, 0.82) 100%);
-  backdrop-filter: blur(36px) saturate(210%);
-  -webkit-backdrop-filter: blur(36px) saturate(210%);
-  border: 1px solid rgba(255, 255, 255, 0.86);
-  box-shadow:
-    0 24px 64px -12px rgba(15, 23, 42, 0.22),
-    0 4px 16px -2px rgba(15, 23, 42, 0.08),
-    inset 0 1px 0.5px rgba(255, 255, 255, 0.98);
-}
-
-.dark .lg-sheet,
-[data-theme="dark"] .lg-sheet {
-  background: linear-gradient(165deg, rgba(22, 26, 40, 0.92) 0%, rgba(15, 18, 29, 0.88) 100%);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  box-shadow:
-    0 28px 72px -12px rgba(0, 0, 0, 0.72),
-    inset 0 1px 0.5px rgba(255, 255, 255, 0.20);
-}
-
-/* .glassEffect(.regular.interactive()) — morphing press physics */
-.lg-pill-interactive {
-  transition:
-    transform 0.18s cubic-bezier(0.22, 1, 0.36, 1),
-    background-color 0.18s ease,
-    border-color 0.18s ease,
-    box-shadow 0.18s ease,
-    color 0.18s ease,
-    opacity 0.18s ease;
-  -webkit-tap-highlight-color: transparent;
-  will-change: transform;
-}
-
-.lg-pill-interactive:active {
-  transform: scale(0.96);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .lg-pill-interactive {
-    transition-duration: 0ms;
-  }
-
-  .lg-pill-interactive:active {
-    transform: none;
-  }
-}
-
-/* .buttonStyle(.glassProminent) — tinted, refractive, specular-topped */
-.lg-btn-prominent {
-  background: linear-gradient(135deg, #4f46e5 0%, #5b5bf0 52%, #4338ca 100%);
-  border: 1px solid rgba(255, 255, 255, 0.34);
-  color: #ffffff;
-  backdrop-filter: blur(18px) saturate(185%);
-  -webkit-backdrop-filter: blur(18px) saturate(185%);
-  box-shadow:
-    0 8px 22px -6px rgba(79, 70, 229, 0.48),
-    inset 0 1px 0.5px rgba(255, 255, 255, 0.52),
-    inset 0 1px 0 rgba(255, 255, 255, 0.38);
-  transition: transform 0.18s cubic-bezier(0.22, 1, 0.36, 1), background-color 0.18s ease, box-shadow 0.18s ease, color 0.18s ease;
-}
-
-.lg-btn-prominent:hover:not(:disabled) {
-  background: linear-gradient(135deg, #4338ca 0%, #4f46e5 52%, #3730a3 100%);
-  box-shadow:
-    0 10px 26px -6px rgba(79, 70, 229, 0.58),
-    inset 0 1px 0.5px rgba(255, 255, 255, 0.62),
-    inset 0 1px 0 rgba(255, 255, 255, 0.44);
-}
-
-.lg-btn-prominent:active:not(:disabled) {
-  transform: scale(0.96);
-}
-
-.dark .lg-btn-prominent,
-[data-theme="dark"] .lg-btn-prominent {
-  background: linear-gradient(135deg, #6366f1 0%, #7c7ff5 50%, #4f46e5 100%);
-  border: 1px solid rgba(255, 255, 255, 0.22);
-  box-shadow:
-    0 10px 26px -8px rgba(99, 102, 241, 0.52),
-    inset 0 1px 0.5px rgba(255, 255, 255, 0.38),
-    inset 0 1px 0 rgba(255, 255, 255, 0.26);
+  color: var(--ruby);
 }
 
 /* Reader secondary drawer — keep its scroll inside the sheet */

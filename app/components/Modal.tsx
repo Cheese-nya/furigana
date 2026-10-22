@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useEffect, useId, useRef } from 'react';
+import React, { useEffect, useId, useRef, useState } from 'react';
+import { IconClose } from './glass/icons';
 
 interface ModalProps {
   isOpen: boolean;
@@ -9,6 +10,8 @@ interface ModalProps {
   children: React.ReactNode;
   footer?: React.ReactNode;
   maxWidth?: 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '3xl' | '4xl' | '5xl';
+  /** Sheets that carry their own heading (e.g. the reading-correction sheet) hide the title bar. */
+  hideHeader?: boolean;
 }
 
 export const Modal: React.FC<ModalProps> = ({
@@ -17,19 +20,36 @@ export const Modal: React.FC<ModalProps> = ({
   title,
   children,
   footer,
-  maxWidth = 'md'
+  maxWidth = 'md',
+  hideHeader = false,
 }) => {
   const modalRef = useRef<HTMLDivElement>(null);
   const closeRef = useRef(onClose);
   const titleId = useId();
+  const [mounted, setMounted] = useState(isOpen);
+  const [visible, setVisible] = useState(false);
+
   useEffect(() => { closeRef.current = onClose; }, [onClose]);
+
+  useEffect(() => {
+    if (isOpen) {
+      // Mount first, then flip `visible` next frame so the entrance transition runs.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setMounted(true);
+      const frame = requestAnimationFrame(() => setVisible(true));
+      return () => cancelAnimationFrame(frame);
+    }
+    setVisible(false);
+    const timer = window.setTimeout(() => setMounted(false), 560);
+    return () => window.clearTimeout(timer);
+  }, [isOpen]);
 
   useEffect(() => {
     if (!isOpen) return;
     const previousFocus = document.activeElement as HTMLElement | null;
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
-    const focusTimer = setTimeout(() => {
+    const focusTimer = window.setTimeout(() => {
       if (!modalRef.current?.contains(document.activeElement)) modalRef.current?.focus();
     }, 0);
     const handleKey = (event: KeyboardEvent) => {
@@ -40,7 +60,7 @@ export const Modal: React.FC<ModalProps> = ({
       }
       if (event.key !== 'Tab' || !modalRef.current) return;
       const focusable = Array.from(modalRef.current.querySelectorAll<HTMLElement>(
-        'button:not(:disabled), input:not(:disabled), textarea:not(:disabled), select:not(:disabled), a[href], [tabindex="0"]'
+        'button:not(:disabled), input:not(:disabled), textarea:not(:disabled), select:not(:disabled), a[href], [tabindex="0"]',
       )).filter(element => element.getClientRects().length > 0);
       const first = focusable[0];
       const last = focusable[focusable.length - 1];
@@ -57,17 +77,17 @@ export const Modal: React.FC<ModalProps> = ({
     };
     document.addEventListener('keydown', handleKey);
     return () => {
-      clearTimeout(focusTimer);
+      window.clearTimeout(focusTimer);
       document.removeEventListener('keydown', handleKey);
       document.body.style.overflow = previousOverflow;
       if (previousFocus?.isConnected) previousFocus.focus();
     };
   }, [isOpen]);
 
-  if (!isOpen) return null;
+  if (!mounted) return null;
 
   const maxWidthClasses = {
-    sm: 'max-w-sm',
+    sm: 'max-w-[420px]',
     md: 'max-w-md',
     lg: 'max-w-lg',
     xl: 'max-w-xl',
@@ -78,58 +98,28 @@ export const Modal: React.FC<ModalProps> = ({
   };
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-6"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby={titleId}
-    >
-      {/* Overlay Backdrop */}
+    <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-6" role="dialog" aria-modal="true" aria-labelledby={titleId}>
       <div
-        className="fixed inset-0 bg-slate-900/35 dark:bg-black/60 backdrop-blur-md transition-opacity duration-200"
+        className={`fixed inset-0 bg-black/20 transition-opacity duration-[260ms] ${visible ? 'opacity-100' : 'opacity-0'}`}
         onClick={onClose}
         aria-hidden="true"
       />
-
-      {/* Modal Content - iOS 26 Adaptive Liquid Glass Sheet & Mobile Bottom Sheet */}
       <div
         ref={modalRef}
         tabIndex={-1}
-        className={`relative w-full ${maxWidthClasses[maxWidth]} max-h-[92dvh] lg-sheet backdrop-blur-2xl bg-white/88 dark:bg-[#161a29]/95 border border-white/80 dark:border-white/12 max-sm:rounded-t-[32px] max-sm:rounded-b-none sm:rounded-[32px] shadow-[0_24px_64px_-12px_rgba(15,23,42,0.18),inset_0_1px_0.5px_rgba(255,255,255,0.96)] dark:shadow-[0_24px_64px_-12px_rgba(0,0,0,0.75),inset_0_1px_0.5px_rgba(255,255,255,0.16)] flex flex-col transform transition-[transform,opacity,background-color] duration-200 outline-none p-5 sm:p-7 max-sm:pb-[max(1.25rem,env(safe-area-inset-bottom))]`}
+        className={`glass glass-sheet relative flex max-h-[92dvh] w-full ${maxWidthClasses[maxWidth]} flex-col overflow-hidden rounded-[30px] bg-[color-mix(in_srgb,var(--surface)_80%,transparent)] p-[22px] text-[var(--label)] shadow-[var(--glass-shadow)] outline-none transition-[scale,opacity,translate] max-sm:rounded-t-[34px] max-sm:rounded-b-none max-sm:pb-[max(22px,env(safe-area-inset-bottom))] sm:scale-90 sm:opacity-0 sm:duration-[560ms,200ms,560ms] sm:[transition-timing-function:var(--spring-bouncy),ease,var(--spring-smooth)] max-sm:translate-y-full max-sm:scale-100 max-sm:opacity-100 max-sm:duration-[560ms] max-sm:[transition-timing-function:var(--spring-smooth)] ${visible ? 'sm:scale-100 sm:opacity-100 max-sm:translate-y-0' : ''}`}
       >
-        {/* iOS Bottom Sheet Grabber Pill (Mobile Only) */}
-        <div
-          className="sm:hidden mx-auto mb-3 h-1.5 w-10 shrink-0 rounded-full bg-slate-400/40 dark:bg-white/25"
-          aria-hidden="true"
-        />
-
-        {/* Header */}
-        <div className="flex items-center justify-between pb-3.5 sm:pb-4 border-b border-slate-200/60 dark:border-white/10 mb-4 sm:mb-5 shrink-0">
-          <h2 id={titleId} className="text-lg sm:text-xl font-semibold text-slate-900 dark:text-slate-100 tracking-tight">
-            {title}
-          </h2>
-          <button
-            onClick={onClose}
-            aria-label="关闭"
-            className="w-8 h-8 rounded-full lg-pill-interactive text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 bg-black/[0.04] dark:bg-white/[0.06] hover:bg-white/75 dark:hover:bg-white/12 border border-white/70 dark:border-white/10 flex items-center justify-center"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2.2} viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-            </svg>
+        <div className="sm:hidden mx-auto -mt-2.5 mb-3 h-[5px] w-9 shrink-0 rounded-full bg-[var(--label-3)]" aria-hidden="true" />
+        {hideHeader ? <h2 id={titleId} className="sr-only">{title}</h2> : (
+        <header className="mb-4 flex shrink-0 items-center justify-between gap-4 border-b border-[var(--sep)] pb-3">
+          <h2 id={titleId} className="text-[17px] font-semibold tracking-tight text-[var(--label)]">{title}</h2>
+          <button type="button" onClick={onClose} aria-label="关闭" className="btn h-8 w-8 justify-center !p-0" >
+            <IconClose size={16} />
           </button>
-        </div>
-
-        {/* Body */}
-        <div className="overflow-y-auto max-h-[calc(92dvh-130px)] text-slate-600 dark:text-slate-300">
-          {children}
-        </div>
-
-        {/* Footer */}
-        {footer && (
-          <div className="pt-4 mt-4 sm:mt-5 border-t border-slate-200/60 dark:border-white/10 flex justify-end gap-3 shrink-0">
-            {footer}
-          </div>
+        </header>
         )}
+        <div className="max-h-[calc(92dvh-130px)] overflow-y-auto text-[var(--label-2)]">{children}</div>
+        {footer && <footer className="mt-4 flex shrink-0 justify-end gap-3 border-t border-[var(--sep)] pt-4">{footer}</footer>}
       </div>
     </div>
   );

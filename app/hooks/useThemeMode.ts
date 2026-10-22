@@ -3,14 +3,14 @@
 import { useCallback, useEffect, useSyncExternalStore } from 'react';
 
 export const THEME_STORAGE_KEY = 'furigana_dark_mode';
-export const DARK_THEME_BG = '#0b0d13';
-export const LIGHT_THEME_BG = '#eef2f9';
+export const DARK_THEME_BG = '#000000';
+export const LIGHT_THEME_BG = '#F2F2F7';
 
 interface NativeThemeWindow {
   webkit?: {
     messageHandlers?: {
       furiganaTheme?: {
-        postMessage?: (msg: { bg: string; isDark: boolean }) => void;
+        postMessage?: (msg: { bg: string; isDark: boolean; auto?: boolean }) => void;
       };
     };
   };
@@ -19,8 +19,15 @@ interface NativeThemeWindow {
   };
 }
 
+export type ThemeMode = 'auto' | 'light' | 'dark';
+
 const listeners = new Set<() => void>();
-let memoryFallbackDark = false;
+let memoryFallbackMode: ThemeMode | null = null;
+const SYSTEM_DARK_QUERY = '(prefers-color-scheme: dark)';
+
+function systemPrefersDark(): boolean {
+  return typeof window !== 'undefined' && !!window.matchMedia?.(SYSTEM_DARK_QUERY).matches;
+}
 
 function emitChange(): void {
   listeners.forEach(listener => listener());
@@ -39,35 +46,56 @@ function subscribe(listener: () => void): () => void {
     }
   };
   window.addEventListener('storage', handleStorage);
+  // 'auto' follows the system appearance live.
+  const media = window.matchMedia?.(SYSTEM_DARK_QUERY);
+  media?.addEventListener?.('change', listener);
   return () => {
     listeners.delete(listener);
     window.removeEventListener('storage', handleStorage);
+    media?.removeEventListener?.('change', listener);
   };
 }
 
-function getSnapshot(): boolean {
+function readMode(): ThemeMode {
   try {
     if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
       const stored = localStorage.getItem(THEME_STORAGE_KEY);
-      if (stored !== null) {
-        return stored === '1';
-      }
+      if (stored === 'auto') return 'auto';
+      if (stored !== null) return stored === '1' ? 'dark' : 'light';
     }
   } catch {
     // Ignore storage read failures
   }
-  return memoryFallbackDark;
+  // Nothing chosen yet: follow the system appearance, like the mockup.
+  return memoryFallbackMode ?? 'auto';
+}
+
+function resolveDark(mode: ThemeMode): boolean {
+  return mode === 'dark' || (mode === 'auto' && systemPrefersDark());
+}
+
+function getSnapshot(): boolean {
+  return resolveDark(readMode());
+}
+
+function getModeSnapshot(): ThemeMode {
+  return readMode();
 }
 
 function getServerSnapshot(): boolean {
   return false;
 }
 
-export function syncThemeSideEffects(isDark: boolean, persist = true): void {
+function getServerModeSnapshot(): ThemeMode {
+  return 'light';
+}
+
+/** `followsSystem` tells the native shells to stop pinning an appearance ("自动"). */
+export function syncThemeSideEffects(isDark: boolean, persist = true, followsSystem = false): void {
   try {
     const bg = isDark ? DARK_THEME_BG : LIGHT_THEME_BG;
     if (persist) {
-      memoryFallbackDark = isDark;
+      memoryFallbackMode = isDark ? 'dark' : 'light';
       if (typeof localStorage !== 'undefined') {
         localStorage.setItem(THEME_STORAGE_KEY, isDark ? '1' : '0');
       }
@@ -87,7 +115,7 @@ export function syncThemeSideEffects(isDark: boolean, persist = true): void {
     }
     if (typeof window !== 'undefined') {
       const win = window as unknown as NativeThemeWindow;
-      win.webkit?.messageHandlers?.furiganaTheme?.postMessage?.({ bg, isDark });
+      win.webkit?.messageHandlers?.furiganaTheme?.postMessage?.({ bg, isDark, auto: followsSystem });
       win.AndroidBridge?.syncTheme?.(bg, isDark);
     }
   } catch {
@@ -97,10 +125,11 @@ export function syncThemeSideEffects(isDark: boolean, persist = true): void {
 
 export function useThemeMode() {
   const darkMode = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
+  const themeMode = useSyncExternalStore(subscribe, getModeSnapshot, getServerModeSnapshot);
 
   useEffect(() => {
-    syncThemeSideEffects(darkMode, false);
-  }, [darkMode]);
+    syncThemeSideEffects(darkMode, false, themeMode === 'auto');
+  }, [darkMode, themeMode]);
 
   const setDarkMode = useCallback((value: boolean | ((prev: boolean) => boolean)) => {
     const next = typeof value === 'function' ? value(getSnapshot()) : value;
@@ -114,8 +143,26 @@ export function useThemeMode() {
     emitChange();
   }, []);
 
+  const setThemeMode = useCallback((mode: ThemeMode) => {
+    memoryFallbackMode = mode;
+    if (mode === 'auto') {
+      // Apply the system appearance without pinning it, then remember "auto".
+      syncThemeSideEffects(systemPrefersDark(), false, true);
+      try {
+        if (typeof localStorage !== 'undefined') localStorage.setItem(THEME_STORAGE_KEY, 'auto');
+      } catch {
+        // Ignore storage write failures
+      }
+    } else {
+      syncThemeSideEffects(mode === 'dark', true);
+    }
+    emitChange();
+  }, []);
+
   return {
     darkMode,
+    themeMode,
+    setThemeMode,
     setDarkMode,
     toggleDarkMode,
   };

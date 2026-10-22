@@ -90,7 +90,8 @@ export function useBatchProcessing({
   };
 
   // Execute Batch Processing on Queue
-  const processBatchQueue = async () => {
+  // 全部导出 picks the format at click time (no separate format setting in the UI).
+  const processBatchQueue = async (format: 'docx' | 'srt' | 'txt' = batchTargetFormat) => {
     if (batchFiles.length === 0 || isBatchProcessing || isKuromojiLoading || !correctionsReady) return;
 
     let effectiveMode: BatchSaveMode = batchSaveMode;
@@ -152,11 +153,11 @@ export function useBatchProcessing({
 
         // Generate output based on target format
         let outputBlob: Blob;
-        if (batchTargetFormat === 'docx') {
+        if (format === 'docx') {
           outputBlob = await buildDocxBlob(parsedLines, { title: itemTitle, baseFontSize: fontSize, rubyFontSize, lineSpacing });
         } else {
-          const textOutput = batchTargetFormat === 'srt' ? generateSRT(parsedLines, importedCues) : generateTextContent(parsedLines, 'txt');
-          const mime = batchTargetFormat === 'srt' ? 'application/x-subrip' : 'text/plain';
+          const textOutput = format === 'srt' ? generateSRT(parsedLines, importedCues) : generateTextContent(parsedLines, 'txt');
+          const mime = format === 'srt' ? 'application/x-subrip' : 'text/plain';
           outputBlob = new Blob([textOutput], { type: mime });
         }
 
@@ -166,7 +167,7 @@ export function useBatchProcessing({
 
         await new Promise(r => setTimeout(r, 200));
 
-        const outExt = batchTargetFormat;
+        const outExt = format;
         const outName = `${cleanScriptTitle(itemTitle) || 'japanese_script'}.${outExt}`;
 
         if (alsoSaveToLibrary) {

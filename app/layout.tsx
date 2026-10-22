@@ -16,7 +16,7 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
-  themeColor: "#eef2f9",
+  themeColor: "#F2F2F7",
 };
 
 export default function RootLayout({
@@ -26,7 +26,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="zh-CN">
-      <body className="antialiased min-h-screen selection:bg-indigo-500/20 selection:text-indigo-900 dark:selection:bg-indigo-400/30 dark:selection:text-indigo-100">
+      <body className="antialiased min-h-screen selection:bg-black/15 dark:selection:bg-white/25">
         {children}
       </body>
     </html>
