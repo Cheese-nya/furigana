@@ -13,13 +13,13 @@ the production relay or GitHub. Nothing here is used by production builds: the h
 ## Android (verified on an API 34 google_apis x86_64 emulator, 2026-10-24)
 
 ```bash
-tools/update-test/build-test-apks.sh                      # old.apk + release/Uku-Furigana-v1.2.2.apk
+tools/update-test/build-test-apks.sh                      # old.apk + release/Uku-Furigana-v<next patch>.apk
 python3 tools/update-test/dev_relay.py --dir /tmp/uku-update-test/release \
   --port 8788 --public-base http://10.0.2.2:8788           # fake release + fake /api/feedback
 adb install -r /tmp/uku-update-test/old.apk && adb shell am start -n com.cheese.uku/.MainActivity
 ```
 
-About 5 s after launch the app finds 1.2.2, downloads it and shows the yellow dot. Drive the menu through
+About 5 s after launch the app finds the next version, downloads it and shows the yellow dot. Drive the menu through
 DevTools (`adb forward tcp:9222 localabstract:webview_devtools_remote_$(adb shell pidof com.cheese.uku)`, then
 `node tools/update-test/cdp.mjs '...'`); `adb shell input tap` is unreliable on the glass buttons. The first
 install attempt opens the "install unknown apps" page; allow it, go back and tap the row again.
