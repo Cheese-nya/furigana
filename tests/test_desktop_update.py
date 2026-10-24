@@ -514,5 +514,18 @@ class TestHostTest(unittest.TestCase):
             os.environ.pop('UKU_UPDATE_TEST_HOST', None)
 
 
+class RelaunchEnvironmentTest(unittest.TestCase):
+    def test_strips_the_old_extraction_dir_and_resets_pyinstaller(self):
+        env = launcher.relaunch_environment({
+            '_MEIPASS2': r'C:\\Temp\\_MEI123', '_PYI_APPLICATION_HOME_DIR': 'x', '_PYI_PARENT_PROCESS_LEVEL': '1',
+            'PATH': 'keep', 'UKU_UPDATE_TEST_HOST': 'h',
+        })
+        self.assertEqual(env['PYINSTALLER_RESET_ENVIRONMENT'], '1')
+        self.assertNotIn('_MEIPASS2', env)
+        self.assertFalse([k for k in env if k.startswith('_PYI_')])
+        self.assertEqual(env['PATH'], 'keep')
+        self.assertEqual(env['UKU_UPDATE_TEST_HOST'], 'h')
+
+
 if __name__ == '__main__':
     unittest.main()

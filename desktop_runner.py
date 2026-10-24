@@ -292,6 +292,21 @@ def _bat_quote(path):
     return '"' + str(path).replace('%', '%%') + '"'
 
 
+def relaunch_environment(environ=None):
+    """Environment for the helper that restarts this onefile exe.
+
+    A PyInstaller onefile app passes its extraction directory to the process it spawns through
+    _MEIPASS2 / _PYI_* variables. A new instance that inherits them looks for DLLs in the old
+    directory, which is gone by then ("Unable to load DLL 'WebView2Loader.dll'"), so strip them
+    and ask the bootloader to start from a clean slate.
+    """
+    env = dict(os.environ if environ is None else environ)
+    for key in [k for k in env if k == '_MEIPASS2' or k.startswith('_PYI_')]:
+        del env[key]
+    env['PYINSTALLER_RESET_ENVIRONMENT'] = '1'
+    return env
+
+
 def build_apply_script(pid, current_exe, new_exe):
     """Batch helper that swaps the exe once this process has exited.
 
@@ -677,6 +692,7 @@ class Api:
                 creationflags=flags,
                 close_fds=True,
                 cwd=str(current_exe.parent),
+                env=relaunch_environment(),
             )
             self._update_logger.info('Update helper started for %s', package)
             self._schedule_quit()
