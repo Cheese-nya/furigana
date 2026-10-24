@@ -307,12 +307,8 @@ def build_issue(payload: dict[str, Any]) -> IssueSpec:
     # User message / description
     raw_message = str(payload.get("message") or "").strip()
     if raw_message:
-        desc_text = (
-            _redact_paths(raw_message)
-            if kind == "text"
-            else redact_log_text(raw_message)
-        )
-        sections.append(f"### 用户描述\n\n{desc_text}")
+        # Typed by the user on purpose (the panel warns it is public), so only paths are masked.
+        sections.append(f"### 用户描述\n\n{_redact_paths(raw_message)}")
 
     base_body = "\n\n".join(sections)
 

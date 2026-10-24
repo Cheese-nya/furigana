@@ -320,8 +320,7 @@ class TestBuildIssue(unittest.TestCase):
         self.assertEqual(issue.title, "[自动反馈] 1.2.1 / android")
         self.assertEqual(issue.labels, ["from-app", "bug"])
         self.assertIn("user@example.com", issue.body)
-        self.assertIn("<details><summary>诊断日志</summary>", issue.body)
-        self.assertNotIn("あいうえおか", issue.body)
+        self.assertIn("附加说明：あいうえおかきく", issue.body)  # typed by the user: kept as written
         self.assertNotIn("一二三四五六", issue.body)
         self.assertNotIn("/home/alice/", issue.body)
         self.assertIn("/home/<user>/secret", issue.body)
