@@ -13,6 +13,7 @@ const {
   createManualDriver,
   pickDriver,
   createUpdateController,
+  desktopBridgeMissing,
 } = loadTypescript('../app/utils/updater.ts');
 
 const { clearEntries, getEntries } = loadTypescript('../app/utils/appLog.ts');
@@ -532,4 +533,13 @@ test('a known uninstalled update bypasses the 6h auto-check throttle, so a resta
   await third.check({ auto: true });
   assert.equal(third.getState().status, 'idle');
   third.dispose();
+});
+
+test('a desktop build waits for the pywebview bridge instead of pinning the manual driver', () => {
+  assert.equal(desktopBridgeMissing({}, 'desktop'), true);
+  assert.equal(desktopBridgeMissing({ pywebview: {} }, 'desktop'), true);
+  assert.equal(desktopBridgeMissing({ pywebview: { api: {} } }, 'desktop'), true);
+  assert.equal(desktopBridgeMissing({ pywebview: { api: { update_download() {} } } }, 'desktop'), false);
+  assert.equal(desktopBridgeMissing({}, 'android'), false);
+  assert.equal(desktopBridgeMissing(undefined, 'web'), false);
 });

@@ -5,6 +5,7 @@ import { APP_VERSION, getPlatform } from '../utils/appInfo';
 import type { UpdateState } from '../utils/updateTypes';
 import {
   createUpdateController,
+  desktopBridgeMissing,
   pickDriver,
   type UpdateController,
 } from '../utils/updater';
@@ -34,25 +35,48 @@ export function useUpdater(): UseUpdaterResult {
 
   useEffect(() => {
     subscriberCount += 1;
-    if (!sharedController) {
-      sharedController = createUpdateController({
-        driver: pickDriver(),
-        currentVersion: APP_VERSION,
-        platform: getPlatform(),
+    let cancelled = false;
+    let unsubscribe = () => {};
+    let fallbackTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const attach = () => {
+      if (cancelled) return;
+      if (!sharedController) {
+        sharedController = createUpdateController({
+          driver: pickDriver(),
+          currentVersion: APP_VERSION,
+          platform: getPlatform(),
+        });
+        autoCheckTimer = setTimeout(() => {
+          autoCheckTimer = null;
+          void sharedController?.check({ auto: true });
+        }, 5000);
+      }
+      unsubscribe = sharedController.subscribe(nextState => {
+        setState(nextState);
       });
-      autoCheckTimer = setTimeout(() => {
-        autoCheckTimer = null;
-        void sharedController?.check({ auto: true });
-      }, 5000);
+      setState(sharedController.getState());
+    };
+
+    const onReady = () => {
+      if (fallbackTimer !== null) clearTimeout(fallbackTimer);
+      attach();
+    };
+    if (desktopBridgeMissing(window as Parameters<typeof desktopBridgeMissing>[0], getPlatform())) {
+      window.addEventListener('pywebviewready', onReady, { once: true });
+      // If the event never comes, carry on with the manual driver rather than never checking.
+      fallbackTimer = setTimeout(() => {
+        window.removeEventListener('pywebviewready', onReady);
+        attach();
+      }, 8000);
+    } else {
+      attach();
     }
 
-    const unsubscribe = sharedController.subscribe(nextState => {
-      setState(nextState);
-    });
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setState(sharedController.getState());
-
     return () => {
+      cancelled = true;
+      if (fallbackTimer !== null) clearTimeout(fallbackTimer);
+      window.removeEventListener('pywebviewready', onReady);
       unsubscribe();
       subscriberCount -= 1;
       if (subscriberCount <= 0) {

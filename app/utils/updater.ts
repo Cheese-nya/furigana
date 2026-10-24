@@ -435,6 +435,14 @@ export interface PickDriverDeps {
   wifiOnly?: boolean;
 }
 
+/**
+ * pywebview attaches `window.pywebview.api` a moment after the page loads (`pywebviewready`). A desktop
+ * build must wait for it before choosing a driver, or it pins the manual one and never downloads.
+ */
+export function desktopBridgeMissing(win: { pywebview?: { api?: Partial<DesktopUpdateApi> } } | undefined, platform: Platform): boolean {
+  return platform === 'desktop' && typeof win?.pywebview?.api?.update_download !== 'function';
+}
+
 export function pickDriver(deps?: PickDriverDeps): UpdateDriver {
   const dist = deps?.distribution ?? DISTRIBUTION;
   if (dist !== 'website') {

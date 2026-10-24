@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React from 'react';
 import { GlassPopover, PopoverItem, PopoverSeparator } from './glass/GlassPopover';
 import { LiquidSelector } from './glass/LiquidSelector';
 import { IconBug, IconCheck, IconDictionary, IconDownload, IconMessage, IconUsers } from './glass/icons';
@@ -73,8 +73,9 @@ export function SettingsMenu({
   const dot = dictionaryStatus === 'ready' ? 'bg-[var(--ok)]' : dictionaryStatus === 'loading' ? 'bg-[var(--label-3)] animate-pulse' : 'bg-[var(--danger)]';
   const segClass = 'flex w-full [&>[data-opt]]:h-7 [&>[data-opt]]:flex-1 [&>[data-opt]]:px-2 [&>[data-opt]]:text-[13px]';
 
-  // Read once: the popover never renders on the server, so the platform is known here.
-  const [desktop] = useState(() => getPlatform() === 'desktop');
+  // Read on every render: pywebview attaches a moment after load, so a value cached at mount would say "web".
+  // The label only exists inside the open popover, which never renders on the server.
+  const desktop = getPlatform() === 'desktop';
 
   const updateRow = update && showUpdate ? (() => {
     let label = '';

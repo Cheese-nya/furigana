@@ -253,7 +253,9 @@ class BuildApplyScriptTest(unittest.TestCase):
             r'C:\Users\me\AppData\Local\UkuFurigana\updates\UkuFurigana-v1.3.0.exe',
         )
         self.assertIn('tasklist /NH /FI "PID eq 4321"', script)
-        self.assertIn('find " 4321 "', script)
+        self.assertIn('findstr /C:" 4321 "', script)
+        # A pipeline aborts the detached, console-less helper before the swap (found on real Windows).
+        self.assertFalse(any('|' in line for line in script.split('\r\n')), script)
         self.assertIn('ping -n 2 127.0.0.1', script)
         self.assertIn('GEQ 30', script)
         self.assertIn('goto wait', script)

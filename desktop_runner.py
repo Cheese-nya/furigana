@@ -4,6 +4,7 @@ Bundles static Next.js export with built-in HTTP server & PyWebView Window mode.
 """
 
 import sys
+import ntpath
 import os
 import re
 import time
@@ -124,7 +125,7 @@ def cleanup_update_dir(updates_dir):
     directory = Path(updates_dir)
     if not directory.is_dir():
         return
-    leftovers = [directory / APPLY_SCRIPT_NAME] + sorted(directory.glob('*.exe.part'))
+    leftovers = [directory / APPLY_SCRIPT_NAME, directory / 'apply_update.pid'] + sorted(directory.glob('*.exe.part'))
     for path in leftovers:
         try:
             path.unlink()
@@ -296,16 +297,21 @@ def build_apply_script(pid, current_exe, new_exe):
 
     Only paths derived from sys.executable and the updates directory are
     interpolated; nothing here comes from the web page.
+
+    The wait loop must not use a pipe (`tasklist | find`): the helper runs detached from a windowed
+    app with no console, and a pipeline there aborts the whole script before it reaches the swap.
     """
     target = _bat_quote(current_exe)
     backup = _bat_quote(f'{current_exe}.old')
     package = _bat_quote(new_exe)
+    pid_file = _bat_quote(ntpath.join(ntpath.dirname(str(new_exe)), 'apply_update.pid'))
     return '\r\n'.join([
         '@echo off',
         'setlocal',
         'set "TRIES=0"',
         ':wait',
-        f'tasklist /NH /FI "PID eq {int(pid)}" 2>nul | find " {int(pid)} " >nul',
+        f'tasklist /NH /FI "PID eq {int(pid)}" > {pid_file} 2>nul',
+        f'findstr /C:" {int(pid)} " {pid_file} >nul',
         'if errorlevel 1 goto swap',
         'set /a TRIES+=1',
         f'if %TRIES% GEQ {APPLY_WAIT_SECONDS} goto swap',
@@ -313,6 +319,7 @@ def build_apply_script(pid, current_exe, new_exe):
         'ping -n 2 127.0.0.1 >nul',
         'goto wait',
         ':swap',
+        f'del /f /q {pid_file} >nul 2>&1',
         f'del /f /q {backup} >nul 2>&1',
         f'move /y {target} {backup} >nul 2>&1',
         'if errorlevel 1 goto relaunch_old',
@@ -773,6 +780,10 @@ def main():
     logger.info('Serving %s on port %s', web_dir, port)
     window = webview.create_window('浮く Uku Furigana', url, width=1280, height=830, js_api=api)
     api.set_window(window)
+    # Test setup only: UKU_DEBUG_PORT opens WebView2's DevTools port so the update test can drive the page.
+    debug_port = os.environ.get('UKU_DEBUG_PORT', '').strip()
+    if debug_port.isdigit():
+        webview.settings['REMOTE_DEBUGGING_PORT'] = int(debug_port)
     try:
         webview.start(private_mode=False)
     finally:
