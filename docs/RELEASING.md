@@ -19,6 +19,22 @@
 
 应用内「检查更新」依赖上面三个**固定的文件名格式**（`Uku-Furigana-vX.Y.Z.apk`、`Uku-Furigana-vX.Y.Z-windows.exe`、`SHA256SUMS.txt`）和 `releases/latest`（不含草稿与预发布版本）。改名会让自动更新找不到安装包。Android 的 APK 必须用同一把 `uku-release.jks` 签名，否则系统安装器会拒绝覆盖安装。中转服务的部署见 `server/relay/DEPLOY.md`。
 
+## 发布之后：同步到网站服务器
+
+GitHub 的发布文件在中国大陆经常下不动（直连实测 40 秒一个字节都没有），所以官网的下载按钮优先走自己的服务器，GitHub 只作为备用链接。每次发布完成后：
+
+1. 把发布文件同步到服务器（服务器自己从 GitHub 拉取并校验 `SHA256SUMS.txt`，通过后才对外可见）：
+   ```bash
+   scripts/sync-release-to-server.sh vX.Y.Z
+   ```
+   文件会放在 `https://saiaino.xyz/downloads/vX.Y.Z/<文件名>`，由 nginx 直接提供（支持断点续传）。脚本不会删除任何东西，旧版本留在服务器上，需要时手动清理。
+2. 更新官网（站点文件不在本仓库里，在服务器的 `/var/www/saiaino.xyz/html`）：
+   - `uku/uku.js` 里的 `RELEASE`：版本、日期、更新说明链接，以及三个安装包的文件名、大小和 SHA-256（取自发布页的 `SHA256SUMS.txt`）；
+   - `config.js` 里应用的 `version`，和 `uku/index.html` 里 `eyebrow-version` 的静态占位版本。
+3. 在线版 `uku.saiaino.xyz` 用发布出来的 `Uku-Furigana-web-vX.Y.Z.zip` 整体替换 `/var/www/uku.saiaino.xyz/html`（先备份，并保留旧版里新版不再带的 `_next/static` 文件，让还开着旧页面的人不会加载失败）。
+
+应用内的自动更新在 GitHub 取不到版本信息时会改走中转服务，并优先使用服务器镜像下载，GitHub 作为备用。
+
 标签必须和 `package.json` 的版本一致（`v1.3.0` ↔ `1.3.0`），否则发布会在第一步失败。
 
 ## 官网下载链接
