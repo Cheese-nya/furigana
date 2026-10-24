@@ -1,3 +1,4 @@
+import { waitForPywebviewApi } from './pywebviewReady';
 import { emptyDatabase, migrateDatabase, type CorrectionDatabaseV2 } from './correctionDatabase';
 
 const STORAGE_KEY = 'furigana-corrections-v2';
@@ -13,8 +14,9 @@ function nativeApi(): CorrectionApi | undefined {
 }
 
 async function readyApi(): Promise<CorrectionApi | undefined> {
-  if (new URLSearchParams(window.location.search).get('desktop') === '1' && !nativeApi()) {
-    await new Promise<void>(resolve => window.addEventListener('pywebviewready', () => resolve(), { once: true }));
+  if (new URLSearchParams(window.location.search).get('desktop') === '1') {
+    const usable = () => { const api = nativeApi(); return !!api && !!api.load_correction_database && !!api.save_correction_database; };
+    await waitForPywebviewApi(window, usable);
   }
   const api = nativeApi();
   if (api && (!api.load_correction_database || !api.save_correction_database)) throw new Error('请更新桌面程序以使用新版校对存储');

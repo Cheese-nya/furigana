@@ -125,6 +125,7 @@ echo "==> [3/7] Linking APK and generating R.java with aapt2..."
 "$AAPT2" link \
   -I "$ANDROID_JAR" \
   --manifest "$ANDROID_DIR/AndroidManifest.xml" \
+  ${ANDROID_DEBUGGABLE:+--debug-mode} \
   --java "$BUILD_DIR/gen" \
   -A "$ANDROID_DIR/assets" \
   -0 .bin -0 .gz -0 .dat -0 .wasm -0 .woff2 -0 .mp3 -0 .ogg \

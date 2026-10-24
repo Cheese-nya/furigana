@@ -1,10 +1,15 @@
 package com.cheese.uku;
 
 import android.app.Activity;
+import android.app.ActivityManager;
+import android.app.ApplicationExitInfo;
 import android.content.ActivityNotFoundException;
 import android.content.ContentResolver;
 import android.content.ContentValues;
+import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
+import android.content.pm.PackageInfo;
 import android.content.res.AssetManager;
 import android.graphics.Bitmap;
 import android.graphics.Color;
@@ -32,6 +37,8 @@ import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.Toast;
 
+import org.json.JSONObject;
+
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -39,11 +46,17 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.io.RandomAccessFile;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 import java.util.HashMap;
+import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.TimeZone;
 
 public class MainActivity extends Activity {
     private static final int FILE_CHOOSER_RESULT_CODE = 1001;
@@ -57,6 +70,13 @@ public class MainActivity extends Activity {
     private static final long RENDERER_RESTART_WINDOW_MS = 60_000L;
     private static int rendererRestarts = 0;
     private static long rendererRestartWindowStart = 0L;
+
+    public static final int NATIVE_LOG_MAX_BYTES = 64 * 1024;
+    public static final int NATIVE_LOG_TRIM_BYTES = 32 * 1024;
+    private static final String NATIVE_LOG_FILE = "native.log";
+    private static final String PREFS_NAME = "uku_native_log";
+    private static final String PREF_LAST_EXIT_TS = "last_exit_timestamp";
+    private static final Object LOG_LOCK = new Object();
 
     private WebView webView;
     private ValueCallback<Uri[]> filePathCallback;
@@ -121,6 +141,85 @@ public class MainActivity extends Activity {
                     : (isDark ? "#000000" : "#F2F2F7");
             runOnUiThread(() -> applySystemBarAndWebViewTheme(safeHex, isDark));
         }
+
+        @JavascriptInterface
+        public String getAppVersion() {
+            try {
+                PackageInfo info = getPackageManager().getPackageInfo(getPackageName(), 0);
+                String versionName = info.versionName != null ? info.versionName : "0.0.0";
+                long versionCode = Build.VERSION.SDK_INT >= Build.VERSION_CODES.P
+                        ? info.getLongVersionCode()
+                        : info.versionCode;
+                JSONObject json = new JSONObject();
+                json.put("versionName", versionName);
+                json.put("versionCode", versionCode);
+                return json.toString();
+            } catch (Exception e) {
+                return formatErrorJson(e.getMessage() != null ? e.getMessage() : "version-error");
+            }
+        }
+
+        @JavascriptInterface
+        public String getNativeLog() {
+            return readNativeLog(MainActivity.this);
+        }
+
+        @JavascriptInterface
+        public String startUpdateDownload(String argsJson) {
+            try {
+                return UpdateManager.getInstance(MainActivity.this).startUpdateDownload(argsJson);
+            } catch (Exception e) {
+                return formatErrorJson(e.getMessage() != null ? e.getMessage() : "start-download-error");
+            }
+        }
+
+        @JavascriptInterface
+        public String getUpdateState() {
+            try {
+                return UpdateManager.getInstance(MainActivity.this).getUpdateState();
+            } catch (Exception e) {
+                return "{\"phase\":\"error\",\"progress\":0,\"error\":\"state-error\"}";
+            }
+        }
+
+        @JavascriptInterface
+        public String installUpdate() {
+            try {
+                return UpdateManager.getInstance(MainActivity.this).installUpdate(MainActivity.this);
+            } catch (Exception e) {
+                return formatErrorJson(e.getMessage() != null ? e.getMessage() : "install-error");
+            }
+        }
+
+        @JavascriptInterface
+        public String cancelUpdateDownload() {
+            try {
+                return UpdateManager.getInstance(MainActivity.this).cancelUpdateDownload();
+            } catch (Exception e) {
+                return formatErrorJson(e.getMessage() != null ? e.getMessage() : "cancel-error");
+            }
+        }
+
+        @JavascriptInterface
+        public String openQqGroup(String uin) {
+            try {
+                if (uin == null || !uin.matches("^\\d{5,12}$")) {
+                    return "{\"success\":false,\"error\":\"invalid-uin\"}";
+                }
+                Uri uri = Uri.parse("mqqapi://card/show_pslcard?src_type=internal&version=1&uin="
+                        + uin + "&card_type=group&source=qrcode");
+                Intent intent = new Intent(Intent.ACTION_VIEW, uri);
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                try {
+                    startActivity(intent);
+                    return "{\"success\":true}";
+                } catch (ActivityNotFoundException e) {
+                    return "{\"success\":false}";
+                }
+            } catch (Exception e) {
+                return formatErrorJson(e.getMessage() != null ? e.getMessage() : "qq-open-error");
+            }
+        }
     }
 
     private boolean isSystemDark() {
@@ -170,6 +269,8 @@ public class MainActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        recordHistoricalExitReasons();
+        UpdateManager.cleanupInstalled(this);
 
         Window window = getWindow();
         if (window != null) {
@@ -244,7 +345,11 @@ public class MainActivity extends Activity {
                 // Without this the dead renderer leaves "This page couldn't load" (or takes the app down).
                 // Tear the WebView down and rebuild the activity so the app comes back on its own.
                 boolean crashed = Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && detail != null && detail.didCrash();
+                int priorityAtExit = (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && detail != null)
+                        ? detail.rendererPriorityAtExit()
+                        : -1;
                 Log.w(TAG, "WebView renderer gone (" + (crashed ? "crash" : "killed by system, likely low memory") + ")");
+                appendNativeLog(MainActivity.this, "renderer-gone didCrash=" + crashed + " priorityAtExit=" + priorityAtExit);
                 if (view != null) {
                     ViewGroup parent = (ViewGroup) view.getParent();
                     if (parent != null) parent.removeView(view);
@@ -546,5 +651,155 @@ public class MainActivity extends Activity {
         if (webView != null) {
             webView.saveState(outState);
         }
+    }
+
+    private void recordHistoricalExitReasons() {
+        if (Build.VERSION.SDK_INT >= 30) {
+            try {
+                ActivityManager am = (ActivityManager) getSystemService(Context.ACTIVITY_SERVICE);
+                if (am == null) return;
+                List<ApplicationExitInfo> reasons = am.getHistoricalProcessExitReasons(getPackageName(), 0, 5);
+                if (reasons == null || reasons.isEmpty()) return;
+
+                SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
+                long lastTs = prefs.getLong(PREF_LAST_EXIT_TS, 0L);
+                long maxTs = lastTs;
+
+                for (int i = reasons.size() - 1; i >= 0; i--) {
+                    ApplicationExitInfo info = reasons.get(i);
+                    if (info == null) continue;
+                    long ts = info.getTimestamp();
+                    if (ts <= lastTs) continue;
+                    if (ts > maxTs) maxTs = ts;
+
+                    String reasonName = exitReasonToString(info.getReason());
+                    String desc = info.getDescription();
+                    if (desc == null) {
+                        desc = "";
+                    } else {
+                        desc = desc.replace('\r', ' ').replace('\n', ' ').trim();
+                    }
+                    String entry = "exit reason=" + reasonName
+                            + " status=" + info.getStatus()
+                            + " importance=" + info.getImportance()
+                            + " description=" + desc;
+                    appendNativeLog(this, ts > 0 ? ts : System.currentTimeMillis(), entry);
+                }
+
+                if (maxTs > lastTs) {
+                    prefs.edit().putLong(PREF_LAST_EXIT_TS, maxTs).apply();
+                }
+            } catch (Throwable ignored) {
+            }
+        }
+    }
+
+    private static String exitReasonToString(int reason) {
+        switch (reason) {
+            case ApplicationExitInfo.REASON_UNKNOWN:
+                return "REASON_UNKNOWN";
+            case ApplicationExitInfo.REASON_EXIT_SELF:
+                return "REASON_EXIT_SELF";
+            case ApplicationExitInfo.REASON_SIGNALED:
+                return "REASON_SIGNALED";
+            case ApplicationExitInfo.REASON_LOW_MEMORY:
+                return "REASON_LOW_MEMORY";
+            case ApplicationExitInfo.REASON_CRASH:
+                return "REASON_CRASH";
+            case ApplicationExitInfo.REASON_CRASH_NATIVE:
+                return "REASON_CRASH_NATIVE";
+            case ApplicationExitInfo.REASON_ANR:
+                return "REASON_ANR";
+            case ApplicationExitInfo.REASON_INITIALIZATION_FAILURE:
+                return "REASON_INITIALIZATION_FAILURE";
+            case ApplicationExitInfo.REASON_PERMISSION_CHANGE:
+                return "REASON_PERMISSION_CHANGE";
+            case ApplicationExitInfo.REASON_EXCESSIVE_RESOURCE_USAGE:
+                return "REASON_EXCESSIVE_RESOURCE_USAGE";
+            case ApplicationExitInfo.REASON_USER_REQUESTED:
+                return "REASON_USER_REQUESTED";
+            case ApplicationExitInfo.REASON_USER_STOPPED:
+                return "REASON_USER_STOPPED";
+            case ApplicationExitInfo.REASON_DEPENDENCY_DIED:
+                return "REASON_DEPENDENCY_DIED";
+            case ApplicationExitInfo.REASON_OTHER:
+                return "REASON_OTHER";
+            case ApplicationExitInfo.REASON_FREEZER:
+                return "REASON_FREEZER";
+            default:
+                return "REASON_" + reason;
+        }
+    }
+
+    public static void appendNativeLog(Context context, String message) {
+        appendNativeLog(context, System.currentTimeMillis(), message);
+    }
+
+    public static void appendNativeLog(Context context, long timestampMs, String message) {
+        if (context == null || message == null) return;
+        synchronized (LOG_LOCK) {
+            try {
+                File logFile = new File(context.getFilesDir(), NATIVE_LOG_FILE);
+                String safeMsg = message.replace('\r', ' ').replace('\n', ' ');
+                String line = formatIsoTimestamp(timestampMs) + " " + safeMsg + "\n";
+                byte[] lineBytes = line.getBytes(StandardCharsets.UTF_8);
+
+                try (FileOutputStream fos = new FileOutputStream(logFile, true)) {
+                    fos.write(lineBytes);
+                    fos.flush();
+                }
+
+                if (logFile.length() > NATIVE_LOG_MAX_BYTES) {
+                    byte[] tail = readTailBytes(logFile, NATIVE_LOG_TRIM_BYTES);
+                    try (FileOutputStream fos = new FileOutputStream(logFile, false)) {
+                        fos.write(tail);
+                        fos.flush();
+                    }
+                }
+            } catch (Throwable ignored) {
+            }
+        }
+    }
+
+    public static String readNativeLog(Context context) {
+        if (context == null) return "";
+        synchronized (LOG_LOCK) {
+            try {
+                File logFile = new File(context.getFilesDir(), NATIVE_LOG_FILE);
+                if (!logFile.isFile()) return "";
+                byte[] bytes = readTailBytes(logFile, NATIVE_LOG_MAX_BYTES);
+                return new String(bytes, StandardCharsets.UTF_8);
+            } catch (Throwable ignored) {
+                return "";
+            }
+        }
+    }
+
+    private static byte[] readTailBytes(File file, int maxBytes) throws IOException {
+        if (file == null || !file.isFile() || maxBytes <= 0) {
+            return new byte[0];
+        }
+        try (RandomAccessFile raf = new RandomAccessFile(file, "r")) {
+            long len = raf.length();
+            if (len <= 0) {
+                return new byte[0];
+            }
+            int toRead = (int) Math.min(len, (long) maxBytes);
+            raf.seek(len - toRead);
+            byte[] buf = new byte[toRead];
+            raf.readFully(buf);
+            return buf;
+        }
+    }
+
+    private static String formatIsoTimestamp(long timestampMs) {
+        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US);
+        sdf.setTimeZone(TimeZone.getTimeZone("UTC"));
+        return sdf.format(new Date(timestampMs));
+    }
+
+    private static String formatErrorJson(String message) {
+        String safe = (message != null ? message : "error").replace("\\", "\\\\").replace("\"", "'");
+        return "{\"success\":false,\"error\":\"" + safe + "\"}";
     }
 }

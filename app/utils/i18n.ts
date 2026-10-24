@@ -409,6 +409,49 @@ export interface Translations {
   nextReviewItem: string;
   previewTotalPrefix: string;
   suppressedRubyTitle: string;
+
+  // Feedback & update
+  feedbackSection: string;
+  feedbackUploadLog: string;
+  feedbackSubmitIssue: string;
+  feedbackJoinQq: string;
+  qqCopied: string;
+  updateCheck: string;
+  updateChecking: string;
+  updateUpToDate: string;
+  updateAvailable: string;
+  updateDownloading: string;
+  updateReady: string;
+  updateReadyDesktop: string;
+  updateFailed: string;
+  updateMeteredHint: string;
+  updateOpenReleases: string;
+  updateCurrentVersion: string;
+  feedbackTitleLog: string;
+  feedbackTitleText: string;
+  feedbackModeLog: string;
+  feedbackModeText: string;
+  feedbackLogIntro: string;
+  feedbackNoteLabel: string;
+  feedbackIssueTitleLabel: string;
+  feedbackIssueBodyLabel: string;
+  feedbackContactLabel: string;
+  feedbackAttachLog: string;
+  feedbackLogPreview: string;
+  feedbackLogEntries: string;
+  feedbackLogLoading: string;
+  feedbackPrivacy: string;
+  feedbackConsent: string;
+  feedbackSend: string;
+  feedbackSending: string;
+  feedbackSuccess: string;
+  feedbackViewIssue: string;
+  feedbackErrRateLimited: string;
+  feedbackErrTooLarge: string;
+  feedbackErrInvalid: string;
+  feedbackErrNetwork: string;
+  feedbackErrServer: string;
+  feedbackRetry: string;
 }
 
 export const translations: Record<Locale, Translations> = {
@@ -798,6 +841,49 @@ export const translations: Record<Locale, Translations> = {
     nextReviewItem: '下一处',
     previewTotalPrefix: '共',
     suppressedRubyTitle: '主动不注音',
+
+    // Feedback & update
+    feedbackSection: '反馈与更新',
+    feedbackUploadLog: '上传报错日志',
+    feedbackSubmitIssue: '提交问题',
+    feedbackJoinQq: '加入 QQ 群',
+    qqCopied: '群号已复制',
+    updateCheck: '检查更新',
+    updateChecking: '检查中…',
+    updateUpToDate: '已是最新',
+    updateAvailable: '发现新版本 v{version}',
+    updateDownloading: '下载中 {percent}%',
+    updateReady: '已下载，点击安装',
+    updateReadyDesktop: '已下载，点击重启更新',
+    updateFailed: '检查失败，点击重试',
+    updateMeteredHint: '当前为移动网络，点击下载',
+    updateOpenReleases: '前往下载页',
+    updateCurrentVersion: '当前版本 v{version}',
+    feedbackTitleLog: '上传报错日志',
+    feedbackTitleText: '提交问题',
+    feedbackModeLog: '日志',
+    feedbackModeText: '文字',
+    feedbackLogIntro: '将把应用版本、设备信息和最近的错误记录发送给开发者，不包含台本文字。',
+    feedbackNoteLabel: '补充说明（选填）',
+    feedbackIssueTitleLabel: '标题',
+    feedbackIssueBodyLabel: '问题描述',
+    feedbackContactLabel: '联系方式（选填，QQ 或邮箱）',
+    feedbackAttachLog: '同时附带技术日志',
+    feedbackLogPreview: '日志预览',
+    feedbackLogEntries: '{count} 条记录',
+    feedbackLogLoading: '正在收集日志…',
+    feedbackPrivacy: '提交内容会公开发布到 GitHub issue，请勿填写隐私信息。日志已隐去台本文字，仅含版本、设备与错误信息。',
+    feedbackConsent: '我已了解并同意公开提交',
+    feedbackSend: '发送',
+    feedbackSending: '发送中…',
+    feedbackSuccess: '已提交，编号 #{number}',
+    feedbackViewIssue: '查看 issue',
+    feedbackErrRateLimited: '提交太频繁，请稍后再试',
+    feedbackErrTooLarge: '内容过大，请精简后重试',
+    feedbackErrInvalid: '内容不符合要求，请检查后重试',
+    feedbackErrNetwork: '网络不可用，请检查网络后重试',
+    feedbackErrServer: '服务器暂时不可用，请稍后再试',
+    feedbackRetry: '重试',
   },
   'en': {
     appTitle: 'Uku Furigana',
@@ -1185,5 +1271,48 @@ export const translations: Record<Locale, Translations> = {
     nextReviewItem: 'Next',
     previewTotalPrefix: 'total',
     suppressedRubyTitle: 'No Ruby',
+
+    // Feedback & update
+    feedbackSection: 'Feedback & Updates',
+    feedbackUploadLog: 'Upload Error Log',
+    feedbackSubmitIssue: 'Report an Issue',
+    feedbackJoinQq: 'Join QQ Group',
+    qqCopied: 'Group number copied',
+    updateCheck: 'Check for Updates',
+    updateChecking: 'Checking…',
+    updateUpToDate: 'Up to date',
+    updateAvailable: 'Version v{version} available',
+    updateDownloading: 'Downloading {percent}%',
+    updateReady: 'Downloaded — tap to install',
+    updateReadyDesktop: 'Downloaded — tap to restart',
+    updateFailed: 'Check failed — tap to retry',
+    updateMeteredHint: 'On mobile data — tap to download',
+    updateOpenReleases: 'Open download page',
+    updateCurrentVersion: 'Current version v{version}',
+    feedbackTitleLog: 'Upload Error Log',
+    feedbackTitleText: 'Report an Issue',
+    feedbackModeLog: 'Log',
+    feedbackModeText: 'Text',
+    feedbackLogIntro: 'Sends the app version, device info and recent errors to the developer. Script text is never included.',
+    feedbackNoteLabel: 'Notes (optional)',
+    feedbackIssueTitleLabel: 'Title',
+    feedbackIssueBodyLabel: 'Description',
+    feedbackContactLabel: 'Contact (optional, QQ or email)',
+    feedbackAttachLog: 'Attach technical log',
+    feedbackLogPreview: 'Log preview',
+    feedbackLogEntries: '{count} entries',
+    feedbackLogLoading: 'Collecting logs…',
+    feedbackPrivacy: 'Your submission is published publicly as a GitHub issue, so please leave out anything private. The log has script text redacted and only contains version, device and error details.',
+    feedbackConsent: 'I understand this will be published publicly',
+    feedbackSend: 'Send',
+    feedbackSending: 'Sending…',
+    feedbackSuccess: 'Submitted as #{number}',
+    feedbackViewIssue: 'View issue',
+    feedbackErrRateLimited: 'Too many submissions — please try again later',
+    feedbackErrTooLarge: 'Content is too large — please trim it and retry',
+    feedbackErrInvalid: 'Content was rejected — please check it and retry',
+    feedbackErrNetwork: 'Network unavailable — check your connection and retry',
+    feedbackErrServer: 'Server is temporarily unavailable — please try again later',
+    feedbackRetry: 'Retry',
   },
 };

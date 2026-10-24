@@ -1,3 +1,4 @@
+import { waitForPywebviewApi } from './pywebviewReady';
 import { createStarterBooks, emptyLibraryDatabase, validateLibraryDatabase, type LibraryDatabaseV1 } from './libraryDatabase';
 
 const STORAGE_KEY = 'furigana-library-v1';
@@ -21,8 +22,9 @@ function nativeApi(): Partial<LibraryApi> | undefined {
 async function readyApi(): Promise<Partial<LibraryApi> | undefined> {
   const browser = (globalThis as { window?: Window & { pywebview?: { api?: Partial<LibraryApi> } } }).window;
   if (!browser) return undefined;
-  if (new URLSearchParams(browser.location.search).get('desktop') === '1' && !nativeApi()) {
-    await new Promise<void>(resolve => browser.addEventListener('pywebviewready', () => resolve(), { once: true }));
+  if (new URLSearchParams(browser.location.search).get('desktop') === '1') {
+    const usable = () => { const api = nativeApi(); return !!api && !!api.load_library_database && !!api.save_library_database; };
+    await waitForPywebviewApi(browser, usable);
   }
   const api = nativeApi();
   if (api && (!api.load_library_database || !api.save_library_database)) throw new Error('请更新桌面程序以使用书库存储');

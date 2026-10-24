@@ -5,6 +5,7 @@ import { LiquidSelector } from './glass/LiquidSelector';
 import { GlassButton } from './glass/GlassButton';
 import { useGlass } from './glass/hooks';
 import { IconBooks, IconEdit, IconGear, IconRead, IconStack } from './glass/icons';
+import { UpdateDot } from './UpdateDot';
 import type { AppTab } from './MobileNavBar';
 import type { Translations } from '../utils/i18n';
 
@@ -17,13 +18,15 @@ export interface SidebarProps {
   hidden?: boolean;
   /** Renders the settings popover; receives the gear button as anchor. */
   renderSettings: (anchor: HTMLElement | null, open: boolean, close: () => void) => React.ReactNode;
+  /** Yellow dot on the settings button: an update is available. */
+  updateDot?: boolean;
   t: Translations;
 }
 
 export const SIDEBAR_WIDTH = 214;
 
 /** Floating glass sidebar for md+ screens (phones use MobileNavBar). */
-export function Sidebar({ activeTab, onSelectTab, libraryBookCount, batchCount, hidden = false, renderSettings, t }: SidebarProps) {
+export function Sidebar({ activeTab, onSelectTab, libraryBookCount, batchCount, hidden = false, renderSettings, updateDot = false, t }: SidebarProps) {
   const glassRef = useGlass<HTMLElement>();
   const [settingsAnchor, setSettingsAnchor] = useState<HTMLButtonElement | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -67,7 +70,7 @@ export function Sidebar({ activeTab, onSelectTab, libraryBookCount, batchCount, 
         ]}
       />
 
-      <div className="mt-auto">
+      <div className="relative mt-auto">
         <GlassButton
           ref={setSettingsAnchor}
           aria-haspopup="dialog"
@@ -78,6 +81,7 @@ export function Sidebar({ activeTab, onSelectTab, libraryBookCount, batchCount, 
           <IconGear />
           <span>{t.settingsTitle}</span>
         </GlassButton>
+        {updateDot && <UpdateDot className="!right-3 !top-1/2 -translate-y-1/2" />}
       </div>
       {renderSettings(settingsAnchor, settingsOpen, () => setSettingsOpen(false))}
     </aside>

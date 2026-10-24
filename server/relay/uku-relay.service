@@ -1,0 +1,26 @@
+[Unit]
+Description=Uku Furigana Feedback and Update Relay
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+DynamicUser=yes
+EnvironmentFile=/etc/uku-relay.env
+Environment=PYTHONUNBUFFERED=1
+Environment=UKU_CACHE_DIR=/var/cache/uku-relay
+ExecStart=/usr/bin/python3 /opt/uku-relay/relay.py
+Restart=on-failure
+RestartSec=5s
+MemoryMax=96M
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+NoNewPrivileges=yes
+StateDirectory=uku-relay
+CacheDirectory=uku-relay
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
