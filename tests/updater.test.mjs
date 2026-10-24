@@ -7,6 +7,7 @@ const {
   compareVersions,
   selectAsset,
   fetchLatestRelease,
+  preferMirror,
   shouldAutoCheck,
   createAndroidDriver,
   createDesktopDriver,
@@ -543,3 +544,31 @@ test('a desktop build waits for the pywebview bridge instead of pinning the manu
   assert.equal(desktopBridgeMissing({}, 'android'), false);
   assert.equal(desktopBridgeMissing(undefined, 'web'), false);
 });
+
+test('when GitHub is unreachable the mirror becomes the primary download URL, and GitHub the fallback', async () => {
+  const GH = 'https://github.com/x/y/releases/download/v1.3.0/Uku-Furigana-v1.3.0.apk';
+  const MIRROR = 'https://uku.saiaino.xyz/api/update/dl/v1.3.0/Uku-Furigana-v1.3.0.apk';
+  const fetchStub = async url => {
+    if (url.includes('api.github.com')) throw new TypeError('blocked');
+    return {
+      ok: true, status: 200,
+      json: async () => ({ version: '1.3.0', tag: 'v1.3.0', notes: '', assets: [{ name: 'Uku-Furigana-v1.3.0.apk', size: 1, url: GH, mirrorUrl: MIRROR, sha256: SAMPLE_APK_HASH }] }),
+    };
+  };
+  const release = await fetchLatestRelease({ fetch: fetchStub });
+  assert.equal(release.assets[0].url, MIRROR);
+  assert.equal(release.assets[0].mirrorUrl, GH);
+});
+
+test('preferMirror leaves assets without a mirror alone and does not mutate its input', () => {
+  const input = { version: '1', tag: 'v1', notes: '', assets: [
+    { name: 'a.apk', size: 1, url: 'gh-a', mirrorUrl: 'mir-a' },
+    { name: 'b.apk', size: 1, url: 'gh-b' },
+  ] };
+  const out = preferMirror(input);
+  assert.equal(out.assets[0].url, 'mir-a');
+  assert.equal(out.assets[0].mirrorUrl, 'gh-a');
+  assert.deepEqual(out.assets[1], input.assets[1]);
+  assert.equal(input.assets[0].url, 'gh-a');
+});
+

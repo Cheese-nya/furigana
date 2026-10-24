@@ -232,6 +232,16 @@ export interface FetchLatestReleaseDeps {
   timeoutMs?: number;
 }
 
+/** Swap each asset's primary and fallback download URLs so the mirror is tried first. */
+export function preferMirror(release: ReleaseInfo): ReleaseInfo {
+  return {
+    ...release,
+    assets: release.assets.map(asset => (
+      asset.mirrorUrl && asset.url ? { ...asset, url: asset.mirrorUrl, mirrorUrl: asset.url } : asset
+    )),
+  };
+}
+
 export async function fetchLatestRelease(deps?: FetchLatestReleaseDeps): Promise<ReleaseInfo> {
   const fetchFn = deps?.fetch ?? (typeof fetch !== 'undefined' ? fetch : undefined);
   if (typeof fetchFn !== 'function') {
@@ -250,7 +260,10 @@ export async function fetchLatestRelease(deps?: FetchLatestReleaseDeps): Promise
   }
 
   try {
-    return await fetchFromRelay(fetchFn, timeoutMs);
+    const release = await fetchFromRelay(fetchFn, timeoutMs);
+    // GitHub just failed us (blocked or stalling, as it often does in mainland China), so downloading from it
+    // first would only cost a stall before the mirror; put the mirror first.
+    return githubErr === 'skipped' ? release : preferMirror(release);
   } catch (relayErr) {
     const ghMsg = githubErr instanceof Error ? githubErr.message : String(githubErr);
     const rlMsg = relayErr instanceof Error ? relayErr.message : String(relayErr);
