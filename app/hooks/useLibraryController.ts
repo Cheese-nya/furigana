@@ -21,6 +21,7 @@ import {
   toggleBookFavorite,
   updateBookMetadata,
   updateReadingProgress,
+  lineProgressPercent,
   upsertBook,
   type BookCategory,
   type BookCoverTheme,
@@ -370,13 +371,15 @@ export function useLibraryController({
     if (editorBookId === bookId) setEditorBookId(null);
   };
 
-  const handleReaderProgress = (chapterIndex: number, lineIndex: number) => {
+  const handleReaderProgress = (chapterIndex: number, lineIndex: number, totalLines?: number) => {
     if (!activeBookId) return;
     setLibraryDb(previous => {
       const book = previous.books[activeBookId];
       if (!book) return previous;
       const total = Math.max(1, book.chapters.length - 1);
-      const percentage = book.chapters.length <= 1 ? 100 : Math.round((chapterIndex / total) * 100);
+      const percentage = totalLines !== undefined
+        ? lineProgressPercent(lineIndex, totalLines)
+        : book.chapters.length <= 1 ? 100 : Math.round((chapterIndex / total) * 100);
       return updateReadingProgress(previous, activeBookId, { chapterIndex, lineIndex, percentage });
     });
   };

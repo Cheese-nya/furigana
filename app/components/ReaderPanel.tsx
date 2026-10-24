@@ -20,7 +20,7 @@ export interface ReaderPanelProps {
   isProcessing: boolean;
   rubyType: RubyMode;
   onRubyTypeChange: (mode: RubyMode) => void;
-  onUpdateProgress: (chapterIndex: number, lineIndex: number) => void;
+  onUpdateProgress: (chapterIndex: number, lineIndex: number, totalLines?: number) => void;
   onGoToLibrary: () => void;
 }
 
@@ -75,6 +75,15 @@ export function ReaderPanel({ t, book, annotatedLines, isProcessing, rubyType, o
   const lastYRef = useRef(0);
   const travelRef = useRef(0);
   const lastLineRef = useRef(-1);
+  // Line to bring back to the top once it has been rendered: the saved place when a book opens, or the
+  // current place when a re-annotation empties the page and the lines stream back in.
+  const resumeLineRef = useRef<number | null>(null);
+  const bookRef = useRef(book);
+  // The line we put back, until the reader moves it themselves; re-placed once the layout settles.
+  const placedLineRef = useRef<number | null>(null);
+  const userMovedRef = useRef(false);
+  const settleTimersRef = useRef<number[]>([]);
+  const placeLineRef = useRef<(line: number) => boolean>(() => false);
   const frameRef = useRef<number | null>(null);
   const capsuleRef = useGlass<HTMLDivElement>();
   const isVertical = prefs.writingMode === 'vertical';
@@ -128,14 +137,18 @@ export function ReaderPanel({ t, book, annotatedLines, isProcessing, rubyType, o
 
     if (!article) return;
     const nodes = article.querySelectorAll<HTMLElement>('[data-line]');
+    // An emptied page (re-annotating) clamps the scroll to 0; that is not the reader's place, so keep the saved one.
+    if (nodes.length === 0) return;
     let index = 0;
     nodes.forEach(node => {
       const rect = node.getBoundingClientRect();
       if (isVertical ? rect.right >= window.innerWidth - 72 : rect.top <= 72) index = Number(node.dataset.line) || 0;
     });
+    // Right after a restore, layout drift must not rewrite the saved place; only the reader's own scrolling may.
+    if (placedLineRef.current !== null && !userMovedRef.current) return;
     if (index !== lastLineRef.current) {
       lastLineRef.current = index;
-      onUpdateProgress(0, index);
+      onUpdateProgress(0, index, nodes.length);
     }
   }, [isVertical, onUpdateProgress]);
 
@@ -155,6 +168,79 @@ export function ReaderPanel({ t, book, annotatedLines, isProcessing, rubyType, o
       frameRef.current = null;
     };
   }, [handleScroll]);
+
+  useEffect(() => { bookRef.current = book; });
+
+  // A book opened (or changed): the place to return to is the one saved with it.
+  const bookId = book?.bookId ?? null;
+  useEffect(() => {
+    const saved = bookRef.current?.readingProgress.lineIndex ?? 0;
+    resumeLineRef.current = saved > 0 ? saved : null;
+    lastLineRef.current = -1;
+    placedLineRef.current = null;
+    userMovedRef.current = false;
+  }, [bookId]);
+
+  // Any hand on the page means the reader has taken over: stop re-placing.
+  useEffect(() => {
+    const markMoved = () => { userMovedRef.current = true; };
+    const events = ['wheel', 'touchstart', 'pointerdown', 'keydown'] as const;
+    events.forEach(name => window.addEventListener(name, markMoved, { passive: true, capture: true }));
+    return () => events.forEach(name => window.removeEventListener(name, markMoved, true));
+  }, []);
+
+  // The lines were emptied by a re-annotation: remember where the reader was so they land back there.
+  const lineTotal = annotatedLines.length;
+  useEffect(() => {
+    if (lineTotal === 0 && lastLineRef.current > 0) resumeLineRef.current = lastLineRef.current;
+  }, [lineTotal]);
+
+  // Switching between horizontal and vertical lays the page out again: keep the place across it.
+  useEffect(() => {
+    if (lastLineRef.current > 0) resumeLineRef.current = lastLineRef.current;
+  }, [isVertical]);
+
+  const placeLine = useCallback((line: number): boolean => {
+    const article = articleRef.current;
+    const node = article?.querySelector<HTMLElement>(`[data-line="${line}"]`);
+    if (!article || !node) return false;
+    const rect = node.getBoundingClientRect();
+    if (isVertical) {
+      // vertical-rl: lines run right to left, and the saved line is the one crossing the right-hand edge;
+      // land it well inside the 72px band the progress check uses, so layout drift cannot pick the neighbour
+      article.scrollLeft += rect.right - (window.innerWidth - 56);
+    } else {
+      const scroller = scrollerRef.current;
+      if (scroller) scroller.scrollTop += rect.top - 70;
+    }
+    return true;
+  }, [isVertical]);
+
+  // Bring the remembered line back as soon as it exists in the page.
+  useEffect(() => {
+    const target = resumeLineRef.current;
+    if (target === null || lineTotal <= target) return;
+    if (!placeLine(target)) return;
+    resumeLineRef.current = null;
+    placedLineRef.current = target;
+    lastLineRef.current = target;
+    // Web fonts and ruby settle a moment later and can nudge the layout; put the line back until they have.
+    settleTimersRef.current.forEach(clearTimeout);
+    const again = () => { if (placedLineRef.current === target && !userMovedRef.current) placeLineRef.current(target); };
+    settleTimersRef.current = [250, 700, 1500].map(ms => window.setTimeout(again, ms));
+    void document.fonts?.ready.then(again);
+  }, [lineTotal, bookId, placeLine]);
+
+  useEffect(() => { placeLineRef.current = placeLine; }, [placeLine]);
+  useEffect(() => () => settleTimersRef.current.forEach(clearTimeout), []);
+
+  // Annotating adds and removes a status line above the text, which nudges the layout; once it is done,
+  // put the line back exactly (unless the reader has already started scrolling).
+  useEffect(() => {
+    const line = placedLineRef.current;
+    if (isProcessing || line === null || userMovedRef.current) return;
+    placeLine(line);
+  }, [isProcessing, placeLine]);
 
   const handleCanvasClick = (event: React.MouseEvent) => {
     if (String(window.getSelection() || '')) return;
