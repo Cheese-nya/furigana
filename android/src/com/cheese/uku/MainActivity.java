@@ -632,11 +632,22 @@ public class MainActivity extends Activity {
 
     @Override
     public void onBackPressed() {
-        if (webView != null && webView.canGoBack()) {
-            webView.goBack();
-        } else {
+        if (webView == null) {
             super.onBackPressed();
+            return;
         }
+        // Let the page decide first: close the open sheet, or step up one screen (reader -> library -> workbench).
+        // Only when it reports nothing left to go back to does the key fall through and leave the app.
+        webView.evaluateJavascript(
+                "(function(){try{return !!(window.__ukuBack&&window.__ukuBack());}catch(e){return false;}})()",
+                value -> {
+                    if ("true".equals(value)) return;
+                    if (webView != null && webView.canGoBack()) {
+                        webView.goBack();
+                    } else {
+                        MainActivity.super.onBackPressed();
+                    }
+                });
     }
 
     @Override

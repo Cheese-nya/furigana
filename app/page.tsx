@@ -28,6 +28,7 @@ import { emptyDatabase, fingerprintText, resolveScript, updateScript, setScriptO
 import { selectReviewWord, makeLearnedReading } from './utils/review';
 import { buildDocxBlob } from './utils/docxExporter';
 import { saveBlob } from './utils/fileSave';
+import { installBackBridge, setNavigationBack } from './utils/backStack';
 import { FeedbackModal } from './components/FeedbackModal';
 import { useUpdater } from './hooks/useUpdater';
 import { buildReport, installGlobalLogging } from './utils/appLog';
@@ -76,6 +77,17 @@ export default function DubbingStudioApp() {
       }
     } catch {}
   }, []);
+  // Android back key: close the open sheet first, then step up one screen (reader -> library -> workbench);
+  // only from the workbench does it fall through and let the shell exit.
+  useEffect(() => installBackBridge(window as unknown as { __ukuBack?: () => boolean }), []);
+  useEffect(() => {
+    setNavigationBack(() => {
+      if (activeTab === 'reader') { setActiveTab('library'); return true; }
+      if (activeTab !== 'editor') { setActiveTab('editor'); return true; }
+      return false;
+    });
+    return () => setNavigationBack(null);
+  }, [activeTab]);
   // Phone portrait-only web orientation lock (best effort; browsers may reject without fullscreen).
   useEffect(() => {
     if (typeof window === 'undefined' || window.innerWidth >= 768) return;

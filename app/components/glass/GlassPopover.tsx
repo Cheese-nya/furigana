@@ -3,6 +3,7 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { SPRING_BOUNCY, prefersReducedMotion, useGlass, mergeRefs } from './hooks';
+import { registerBackHandler } from '../../utils/backStack';
 
 export interface GlassPopoverProps {
   open: boolean;
@@ -67,6 +68,11 @@ export function GlassPopover({ open, onClose, anchor, point, placement = 'below'
       panel.animate([{ opacity: 0, transform: 'scale(0.35)' }, { opacity: 1, transform: 'scale(1)' }], { duration: 560, easing: SPRING_BOUNCY });
     }
   }, [open, mounted, anchor, point, placement]);
+
+  useEffect(() => {
+    if (!open) return;
+    return registerBackHandler(() => onCloseRef.current());
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
