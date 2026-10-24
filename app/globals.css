@@ -288,6 +288,14 @@ html[data-refract="on"] .gbtn.gbtn-prominent:hover:not(:disabled) { background: 
 .switch:active > i { width: 34px; }
 .switch[aria-checked="true"]:active > i { left: 15px; }
 
+/* Sheet content: items rise in on the same spring as the sheet, and disclosures animate their height */
+@keyframes rise-in { from { opacity: 0; transform: translateY(10px) scale(0.985); } to { opacity: 1; transform: none; } }
+.rise-in { animation: rise-in 480ms var(--spring-smooth) both; }
+.disclosure { display: grid; grid-template-rows: 0fr; transition: grid-template-rows 420ms var(--spring-smooth); }
+.disclosure.is-open { grid-template-rows: 1fr; }
+.disclosure > div { min-height: 0; overflow: hidden; }
+@media (prefers-reduced-motion: reduce) { .rise-in { animation: none; } .disclosure { transition-duration: 1ms; } }
+
 /* reduced motion: no stretch, no swell */
 @media (prefers-reduced-motion: reduce) {
   .gbtn, .btn, .sel-ind { transition-duration: 1ms !important; }
