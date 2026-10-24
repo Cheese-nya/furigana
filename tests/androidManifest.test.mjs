@@ -57,3 +57,10 @@ test('onPermissionRequest 拒绝网页发起的所有权限请求', () => {
     'onPermissionRequest 必须调用 request.deny()',
   );
 });
+
+test('MainActivity 处理 WebView 渲染进程崩溃，避免停在 "This page couldn\'t load"', () => {
+  assert.match(mainActivitySource, /onRenderProcessGone\(WebView view, RenderProcessGoneDetail detail\)/);
+  assert.match(mainActivitySource, /recreate\(\)/);
+  // 重建后的 Bundle 里没有 WebView 状态，必须回退到 START_URL。
+  assert.match(mainActivitySource, /restoreState\(savedInstanceState\) == null/);
+});

@@ -35,7 +35,7 @@ export class AnnotationClient {
       this.worker.onmessage = (event: MessageEvent<WorkerResponse>) => this.receive(event.data);
       this.worker.onerror = event => { event.preventDefault(); void this.startFallback('异步注音线程不可用'); };
       this.worker.onmessageerror = () => { void this.startFallback('异步注音结果无法读取'); };
-      this.bootTimer = setTimeout(() => { void this.startFallback('异步注音线程加载超时'); }, 20000);
+      this.bootTimer = setTimeout(() => { void this.startFallback('异步注音线程加载超时'); }, 60000);
       this.send({ type: 'INIT', dictionaryPath });
     } catch (error) {
       void this.startFallback(String(error));

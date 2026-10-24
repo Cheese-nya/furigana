@@ -14,12 +14,15 @@ import android.os.Bundle;
 import android.os.Environment;
 import android.provider.MediaStore;
 import android.util.Base64;
+import android.util.Log;
+import android.view.ViewGroup;
 import android.view.Window;
 import android.view.WindowManager;
 import android.webkit.ConsoleMessage;
 import android.webkit.JavascriptInterface;
 import android.webkit.MimeTypeMap;
 import android.webkit.PermissionRequest;
+import android.webkit.RenderProcessGoneDetail;
 import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceRequest;
@@ -48,6 +51,12 @@ public class MainActivity extends Activity {
     private static final String START_URL = "https://localhost/index.html";
     private static final String PIXIV_UA =
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
+
+    private static final String TAG = "UkuFurigana";
+    private static final int MAX_RENDERER_RESTARTS = 3;
+    private static final long RENDERER_RESTART_WINDOW_MS = 60_000L;
+    private static int rendererRestarts = 0;
+    private static long rendererRestartWindowStart = 0L;
 
     private WebView webView;
     private ValueCallback<Uri[]> filePathCallback;
@@ -231,6 +240,33 @@ public class MainActivity extends Activity {
             }
 
             @Override
+            public boolean onRenderProcessGone(WebView view, RenderProcessGoneDetail detail) {
+                // Without this the dead renderer leaves "This page couldn't load" (or takes the app down).
+                // Tear the WebView down and rebuild the activity so the app comes back on its own.
+                boolean crashed = Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && detail != null && detail.didCrash();
+                Log.w(TAG, "WebView renderer gone (" + (crashed ? "crash" : "killed by system, likely low memory") + ")");
+                if (view != null) {
+                    ViewGroup parent = (ViewGroup) view.getParent();
+                    if (parent != null) parent.removeView(view);
+                    view.destroy();
+                }
+                webView = null;
+
+                long now = System.currentTimeMillis();
+                if (now - rendererRestartWindowStart > RENDERER_RESTART_WINDOW_MS) {
+                    rendererRestartWindowStart = now;
+                    rendererRestarts = 0;
+                }
+                if (++rendererRestarts > MAX_RENDERER_RESTARTS) {
+                    Toast.makeText(MainActivity.this, "页面反复崩溃，请重新打开应用", Toast.LENGTH_LONG).show();
+                    finish();
+                } else {
+                    recreate();
+                }
+                return true;
+            }
+
+            @Override
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
                 Uri uri = request.getUrl();
                 if (uri == null) return false;
@@ -294,10 +330,9 @@ public class MainActivity extends Activity {
             }
         });
 
-        if (savedInstanceState == null) {
+        // After a renderer restart the saved bundle holds no WebView state, so restoreState returns null.
+        if (savedInstanceState == null || webView.restoreState(savedInstanceState) == null) {
             webView.loadUrl(START_URL);
-        } else {
-            webView.restoreState(savedInstanceState);
         }
     }
 
