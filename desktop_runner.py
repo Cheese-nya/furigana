@@ -334,6 +334,9 @@ def build_apply_script(pid, current_exe, new_exe):
         'ping -n 2 127.0.0.1 >nul',
         'goto wait',
         ':swap',
+        # Give the old WebView2 browser process time to exit: the new instance shares its user data
+        # folder, and starting during that shutdown made the first page load fail.
+        'ping -n 5 127.0.0.1 >nul',
         f'del /f /q {pid_file} >nul 2>&1',
         f'del /f /q {backup} >nul 2>&1',
         f'move /y {target} {backup} >nul 2>&1',
@@ -341,6 +344,8 @@ def build_apply_script(pid, current_exe, new_exe):
         f'copy /y {package} {target} >nul 2>&1',
         'if errorlevel 1 goto rollback',
         f'start "" {target}',
+        # The renamed old exe may still be loaded for a moment, so clean up after a short wait.
+        'ping -n 5 127.0.0.1 >nul',
         f'del /f /q {package} >nul 2>&1',
         f'del /f /q {backup} >nul 2>&1',
         'del /f /q "%~f0" >nul 2>&1',

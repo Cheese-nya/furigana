@@ -258,6 +258,7 @@ class BuildApplyScriptTest(unittest.TestCase):
         self.assertFalse(any('|' in line for line in script.split('\r\n')), script)
         self.assertIn('ping -n 2 127.0.0.1', script)
         self.assertIn('GEQ 30', script)
+        self.assertGreaterEqual(script.count('ping -n 5 127.0.0.1'), 2)  # settle before the swap and before cleanup
         self.assertIn('goto wait', script)
         self.assertIn('"C:\\Users\\me\\AppData\\Local\\Programs\\Uku Furigana\\UkuFurigana.exe"', script)
         self.assertIn('.exe.old"', script)
