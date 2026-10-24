@@ -1,4 +1,5 @@
 import kuromoji from 'kuromoji';
+import './kuromojiLoader';
 
 export interface KuromojiToken {
   word_id: number;
@@ -47,7 +48,7 @@ export const initKuromoji = async (dictionaryPath?: string): Promise<void> => {
       settled = true;
       initPromise = null;
       reject(new Error('离线词典加载超时，请重试'));
-    }, 15000);
+    }, 60000);
     kuromoji.builder({ dicPath: dictionaryPath || dictPath }).build((err, _tokenizer) => {
       if (settled) return;
       settled = true;
