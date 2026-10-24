@@ -5,6 +5,7 @@
 - `POST /api/feedback`：脱敏、限流并在 `Cheese-nya/uku-furigana` 创建 GitHub Issue
 - `GET /api/update/latest`：缓存并返回最新 Release 信息与 `SHA256SUMS.txt` 哈希
 - `GET /api/update/dl/{tag}/{name}`：流式镜像下载安装包（支持 `Range` 断点续传，磁盘最多缓存最近 2 个版本）
+- `GET /api/pixiv?id={id}`：代取 Pixiv 小说（网页版是静态导出，没有 Next.js 的 `/api/pixiv` 路由，浏览器又不能跨域直连 pixiv.net）。返回格式与 `app/api/pixiv/route.ts` 相同，全局限速 120 次/小时，同一作品缓存 10 分钟
 - `GET /api/health`：健康检查
 
 ---
@@ -90,6 +91,14 @@ journalctl -u uku-relay.service -n 50 --no-pager
         proxy_read_timeout 300s;
     }
 
+    location = /api/pixiv {
+        proxy_pass http://127.0.0.1:8787;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_read_timeout 60s;
+    }
+
     location = /api/health {
         proxy_pass http://127.0.0.1:8787;
         proxy_http_version 1.1;
@@ -130,7 +139,10 @@ curl -i -X POST https://uku.saiaino.xyz/api/feedback \
   -H "Content-Type: application/json" \
   -d '{"kind":"text","includeLog":false}'
 
-# 6. 测试镜像下载 Range 支持（需将 v1.2.1 替换为实际已发布的 tag）
+# 6. 网页版 Pixiv 导入（应返回 200 和小说 JSON）
+curl -fsS "https://uku.saiaino.xyz/api/pixiv?id=22148644" | head -c 200
+
+# 7. 测试镜像下载 Range 支持（需将 v1.2.1 替换为实际已发布的 tag）
 curl -i -H "Range: bytes=0-63" \
   https://uku.saiaino.xyz/api/update/dl/v1.2.1/Uku-Furigana-v1.2.1.apk \
   -o /dev/null
