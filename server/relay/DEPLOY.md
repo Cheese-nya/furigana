@@ -34,7 +34,7 @@ install -m 0755 relay.py /opt/uku-relay/relay.py
 
 # 2. 创建环境变量文件（请将 <YOUR_GITHUB_PAT> 替换为你自己生成的细粒度 PAT）
 cat >/etc/uku-relay.env <<'EOF'
-UKU_GITHUB_TOKEN=<YOUR_GITHUB_PAT>
+UKU_GITHUB_TOKEN=<YOUR_GITHUB_PAT>   # 可选：不设置时更新接口照常工作，/api/feedback 返回 503
 UKU_REPO=Cheese-nya/uku-furigana
 UKU_BIND=127.0.0.1
 UKU_PORT=8787

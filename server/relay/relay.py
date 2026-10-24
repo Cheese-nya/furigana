@@ -944,6 +944,10 @@ def make_handler(service: RelayService) -> type[BaseHTTPRequestHandler]:
                 self._send_json(400, {"ok": False, "error": "invalid"})
                 return
 
+            if not service.github.token:
+                self._send_json(503, {"ok": False, "error": "server"})
+                return
+
             if not service.rate_limiter.allow(rate_limit_key(payload, self._client_ip())):
                 self._send_json(429, {"ok": False, "error": "rate-limited"})
                 return
@@ -1074,9 +1078,8 @@ def load_config_from_env(
     env: Optional[dict[str, str]] = None,
 ) -> dict[str, Any]:
     source = os.environ if env is None else env
+    # Optional: without a token the update endpoints still work and feedback answers 503.
     token = source.get("UKU_GITHUB_TOKEN", "").strip()
-    if not token:
-        raise RuntimeError("Missing required environment variable: UKU_GITHUB_TOKEN")
     repo = source.get("UKU_REPO", DEFAULT_REPO).strip() or DEFAULT_REPO
     bind = source.get("UKU_BIND", DEFAULT_BIND).strip() or DEFAULT_BIND
     port = int(source.get("UKU_PORT", str(DEFAULT_PORT)))
@@ -1109,6 +1112,8 @@ def create_server(
 
 def main() -> None:
     cfg = load_config_from_env()
+    if not cfg["token"]:
+        log_stdout("WARN UKU_GITHUB_TOKEN is not set: /api/feedback is disabled")
     github = GitHubClient(token=cfg["token"], repo=cfg["repo"])
     service = RelayService(
         github_client=github,

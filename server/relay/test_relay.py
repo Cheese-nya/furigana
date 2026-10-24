@@ -47,7 +47,8 @@ def _sample_log_report(**overrides):
 
 
 class FakeGitHubClient:
-    def __init__(self):
+    def __init__(self, token="test-token"):
+        self.token = token
         self.issues_created = []
         self.fail_create_issue = False
         self.fail_latest_release = False
@@ -641,6 +642,30 @@ class RateLimitKeyTest(unittest.TestCase):
         self.assertTrue(all(limiter.allow(f"id:{n}") for n in range(3)))
         self.assertFalse(limiter.allow("id:other"))
         self.assertTrue(limiter.allow("id:later", now=1000.0 + 3601))
+
+
+class OptionalTokenTest(unittest.TestCase):
+    def test_config_loads_without_a_token(self):
+        cfg = relay.load_config_from_env({})
+        self.assertEqual(cfg["token"], "")
+        self.assertEqual(relay.load_config_from_env({"UKU_GITHUB_TOKEN": " abc "})["token"], "abc")
+
+    def test_feedback_is_503_when_the_token_is_missing(self):
+        github = FakeGitHubClient(token="")
+        service = relay.RelayService(github_client=github, cache_dir=tempfile.mkdtemp(), allowed_origins=("https://localhost",))
+        server = relay.create_server(service, bind="127.0.0.1", port=0)
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        try:
+            body = json.dumps({"kind": "text", "title": "t", "message": "m", "includeLog": False}).encode()
+            req = urllib.request.Request(f"http://127.0.0.1:{server.server_address[1]}/api/feedback", data=body, headers={"Content-Type": "application/json"})
+            with self.assertRaises(urllib.error.HTTPError) as caught:
+                urllib.request.urlopen(req, timeout=5)
+            self.assertEqual(caught.exception.code, 503)
+            self.assertEqual(github.issues_created, [])
+        finally:
+            server.shutdown()
+            server.server_close()
 
 
 if __name__ == "__main__":
