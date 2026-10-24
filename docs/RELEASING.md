@@ -17,6 +17,8 @@
    - `Uku-Furigana-vX.Y.Z.apk`：已签名 APK（需要下面的两个 Secret）
    - `SHA256SUMS.txt`：校验值
 
+应用内「检查更新」依赖上面三个**固定的文件名格式**（`Uku-Furigana-vX.Y.Z.apk`、`Uku-Furigana-vX.Y.Z-windows.exe`、`SHA256SUMS.txt`）和 `releases/latest`（不含草稿与预发布版本）。改名会让自动更新找不到安装包。Android 的 APK 必须用同一把 `uku-release.jks` 签名，否则系统安装器会拒绝覆盖安装。中转服务的部署见 `server/relay/DEPLOY.md`。
+
 标签必须和 `package.json` 的版本一致（`v1.3.0` ↔ `1.3.0`），否则发布会在第一步失败。
 
 ## 官网下载链接

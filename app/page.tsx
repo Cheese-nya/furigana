@@ -28,6 +28,12 @@ import { emptyDatabase, fingerprintText, resolveScript, updateScript, setScriptO
 import { selectReviewWord, makeLearnedReading } from './utils/review';
 import { buildDocxBlob } from './utils/docxExporter';
 import { saveBlob } from './utils/fileSave';
+import { FeedbackModal } from './components/FeedbackModal';
+import { useUpdater } from './hooks/useUpdater';
+import { buildReport, installGlobalLogging } from './utils/appLog';
+import { buildFeedbackPayload, submitFeedback } from './utils/feedback';
+import { DISTRIBUTION } from './utils/appInfo';
+import { QQ_GROUP, RELEASES_URL, type AndroidUpdateBridge, type FeedbackKind } from './utils/updateTypes';
 import { translations, type Locale } from './utils/i18n';
 
 export default function DubbingStudioApp() {
@@ -114,7 +120,7 @@ export default function DubbingStudioApp() {
   // position (after the tab/orientation effects, before the correction-database effects).
   const {
     libraryDb, setLibraryDb, libraryDbRef, activeBook, setEditorBookId, markEditorSource, libraryBooks,
-    libraryToast,
+    libraryToast, setLibraryToast,
     loadBookIntoWorkspace, handleSaveToLibrary, importLibraryFiles, createOrUpdateBook,
     handleToggleFavorite, handleUpdateBookMetadata,
     handleImportPixivNovel, handleDeleteBook, handleReaderProgress,
@@ -123,6 +129,18 @@ export default function DubbingStudioApp() {
     setDocTitle, setRawText, setSourceOverrides, setSrtCues, setEditingToken, setActiveTab, setImportError,
   });
   useEffect(() => { databaseRef.current = database; }, [database]);
+
+  // Bug feedback + online update (entries live in the settings menu).
+  const updater = useUpdater();
+  const [feedbackKind, setFeedbackKind] = useState<FeedbackKind | null>(null);
+  useEffect(() => { installGlobalLogging(); }, []);
+  const openExternal = (url: string) => { window.open(url, '_blank', 'noopener,noreferrer'); };
+  const copyQqGroup = () => {
+    const bridge = (window as unknown as { AndroidBridge?: Partial<AndroidUpdateBridge> }).AndroidBridge;
+    try { bridge?.openQqGroup?.(QQ_GROUP); } catch { /* QQ not installed: the copied number is enough */ }
+    void navigator.clipboard?.writeText(QQ_GROUP).catch(() => undefined);
+    setLibraryToast(`${t.qqCopied}: ${QQ_GROUP}`);
+  };
 
   const learnedReadings = useMemo(() => database.scripts[documentId]?.learned || [], [database.scripts, documentId]);
   const documentCorrections = useMemo(() => database.scripts[documentId]?.overrides || [], [database.scripts, documentId]);
@@ -421,6 +439,14 @@ export default function DubbingStudioApp() {
       dictionaryLabel={dictionaryLabel}
       extra={extra}
       t={t}
+      update={updater.state}
+      showUpdate={DISTRIBUTION === 'website'}
+      onCheckUpdate={() => { void updater.check({ force: true }); }}
+      onDownloadUpdate={() => { void updater.startDownload(); }}
+      onApplyUpdate={() => { void updater.apply(); }}
+      onOpenReleases={() => openExternal(RELEASES_URL)}
+      onOpenFeedback={setFeedbackKind}
+      onCopyQqGroup={copyQqGroup}
     />
   );
 
@@ -438,6 +464,7 @@ export default function DubbingStudioApp() {
         batchCount={batchFiles.length}
         hidden={activeTab === 'reader'}
         renderSettings={renderSettings}
+        updateDot={updater.state.hasUpdate}
         t={t}
       />
 
@@ -463,6 +490,7 @@ export default function DubbingStudioApp() {
             reviewCount={reviewCount} jumpToNextReview={jumpToNextReview} reviewError={reviewError}
             openTokenEditor={openTokenEditor} previewPage={previewPage} setPreviewPage={setPreviewPage}
             renderSettings={renderSettings}
+            updateDot={updater.state.hasUpdate}
           />
         )}
 
@@ -580,6 +608,16 @@ export default function DubbingStudioApp() {
         onChange={handleSelectTab}
         bookCount={Object.keys(libraryDb.books).length}
         hidden={activeTab === 'reader'}
+        t={t}
+      />
+      <FeedbackModal
+        open={feedbackKind !== null}
+        onClose={() => setFeedbackKind(null)}
+        initialKind={feedbackKind ?? 'log'}
+        buildReport={buildReport}
+        submit={submitFeedback}
+        buildPayload={buildFeedbackPayload}
+        onOpenUrl={openExternal}
         t={t}
       />
     </main>

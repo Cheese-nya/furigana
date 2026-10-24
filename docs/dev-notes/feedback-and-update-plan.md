@@ -1,6 +1,6 @@
 # Bug 反馈与在线更新 实施方案
 
-状态：方案已确认（2026-10-24），尚未开工。Leader：Claude（只做接口定义、评审、整合、测试）；实现由 agy（gemini-4-argon-high）workers 完成，不使用 Claude 子代理。
+状态：客户端、Android、桌面端、中转服务代码已实现并通过测试（2026-10-24）；**中转服务尚未部署**，Android/Windows 的真机更新流程尚未端到端验证。Leader：Claude（只做接口定义、评审、整合、测试）；实现由 agy（gemini-4-argon-high）workers 完成，不使用 Claude 子代理。
 
 ## 已确认的决策
 
@@ -119,3 +119,8 @@ W1–W5 互相无文件重叠，可并行；每个 brief 附明确文件列表�
 - **滥用**：匿名提交可能被刷，靠 IP 限流 + 体积限制 + 标签过滤；必要时服务端加全局日上限。
 - **服务器资源**：800 MB 内存、同机还跑着 sing-box；镜像缓存限 2 个文件，relay 限制并发下载数为 2。
 - 小黄点用的颜色 token、QQ 加群深链的具体格式，在实现时核对现有 token 与实机效果。
+
+## 实现时的调整
+
+- **限流改按客户端 ID**：服务器上 443 先经 nginx stream 的 SNI 分流再转到 8443，没有传 PROXY 协议，relay 看到的客户端地址永远是 127.0.0.1。因此 `FeedbackPayload` 增加 `clientId`（每个安装一个随机 ID，存 localStorage），relay 按 `clientId` 限流（5/小时、20/天），并增加全局上限（30/小时、200/天）兜底；没有合法 `clientId` 的请求共用同一个额度。
+- **GitHub 直连取不到 sums 时回退中转**：浏览器里跨域读取 Release 资产常被 CORS 挡住，`fetchLatestRelease` 会因此经常走中转，这是预期行为。

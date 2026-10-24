@@ -5,6 +5,7 @@ import { TypographyPopover } from './TypographyPopover';
 import type { EditingTokenState } from './RubyCorrectionModal';
 import { GlassButton, GlassCapsule } from './glass/GlassButton';
 import { GlassPopover, PopoverItem, PopoverSeparator } from './glass/GlassPopover';
+import { UpdateDot } from './UpdateDot';
 import { LiquidSelector } from './glass/LiquidSelector';
 import {
   IconBookmark,
@@ -77,6 +78,8 @@ export interface EditorWorkspaceProps {
   previewPage: number;
   setPreviewPage: Setter<number>;
   renderSettings: RenderSettings;
+  /** Yellow dot on the ⋮ button: an update is available. */
+  updateDot?: boolean;
 }
 
 export function EditorWorkspace(props: EditorWorkspaceProps) {
@@ -85,7 +88,7 @@ export function EditorWorkspace(props: EditorWorkspaceProps) {
     previewShowRuby, setPreviewShowRuby, correctionsReady, advanceControllerRef, setIsGlossaryOpen,
     editorFileInputRef, handleEditorFileImport, isImporting, importError, libraryBooks, onImportFromLibrary,
     handleSaveToLibrary, isExporting, handleExport, dictionaryStatus, isKuromojiLoading, runDependencyRepair,
-    isAnnotating, annotationError, reviewCount, jumpToNextReview, renderSettings,
+    isAnnotating, annotationError, reviewCount, jumpToNextReview, renderSettings, updateDot,
   } = props;
 
   const [pane, setPane] = useState<'source' | 'preview'>('source');
@@ -129,18 +132,21 @@ export function EditorWorkspace(props: EditorWorkspaceProps) {
     <section className="relative flex min-h-0 flex-1 flex-col">
       {/* Floating toolbar — glass capsules over the scrolling content */}
       <div className="pointer-events-none relative z-20 mb-3 flex items-center gap-2.5 [&>*]:pointer-events-auto">
-        <GlassButton
-          ref={setSettingsAnchor}
-          variant="glass"
-          icon
-          aria-label={t.settingsTitle}
-          aria-haspopup="dialog"
-          aria-expanded={settingsOpen}
-          onClick={() => setSettingsOpen(open => !open)}
-          className="!h-[42px] !w-[42px] md:!hidden"
-        >
-          <IconMoreVertical size={20} />
-        </GlassButton>
+        <div className="relative md:hidden">
+          <GlassButton
+            ref={setSettingsAnchor}
+            variant="glass"
+            icon
+            aria-label={t.settingsTitle}
+            aria-haspopup="dialog"
+            aria-expanded={settingsOpen}
+            onClick={() => setSettingsOpen(open => !open)}
+            className="!h-[42px] !w-[42px]"
+          >
+            <IconMoreVertical size={20} />
+          </GlassButton>
+          {updateDot && <UpdateDot className="!right-0.5 !top-0.5" />}
+        </div>
 
         <LiquidSelector
           variant="glass"

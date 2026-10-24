@@ -58,6 +58,11 @@ export interface FeedbackPayload {
   /** Optional QQ / mail, up to 80 chars. */
   contact?: string;
   includeLog: boolean;
+  /**
+   * Random per-install id (16–64 chars of [A-Za-z0-9-]) the relay rate-limits on.
+   * The relay sits behind an SNI router and cannot see client IPs.
+   */
+  clientId?: string;
   /** Present when includeLog is true. */
   log?: DiagnosticReport;
 }
