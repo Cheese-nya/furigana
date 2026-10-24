@@ -667,5 +667,168 @@ class OptionalTokenTest(unittest.TestCase):
             server.server_close()
 
 
+
+class FakeResponse:
+    def __init__(self, data, content_type="application/json"):
+        self._data = data
+        self.headers = {"Content-Type": content_type}
+
+    def read(self, limit=-1):
+        return self._data if limit < 0 else self._data[:limit]
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return False
+
+
+class FakeOpener:
+    def __init__(self, routes):
+        self.routes = routes
+        self.urls = []
+
+    def open(self, req, timeout=None):
+        url = req.full_url
+        self.urls.append(url)
+        result = self.routes[url]
+        if isinstance(result, Exception):
+            raise result
+        return result
+
+
+NOVEL_URL = "https://www.pixiv.net/ajax/novel/22148644"
+COVER_URL = "https://i.pximg.net/c/600x600/novel-cover-master/cover.jpg"
+
+
+def _novel_json(**body):
+    base = {
+        "title": " 題名 ",
+        "userName": "作者",
+        "description": "説明<br />二行目 &amp;",
+        "content": "[[rb:漢字 > かんじ]]です[newpage]次",
+        "coverUrl": COVER_URL,
+    }
+    base.update(body)
+    return json.dumps({"error": False, "message": "", "body": base}).encode("utf-8")
+
+
+class PixivClientTest(unittest.TestCase):
+    def test_fetch_novel_matches_the_next_route_shape(self):
+        opener = FakeOpener({
+            NOVEL_URL: FakeResponse(_novel_json()),
+            COVER_URL: FakeResponse(b"\xff\xd8jpeg", "image/jpeg"),
+        })
+        novel = relay.PixivClient(opener=opener).fetch_novel("22148644")
+        self.assertEqual(novel["id"], "22148644")
+        self.assertEqual(novel["title"], "題名")
+        self.assertEqual(novel["author"], "作者")
+        self.assertEqual(novel["description"], "説明\n二行目 &")
+        self.assertEqual(novel["content"], "漢字(かんじ)です\n\n次")
+        self.assertEqual(novel["rubyOverrides"], {"漢字": "かんじ"})
+        self.assertEqual(novel["coverUrl"], "data:image/jpeg;base64,/9hqcGVn")
+        self.assertEqual(novel["sourceUrl"], "https://www.pixiv.net/novel/show.php?id=22148644")
+
+    def test_cover_falls_back_to_the_mirror(self):
+        opener = FakeOpener({
+            NOVEL_URL: FakeResponse(_novel_json()),
+            COVER_URL: urllib.error.URLError("down"),
+        })
+        novel = relay.PixivClient(opener=opener).fetch_novel("22148644")
+        self.assertEqual(novel["coverUrl"], "https://i.pixiv.re/c/600x600/novel-cover-master/cover.jpg")
+
+    def test_cover_from_another_host_is_not_fetched(self):
+        opener = FakeOpener({NOVEL_URL: FakeResponse(_novel_json(coverUrl="https://evil.example/x.jpg"))})
+        novel = relay.PixivClient(opener=opener).fetch_novel("22148644")
+        self.assertEqual(novel["coverUrl"], "https://evil.example/x.jpg")
+        self.assertEqual(opener.urls, [NOVEL_URL])
+
+    def test_pixiv_error_message_is_kept(self):
+        body = json.dumps({"error": True, "message": "該当作品は削除されたか、存在しない作品IDです。", "body": []}).encode()
+        opener = FakeOpener({
+            NOVEL_URL: urllib.error.HTTPError(NOVEL_URL, 404, "Not Found", {}, __import__("io").BytesIO(body)),
+        })
+        with self.assertRaises(relay.PixivError) as caught:
+            relay.PixivClient(opener=opener).fetch_novel("22148644")
+        self.assertEqual(caught.exception.status_code, 404)
+        self.assertIn("削除", str(caught.exception))
+
+    def test_network_failure_is_a_502(self):
+        opener = FakeOpener({NOVEL_URL: urllib.error.URLError("timeout")})
+        with self.assertRaises(relay.PixivError) as caught:
+            relay.PixivClient(opener=opener).fetch_novel("22148644")
+        self.assertEqual(caught.exception.status_code, 502)
+
+
+class FakePixivClient:
+    def __init__(self):
+        self.calls = []
+        self.error = None
+
+    def fetch_novel(self, novel_id):
+        self.calls.append(novel_id)
+        if self.error:
+            raise self.error
+        return {"id": novel_id, "title": "t", "content": "c"}
+
+
+class PixivEndpointTest(unittest.TestCase):
+    def setUp(self):
+        self.pixiv = FakePixivClient()
+        self.now = [1000.0]
+        self.service = relay.RelayService(
+            github_client=FakeGitHubClient(),
+            cache_dir=tempfile.mkdtemp(),
+            clock=lambda: self.now[0],
+            pixiv_client=self.pixiv,
+            pixiv_rate_limiter=relay.RateLimiter(
+                per_hour=2, per_day=10, global_per_hour=2, global_per_day=10, clock=lambda: self.now[0]
+            ),
+        )
+        self.server = relay.create_server(self.service, bind="127.0.0.1", port=0)
+        threading.Thread(target=self.server.serve_forever, daemon=True).start()
+
+    def tearDown(self):
+        self.server.shutdown()
+        self.server.server_close()
+
+    def _get(self, query):
+        url = f"http://127.0.0.1:{self.server.server_address[1]}/api/pixiv{query}"
+        try:
+            with urllib.request.urlopen(url, timeout=5) as resp:
+                return resp.status, json.loads(resp.read())
+        except urllib.error.HTTPError as exc:
+            return exc.code, json.loads(exc.read())
+
+    def test_returns_the_novel_and_caches_it(self):
+        self.assertEqual(self._get("?id=12345"), (200, {"id": "12345", "title": "t", "content": "c"}))
+        self.assertEqual(self._get("?id=12345")[0], 200)
+        self.assertEqual(self.pixiv.calls, ["12345"])
+        self.now[0] += relay.PIXIV_CACHE_TTL_SECONDS + 1
+        self._get("?id=12345")
+        self.assertEqual(self.pixiv.calls, ["12345", "12345"])
+
+    def test_rejects_invalid_ids(self):
+        for query in ("", "?id=", "?id=123", "?id=abc12345", "?id=1234567890123456"):
+            status, body = self._get(query)
+            self.assertEqual(status, 400, query)
+            self.assertEqual(body, {"error": "无效的 Pixiv 小说链接或 ID"})
+        self.assertEqual(self.pixiv.calls, [])
+
+    def test_pixiv_errors_become_error_json(self):
+        self.pixiv.error = relay.PixivError("作品は削除されました", 404)
+        self.assertEqual(self._get("?id=12345"), (404, {"error": "作品は削除されました"}))
+        self.pixiv.error = RuntimeError("boom")
+        self.assertEqual(self._get("?id=12346"), (502, {"error": "获取 Pixiv 小说失败"}))
+
+    def test_rate_limited(self):
+        self._get("?id=11111")
+        self._get("?id=22222")
+        status, body = self._get("?id=33333")
+        self.assertEqual(status, 429)
+        self.assertIn("error", body)
+        self.assertEqual(self.pixiv.calls, ["11111", "22222"])
+
+
 if __name__ == "__main__":
     unittest.main()

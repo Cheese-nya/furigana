@@ -4,11 +4,13 @@ Uku Furigana (浮く) — Feedback & Update Relay Server.
 
 Single-file Python 3.11+ standard-library HTTP service behind nginx on
 127.0.0.1:8787. Handles anonymous bug/feedback issue creation, release
-metadata caching, and streaming mirror downloads with Range support.
+metadata caching, streaming mirror downloads with Range support, and a Pixiv
+novel proxy for the static web build (which has no Next.js `/api/pixiv` route).
 """
 
 from __future__ import annotations
 
+import base64
 import http.client
 import json
 import os
@@ -18,6 +20,7 @@ import sys
 import threading
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -49,6 +52,15 @@ MAX_CONCURRENT_DOWNLOADS = 2
 MAX_CACHED_VERSIONS = 2
 STREAM_CHUNK_BYTES = 64 * 1024
 
+PIXIV_USER_AGENT = (
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+    "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+)
+MAX_PIXIV_JSON_BYTES = 8 * 1024 * 1024
+MAX_PIXIV_COVER_BYTES = 2 * 1024 * 1024
+PIXIV_CACHE_TTL_SECONDS = 10 * 60
+PIXIV_CACHE_MAX_ENTRIES = 16
+
 _CJK_KANA_RUN_RE = re.compile(
     r"[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff]{6,}"
 )
@@ -64,6 +76,10 @@ _ASSET_WHITELIST_RE = re.compile(
 _SUM_LINE_RE = re.compile(r"^([0-9a-fA-F]{64})\s+\*?([^\s/\\]+)$")
 _RANGE_HEADER_RE = re.compile(r"^bytes=(\d*)-(\d*)$")
 _LOOPBACK_ORIGIN_RE = re.compile(r"^http://127\.0\.0\.1:\d+$")
+# Same 4-15 digit rule as `extractPixivNovelId` in app/utils/pixivImporter.ts.
+_PIXIV_ID_RE = re.compile(r"^\d{4,15}$")
+_PIXIV_RUBY_RE = re.compile(r"\[\[rb:([^\s>＞]+)\s*[>＞]\s*([^\]]+)\]\]")
+_PIXIV_COVER_HOST_RE = re.compile(r"^https://[a-z0-9-]+\.pximg\.net/", re.IGNORECASE)
 
 
 def log_stdout(message: str) -> None:
@@ -666,6 +682,150 @@ class GitHubClient:
             raise GitHubError("GitHub download_asset failed") from exc
 
 
+# The three helpers below mirror `cleanPixivDescription`, `cleanPixivContent` and
+# `toPixivMirrorCoverUrl` in app/utils/pixivImporter.ts: keep them in step.
+def clean_pixiv_description(html: str) -> str:
+    if not html:
+        return ""
+    text = re.sub(r"\r\n?", "\n", html)
+    text = re.sub(r"<br\s*/?>", "\n", text, flags=re.IGNORECASE)
+    text = re.sub(r"<[^>]+>", "", text)
+    text = re.sub(r"&nbsp;", " ", text, flags=re.IGNORECASE)
+    text = re.sub(r"&lt;", "<", text, flags=re.IGNORECASE)
+    text = re.sub(r"&gt;", ">", text, flags=re.IGNORECASE)
+    text = re.sub(r"&quot;", '"', text, flags=re.IGNORECASE)
+    text = re.sub(r"&#39;|&apos;|&#x27;", "'", text, flags=re.IGNORECASE)
+    text = re.sub(r"&amp;", "&", text, flags=re.IGNORECASE)
+    return text.strip()
+
+
+def clean_pixiv_content(raw: str) -> tuple[str, dict[str, str]]:
+    ruby_overrides: dict[str, str] = {}
+    if not raw:
+        return "", ruby_overrides
+
+    def ruby(match: re.Match[str]) -> str:
+        kanji = match.group(1).strip()
+        reading = match.group(2).strip()
+        if kanji and reading:
+            ruby_overrides[kanji] = reading
+        return f"{kanji}({reading})" if reading else kanji
+
+    content = re.sub(r"\r\n?", "\n", raw)
+    content = _PIXIV_RUBY_RE.sub(ruby, content)
+    content = re.sub(r"\[chapter:([^\]]+)\]", "\n【\\1】\n", content, flags=re.IGNORECASE)
+    content = re.sub(r"\[newpage\]", "\n\n", content, flags=re.IGNORECASE)
+    content = re.sub(r"\[pixivimage:[^\]]+\]", "", content, flags=re.IGNORECASE)
+    content = re.sub(r"\[uploadedimage:[^\]]+\]", "", content, flags=re.IGNORECASE)
+    content = re.sub(r"\n{4,}", "\n\n\n", content).strip()
+    return content, ruby_overrides
+
+
+def to_pixiv_mirror_cover_url(cover_url: str) -> str:
+    if not cover_url:
+        return ""
+    trimmed = cover_url.strip()
+    if trimmed.startswith("data:"):
+        return trimmed
+    return re.sub(r"^https?://i\.pximg\.net/", "https://i.pixiv.re/", trimmed, flags=re.IGNORECASE)
+
+
+class PixivError(Exception):
+    """A failure whose message is shown to the user as is (same wording as the Next.js route)."""
+
+    def __init__(self, message: str, status_code: int = 502) -> None:
+        super().__init__(message)
+        self.status_code = status_code
+
+
+class PixivClient:
+    """Fetches a novel from Pixiv's AJAX API, which browsers cannot call cross-origin."""
+
+    def __init__(
+        self,
+        connect_timeout: float = 10.0,
+        read_timeout: float = 20.0,
+        opener: Optional[urllib.request.OpenerDirector] = None,
+    ) -> None:
+        self.connect_timeout = connect_timeout
+        self._opener = opener or _build_timeout_opener(read_timeout)
+
+    def _get(self, url: str, limit: int) -> tuple[bytes, str]:
+        req = urllib.request.Request(
+            url,
+            headers={
+                "User-Agent": PIXIV_USER_AGENT,
+                "Referer": "https://www.pixiv.net/",
+                "Accept-Language": "ja,zh-CN;q=0.9,en;q=0.8",
+            },
+            method="GET",
+        )
+        with self._opener.open(req, timeout=self.connect_timeout) as resp:
+            data = resp.read(limit + 1)
+            if len(data) > limit:
+                raise ValueError("response too large")
+            return data, str(resp.headers.get("Content-Type") or "")
+
+    def _cover_data_url(self, cover_url: str) -> str:
+        # Embed the cover so the library keeps it offline and i.pximg.net's Referer check
+        # never matters; fall back to the public mirror when the download fails.
+        if not _PIXIV_COVER_HOST_RE.match(cover_url):
+            return to_pixiv_mirror_cover_url(cover_url)
+        try:
+            data, content_type = self._get(cover_url, MAX_PIXIV_COVER_BYTES)
+        except Exception:
+            return to_pixiv_mirror_cover_url(cover_url)
+        mime = content_type.split(";", 1)[0].strip().lower()
+        if not mime.startswith("image/"):
+            mime = "image/jpeg"
+        return f"data:{mime};base64,{base64.b64encode(data).decode('ascii')}"
+
+    def fetch_novel(self, novel_id: str) -> dict[str, Any]:
+        url = f"https://www.pixiv.net/ajax/novel/{urllib.parse.quote(novel_id)}"
+        try:
+            raw, _ = self._get(url, MAX_PIXIV_JSON_BYTES)
+        except urllib.error.HTTPError as exc:
+            # Pixiv answers a deleted or private novel with an error JSON body; prefer its message.
+            message = ""
+            try:
+                message = str(json.loads(exc.read(64 * 1024).decode("utf-8")).get("message") or "")
+            except Exception:
+                pass
+            if message:
+                raise PixivError(message, 404) from exc
+            raise PixivError(
+                f"无法从 Pixiv 获取小说 (HTTP {exc.code})", 404 if exc.code == 404 else 502
+            ) from exc
+        except Exception as exc:
+            raise PixivError("无法连接 Pixiv，请稍后再试") from exc
+
+        try:
+            data = json.loads(raw.decode("utf-8"))
+        except Exception as exc:
+            raise PixivError("Pixiv 返回了无法解析的数据") from exc
+        body = data.get("body") if isinstance(data, dict) else None
+        if not isinstance(data, dict) or data.get("error") is not False or not isinstance(body, dict):
+            message = data.get("message") if isinstance(data, dict) else None
+            raise PixivError(str(message or "未找到该 Pixiv 小说"), 404)
+
+        def text(key: str) -> str:
+            value = body.get(key)
+            return value if isinstance(value, str) else ""
+
+        content, ruby_overrides = clean_pixiv_content(text("content"))
+        cover = text("coverUrl")
+        return {
+            "id": novel_id,
+            "title": (text("title") or f"Pixiv #{novel_id}").strip(),
+            "author": text("userName").strip(),
+            "description": clean_pixiv_description(text("description")),
+            "content": content,
+            "rubyOverrides": ruby_overrides,
+            "coverUrl": self._cover_data_url(cover) if cover else "",
+            "sourceUrl": f"https://www.pixiv.net/novel/show.php?id={novel_id}",
+        }
+
+
 def _version_tuple_from_name(filename: str) -> tuple[int, ...]:
     match = _ASSET_WHITELIST_RE.match(filename)
     if not match:
@@ -690,8 +850,18 @@ class RelayService:
         clock: Callable[[], float] = time.time,
         max_concurrent_downloads: int = MAX_CONCURRENT_DOWNLOADS,
         max_cached_versions: int = MAX_CACHED_VERSIONS,
+        pixiv_client: Any = None,
+        pixiv_rate_limiter: Optional[RateLimiter] = None,
     ) -> None:
         self.github = github_client
+        self.pixiv = pixiv_client or PixivClient()
+        # Every request reaches us from 127.0.0.1 (see RateLimiter), so this only caps how hard
+        # the server as a whole can hit Pixiv; the per-key limits are set to the same values.
+        self.pixiv_rate_limiter = pixiv_rate_limiter or RateLimiter(
+            per_hour=120, per_day=1000, global_per_hour=120, global_per_day=1000, clock=clock
+        )
+        self._pixiv_lock = threading.Lock()
+        self._pixiv_cache: dict[str, tuple[float, dict[str, Any]]] = {}
         self.cache_dir = Path(cache_dir)
         self.allowed_origins = tuple(allowed_origins)
         self.mirror_base = mirror_base
@@ -710,6 +880,28 @@ class RelayService:
         self._version_seq_lock = threading.Lock()
         self._version_seq: dict[str, int] = {}
         self._seq_counter = 0
+
+    def get_pixiv_novel(self, novel_id: str) -> Optional[dict[str, Any]]:
+        """Returns the novel, or None when the Pixiv rate limit is exhausted."""
+        now = float(self._clock())
+        with self._pixiv_lock:
+            cached = self._pixiv_cache.get(novel_id)
+            if cached is not None and (now - cached[0]) < PIXIV_CACHE_TTL_SECONDS:
+                return cached[1]
+        if not self.pixiv_rate_limiter.allow("pixiv", now=now):
+            return None
+        novel = self.pixiv.fetch_novel(novel_id)
+        with self._pixiv_lock:
+            self._pixiv_cache = {
+                k: v
+                for k, v in self._pixiv_cache.items()
+                if (now - v[0]) < PIXIV_CACHE_TTL_SECONDS
+            }
+            while len(self._pixiv_cache) >= PIXIV_CACHE_MAX_ENTRIES:
+                oldest = min(self._pixiv_cache, key=lambda k: self._pixiv_cache[k][0])
+                del self._pixiv_cache[oldest]
+            self._pixiv_cache[novel_id] = (now, novel)
+        return novel
 
     def get_latest_release_info(self) -> dict[str, Any]:
         now = float(self._clock())
@@ -892,6 +1084,9 @@ def make_handler(service: RelayService) -> type[BaseHTTPRequestHandler]:
             if path.startswith("/api/update/dl/"):
                 self._handle_update_download(path)
                 return
+            if path == "/api/pixiv":
+                self._handle_pixiv()
+                return
             self._send_json(404, {"ok": False, "error": "not-found"})
 
         def do_POST(self) -> None:
@@ -966,6 +1161,32 @@ def make_handler(service: RelayService) -> type[BaseHTTPRequestHandler]:
                     "url": str(created["url"]),
                 },
             )
+
+        def _handle_pixiv(self) -> None:
+            # Same contract as app/api/pixiv/route.ts: the novel on success, `{"error": message}`
+            # otherwise, which pixivImporter.ts shows to the user verbatim.
+            query = urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query)
+            novel_id = (query.get("id") or [""])[0].strip()
+            if not _PIXIV_ID_RE.match(novel_id):
+                self._send_json(400, {"error": "无效的 Pixiv 小说链接或 ID"})
+                return
+            try:
+                novel = service.get_pixiv_novel(novel_id)
+            except PixivError as exc:
+                self._send_json(exc.status_code, {"error": str(exc)})
+                return
+            except Exception as exc:
+                log_stdout(f"ERROR pixiv fetch failed: {type(exc).__name__}")
+                self._send_json(502, {"error": "获取 Pixiv 小说失败"})
+                return
+            if novel is None:
+                self._send_json(
+                    429,
+                    {"error": "请求过于频繁，请稍后再试"},
+                    extra_headers={"Retry-After": "60"},
+                )
+                return
+            self._send_json(200, novel)
 
         def _handle_update_latest(self) -> None:
             try:
