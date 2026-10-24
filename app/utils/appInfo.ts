@@ -5,6 +5,7 @@ interface PlatformWindow {
   pywebview?: unknown;
   Capacitor?: unknown;
   navigator?: { userAgent?: string };
+  location?: { search?: string };
 }
 
 /** Version of this build, injected from package.json by next.config.ts. */
@@ -19,7 +20,8 @@ export const DISTRIBUTION: Distribution =
 export function getPlatform(target: PlatformWindow | undefined = typeof window === 'undefined' ? undefined : (window as unknown as PlatformWindow)): Platform {
   if (!target) return 'web';
   if (target.AndroidBridge) return 'android';
-  if (target.pywebview) return 'desktop';
+  // desktop_runner opens the page as /?desktop=1; window.pywebview itself can appear a moment after load.
+  if (target.pywebview || /[?&]desktop=1(?:&|$)/.test(target.location?.search ?? '')) return 'desktop';
   if (target.Capacitor || /iPhone|iPad|iPod/i.test(target.navigator?.userAgent ?? '')) return 'ios';
   return 'web';
 }
