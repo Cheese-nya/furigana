@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Modal } from './Modal';
 import { LiquidSelector } from './glass/LiquidSelector';
+import { IconCheck, IconChevronDown } from './glass/icons';
 import type { Translations } from '../utils/i18n';
 import type { DiagnosticReport, FeedbackError, FeedbackKind, FeedbackPayload, FeedbackResult } from '../utils/updateTypes';
 
@@ -33,7 +34,8 @@ type FeedbackPhase = 'idle' | 'sending' | 'success' | 'error';
 
 const fieldClass = 'w-full rounded-xl bg-[var(--fill-2)] px-3 text-[16px] text-[var(--label)] placeholder:text-[var(--label-3)] focus:outline-none focus:ring-2 focus:ring-[var(--fill)]';
 const inputClass = `${fieldClass} h-[42px]`;
-const areaClass = `${fieldClass} min-h-[90px] resize-y py-2.5 leading-relaxed`;
+const areaClass = `${fieldClass} min-h-[96px] resize-none py-2.5 leading-relaxed`;
+const cardClass = 'rounded-[18px] bg-[var(--surface)] p-4 shadow-[var(--card-shadow)]';
 const countClass = 'text-[11px] tabular-nums text-[var(--label-3)]';
 
 function errorText(error: FeedbackError | undefined, t: Translations): string {
@@ -44,6 +46,18 @@ function errorText(error: FeedbackError | undefined, t: Translations): string {
     case 'network': return t.feedbackErrNetwork;
     default: return t.feedbackErrServer;
   }
+}
+
+/** The same iOS-style switch the typography popover uses, as a labelled row. */
+function SwitchRow({ label, checked, onChange }: { label: string; checked: boolean; onChange: (value: boolean) => void }) {
+  return (
+    <div className="flex items-center justify-between gap-4 text-[13px] font-medium leading-snug text-[var(--label)]">
+      <span className="min-w-0">{label}</span>
+      <button type="button" role="switch" aria-checked={checked} aria-label={label} className="switch" onClick={() => onChange(!checked)}>
+        <i />
+      </button>
+    </div>
+  );
 }
 
 /** Feedback sheet shell. `Modal` unmounts the body once the sheet has closed, so every open starts from a clean draft. */
@@ -77,6 +91,8 @@ function FeedbackForm({
   const [result, setResult] = useState<FeedbackResult | null>(null);
   const [report, setReport] = useState<DiagnosticReport | null>(null);
   const [reportFailed, setReportFailed] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const statusRef = useRef<HTMLParagraphElement | null>(null);
 
   useEffect(() => {
     sendingRef.current = phase === 'sending';
@@ -94,6 +110,11 @@ function FeedbackForm({
     );
     return () => { alive = false; };
   }, []);
+
+  // The result banner sits at the end of a scrolling form with the footer pinned over it: bring it into view.
+  useEffect(() => {
+    if (phase === 'success' || phase === 'error') statusRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }, [phase]);
 
   const sending = phase === 'sending';
   const trimmedTitle = issueTitle.trim();
@@ -141,26 +162,41 @@ function FeedbackForm({
   );
 
   const preview = showPreview && !reportFailed && (
-    <details className="rounded-[18px] bg-[var(--fill-2)] p-3">
-      <summary className="cursor-pointer select-none text-xs font-semibold text-[var(--label)]">{t.feedbackLogPreview}</summary>
-      <div className="mt-2 space-y-2">
-        {report ? (
-          <>
-            <p className="text-[11px] text-[var(--label-2)]">
-              {t.feedbackLogEntries.replace('{count}', String(report.entries.length))}
-              {' · '}v{report.version}{' · '}{report.device.platform}{' · '}{report.device.screen}{' · '}{report.device.language}
-            </p>
-            <pre className="max-h-40 overflow-auto whitespace-pre-wrap break-words rounded-xl bg-[var(--surface)] p-2.5 text-[11px] leading-relaxed text-[var(--label-2)]">
-              {report.entries.slice(-PREVIEW_ENTRIES).map(entry => (
-                `${new Date(entry.t).toLocaleTimeString()} [${entry.level}] ${entry.source}: ${entry.message}`
-              )).join('\n') || '—'}
-            </pre>
-          </>
-        ) : (
-          <p className="text-[11px] text-[var(--label-2)]">{t.feedbackLogLoading}</p>
-        )}
+    <div className={`${cardClass} !p-0`}>
+      <button
+        type="button"
+        aria-expanded={previewOpen}
+        className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left text-[13px] font-semibold text-[var(--label)]"
+        onClick={() => setPreviewOpen(open => !open)}
+      >
+        {t.feedbackLogPreview}
+        <IconChevronDown
+          size={16}
+          className={`shrink-0 text-[var(--label-3)] transition-transform duration-[420ms] [transition-timing-function:var(--spring-bouncy)] ${previewOpen ? 'rotate-180' : ''}`}
+        />
+      </button>
+      <div className={`disclosure ${previewOpen ? 'is-open' : ''}`}>
+        <div>
+          <div className="space-y-2 px-4 pb-4">
+            {report ? (
+              <>
+                <p className="text-[11px] text-[var(--label-2)]">
+                  {t.feedbackLogEntries.replace('{count}', String(report.entries.length))}
+                  {' · '}v{report.version}{' · '}{report.device.platform}{' · '}{report.device.screen}{' · '}{report.device.language}
+                </p>
+                <pre className="max-h-40 overflow-auto whitespace-pre-wrap break-words rounded-xl bg-[var(--fill-2)] p-2.5 text-[11px] leading-relaxed text-[var(--label-2)]">
+                  {report.entries.slice(-PREVIEW_ENTRIES).map(entry => (
+                    `${new Date(entry.t).toLocaleTimeString()} [${entry.level}] ${entry.source}: ${entry.message}`
+                  )).join('\n') || '—'}
+                </pre>
+              </>
+            ) : (
+              <p className="text-[11px] text-[var(--label-2)]">{t.feedbackLogLoading}</p>
+            )}
+          </div>
+        </div>
       </div>
-    </details>
+    </div>
   );
 
   const issueUrl = result?.url;
@@ -185,66 +221,72 @@ function FeedbackForm({
     <div className="space-y-3.5">
       {modeSelector}
 
-      {kind === 'log' ? (
-        <>
-          <p className="text-sm leading-relaxed text-[var(--label-2)]">{t.feedbackLogIntro}</p>
-          <label className="grid gap-1.5 text-xs font-medium text-[var(--label)]">
-            <span className="flex items-baseline justify-between gap-2">
-              {t.feedbackNoteLabel}
-              <span className={countClass}>{note.length}/{NOTE_MAX}</span>
-            </span>
-            <textarea className={areaClass} value={note} maxLength={NOTE_MAX} onChange={event => setNote(event.target.value)} />
-          </label>
-        </>
-      ) : (
-        <>
-          <label className="grid gap-1.5 text-xs font-medium text-[var(--label)]">
-            <span className="flex items-baseline justify-between gap-2">
-              {t.feedbackIssueTitleLabel}
-              <span className={countClass}>{issueTitle.length}/{TITLE_MAX}</span>
-            </span>
-            <input className={inputClass} value={issueTitle} maxLength={TITLE_MAX} onChange={event => setIssueTitle(event.target.value)} />
-          </label>
-          <label className="grid gap-1.5 text-xs font-medium text-[var(--label)]">
-            <span className="flex items-baseline justify-between gap-2">
-              {t.feedbackIssueBodyLabel}
-              <span className={countClass}>{issueBody.length}/{BODY_MAX}</span>
-            </span>
-            <textarea className={areaClass} value={issueBody} maxLength={BODY_MAX} onChange={event => setIssueBody(event.target.value)} />
-          </label>
-          <label className="flex items-center gap-2 text-xs font-medium text-[var(--label)]">
-            <input type="checkbox" className="h-4 w-4 accent-[var(--ink)]" checked={includeLog} onChange={event => setIncludeLog(event.target.checked)} />
-            {t.feedbackAttachLog}
-          </label>
-        </>
-      )}
-
-      <label className="grid gap-1.5 text-xs font-medium text-[var(--label)]">
-        {t.feedbackContactLabel}
-        <input className={inputClass} value={contact} maxLength={80} onChange={event => setContact(event.target.value)} />
-      </label>
+      {/* keyed so switching mode replays the entrance, like the sheet itself */}
+      <div key={kind} className="rise-in space-y-3.5">
+        {kind === 'log' ? (
+          <>
+            <p className="px-1 text-sm leading-relaxed text-[var(--label-2)]">{t.feedbackLogIntro}</p>
+            <div className={`${cardClass} grid gap-3`}>
+              <label className="grid gap-1.5 text-xs font-medium text-[var(--label)]">
+                <span className="flex items-baseline justify-between gap-2">
+                  {t.feedbackNoteLabel}
+                  <span className={countClass}>{note.length}/{NOTE_MAX}</span>
+                </span>
+                <textarea className={areaClass} value={note} maxLength={NOTE_MAX} onChange={event => setNote(event.target.value)} />
+              </label>
+              <label className="grid gap-1.5 text-xs font-medium text-[var(--label)]">
+                {t.feedbackContactLabel}
+                <input className={inputClass} value={contact} maxLength={80} onChange={event => setContact(event.target.value)} />
+              </label>
+            </div>
+          </>
+        ) : (
+          <div className={`${cardClass} grid gap-3`}>
+            <label className="grid gap-1.5 text-xs font-medium text-[var(--label)]">
+              <span className="flex items-baseline justify-between gap-2">
+                {t.feedbackIssueTitleLabel}
+                <span className={countClass}>{issueTitle.length}/{TITLE_MAX}</span>
+              </span>
+              <input className={inputClass} value={issueTitle} maxLength={TITLE_MAX} onChange={event => setIssueTitle(event.target.value)} />
+            </label>
+            <label className="grid gap-1.5 text-xs font-medium text-[var(--label)]">
+              <span className="flex items-baseline justify-between gap-2">
+                {t.feedbackIssueBodyLabel}
+                <span className={countClass}>{issueBody.length}/{BODY_MAX}</span>
+              </span>
+              <textarea className={areaClass} value={issueBody} maxLength={BODY_MAX} onChange={event => setIssueBody(event.target.value)} />
+            </label>
+            <label className="grid gap-1.5 text-xs font-medium text-[var(--label)]">
+              {t.feedbackContactLabel}
+              <input className={inputClass} value={contact} maxLength={80} onChange={event => setContact(event.target.value)} />
+            </label>
+            <SwitchRow label={t.feedbackAttachLog} checked={includeLog} onChange={setIncludeLog} />
+          </div>
+        )}
+      </div>
 
       {preview}
 
-      <p className="rounded-xl bg-[color-mix(in_srgb,var(--review)_12%,transparent)] p-3 text-xs leading-relaxed text-[var(--label-2)]">{t.feedbackPrivacy}</p>
+      <p className="rounded-[18px] bg-[color-mix(in_srgb,var(--review)_12%,transparent)] p-3.5 text-xs leading-relaxed text-[var(--label-2)]">{t.feedbackPrivacy}</p>
 
-      <label className="flex items-start gap-2 text-xs leading-relaxed text-[var(--label)]">
-        <input type="checkbox" className="mt-0.5 h-4 w-4 shrink-0 accent-[var(--ink)]" checked={consent} onChange={event => setConsent(event.target.checked)} />
-        <span>{t.feedbackConsent}</span>
-      </label>
+      <div className={cardClass}>
+        <SwitchRow label={t.feedbackConsent} checked={consent} onChange={setConsent} />
+      </div>
 
       {phase === 'success' && result?.ok && (
-        <p role="status" className="rounded-xl bg-[color-mix(in_srgb,var(--ok)_12%,transparent)] p-3 text-xs font-medium text-[var(--ok)]">
+        <p ref={statusRef} role="status" className="rise-in scroll-mb-20 flex items-center gap-2 rounded-[18px] bg-[color-mix(in_srgb,var(--ok)_12%,transparent)] p-3.5 text-xs font-medium text-[var(--ok)]">
+          <span className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-[var(--ok)] text-white"><IconCheck size={13} /></span>
           {t.feedbackSuccess.replace('{number}', String(result.number ?? ''))}
         </p>
       )}
       {phase === 'error' && (
-        <p role="alert" className="rounded-xl bg-[color-mix(in_srgb,var(--danger)_12%,transparent)] p-3 text-xs font-medium text-[var(--danger)]">
+        <p ref={statusRef} role="alert" className="rise-in scroll-mb-20 rounded-[18px] bg-[color-mix(in_srgb,var(--danger)_12%,transparent)] p-3.5 text-xs font-medium text-[var(--danger)]">
           {errorText(result?.error, t)}
         </p>
       )}
 
-      <div className="flex gap-2 border-t border-[var(--sep)] pt-3 sm:justify-end">{footer}</div>
+      {/* pinned to the bottom of the sheet while the form scrolls, like the footer of the other sheets */}
+      <div className="sticky bottom-0 z-10 -mb-px flex gap-2 border-t border-[var(--sep)] bg-[color-mix(in_srgb,var(--surface)_84%,transparent)] pt-3 backdrop-blur-xl sm:justify-end">{footer}</div>
     </div>
   );
 }
