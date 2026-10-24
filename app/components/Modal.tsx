@@ -2,6 +2,7 @@
 
 import React, { useEffect, useId, useRef, useState } from 'react';
 import { IconClose } from './glass/icons';
+import { registerBackHandler } from '../utils/backStack';
 
 interface ModalProps {
   isOpen: boolean;
@@ -30,6 +31,12 @@ export const Modal: React.FC<ModalProps> = ({
   const [visible, setVisible] = useState(false);
 
   useEffect(() => { closeRef.current = onClose; }, [onClose]);
+
+  // The Android back key closes the newest open sheet first.
+  useEffect(() => {
+    if (!isOpen) return;
+    return registerBackHandler(() => closeRef.current());
+  }, [isOpen]);
 
   useEffect(() => {
     if (isOpen) {
