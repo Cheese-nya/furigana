@@ -16,6 +16,8 @@ import {
 
 export const UPDATE_LAST_CHECK_KEY = 'uku.update.lastCheck';
 export const UPDATE_DISMISSED_KEY = 'uku.update.dismissed';
+/** Version of the newest release we found but the user has not installed yet; keeps the dot across restarts. */
+export const UPDATE_PENDING_KEY = 'uku.update.pending';
 export const AUTO_CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000;
 const DEFAULT_FETCH_TIMEOUT_MS = 8_000;
 const DEFAULT_POLL_MS = 1_000;
@@ -652,6 +654,13 @@ export function createUpdateController(deps: UpdateControllerDeps): UpdateContro
     }
   }
 
+  function setPending(version: string | null): void {
+    try {
+      if (version) storage?.setItem(UPDATE_PENDING_KEY, version);
+      else storage?.setItem(UPDATE_PENDING_KEY, '');
+    } catch {}
+  }
+
   async function check(opts?: { auto?: boolean; force?: boolean }): Promise<void> {
     if (disposed) return;
     const isAuto = Boolean(opts?.auto);
@@ -668,7 +677,11 @@ export function createUpdateController(deps: UpdateControllerDeps): UpdateContro
           }
         }
       } catch {}
-      if (!shouldAutoCheck(lastCheckedAt, now())) {
+      let pending: string | null = null;
+      try { pending = storage?.getItem(UPDATE_PENDING_KEY) ?? null; } catch {}
+      // A known-but-uninstalled update bypasses the throttle on the first check after a restart, so the dot comes back.
+      const hasPending = !state.latest && !!pending && compareVersions(pending, currentVersion) > 0;
+      if (!hasPending && !shouldAutoCheck(lastCheckedAt, now())) {
         return;
       }
     }
@@ -717,6 +730,7 @@ export function createUpdateController(deps: UpdateControllerDeps): UpdateContro
       compareVersions(release.version, currentVersion) <= 0 ||
       (!isForce && dismissedVersion === release.version)
     ) {
+      setPending(null);
       updateState({
         status: 'up-to-date',
         latest: release,
@@ -726,6 +740,7 @@ export function createUpdateController(deps: UpdateControllerDeps): UpdateContro
       return;
     }
 
+    setPending(release.version);
     if (manualOnly) {
       logEvent('info', 'update', `update available (manual) v${release.version}`);
       updateState({
@@ -739,6 +754,7 @@ export function createUpdateController(deps: UpdateControllerDeps): UpdateContro
 
     const asset = selectAsset(release, platform);
     if (!asset) {
+      setPending(null);
       updateState({
         status: 'up-to-date',
         latest: release,
@@ -769,6 +785,12 @@ export function createUpdateController(deps: UpdateControllerDeps): UpdateContro
     } catch (err) {
       if (disposed) return;
       const errMsg = err instanceof Error ? err.message : String(err);
+      if (errMsg === 'need-install-permission') {
+        // The system sent the user to "install unknown apps"; the download is still good, so stay
+        // `ready` and let the next tap install it once they have allowed it.
+        logEvent('info', 'update', 'install needs the unknown-apps permission first');
+        return;
+      }
       logEvent('warn', 'update', `apply failed: ${errMsg}`);
       updateState(
         {
@@ -787,6 +809,7 @@ export function createUpdateController(deps: UpdateControllerDeps): UpdateContro
         storage?.setItem(UPDATE_DISMISSED_KEY, state.latest.version);
       } catch {}
     }
+    setPending(null);
     stopPolling();
     if (driver.canAutoDownload && state.status === 'downloading') {
       void driver.cancel().catch(() => {});

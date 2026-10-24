@@ -481,3 +481,55 @@ test('NEXT_PUBLIC_UPDATE_SOURCE=relay skips the GitHub direct path (test builds 
     delete process.env.NEXT_PUBLIC_UPDATE_SOURCE;
   }
 });
+
+test('an install that first needs the unknown-apps permission stays ready instead of turning into an error', async () => {
+  clearEntries();
+  let applies = 0;
+  const driver = {
+    canAutoDownload: true,
+    async start() {},
+    async poll() { return { phase: 'ready', progress: 1, version: '1.3.0' }; },
+    async apply() { applies += 1; if (applies === 1) throw new Error('need-install-permission'); },
+    async cancel() {},
+  };
+  const ctrl = createUpdateController({
+    driver, currentVersion: '1.2.1', platform: 'android', fetchRelease: async () => SAMPLE_RELEASE,
+    storage: createFakeStorage(), now: () => 50_000, pollMs: 10,
+  });
+  await new Promise(resolve => { ctrl.subscribe(st => { if (st.status === 'ready') resolve(); }); void ctrl.check({ auto: true }); });
+  await ctrl.apply();
+  assert.equal(ctrl.getState().status, 'ready');
+  assert.equal(ctrl.getState().hasUpdate, true);
+  await ctrl.apply();
+  assert.equal(applies, 2);
+  assert.equal(ctrl.getState().status, 'ready');
+  ctrl.dispose();
+});
+
+test('a known uninstalled update bypasses the 6h auto-check throttle, so a restart still shows the dot', async () => {
+  clearEntries();
+  const storage = createFakeStorage();
+  storage.setItem('uku.update.lastCheck', String(50_000 - 60_000)); // checked a minute ago
+  const driver = { canAutoDownload: true, async start() {}, async poll() { return { phase: 'ready', progress: 1, version: '1.3.0' }; }, async apply() {}, async cancel() {} };
+  const make = () => createUpdateController({
+    driver, currentVersion: '1.2.1', platform: 'android', fetchRelease: async () => SAMPLE_RELEASE,
+    storage, now: () => 50_000, pollMs: 10,
+  });
+
+  const first = make();
+  await first.check({ auto: true });
+  assert.equal(first.getState().status, 'idle'); // throttled: nothing pending yet
+  first.dispose();
+
+  storage.setItem('uku.update.pending', '1.3.0');
+  const second = make();
+  await new Promise(resolve => { second.subscribe(st => { if (st.status === 'ready') resolve(); }); void second.check({ auto: true }); });
+  assert.equal(second.getState().hasUpdate, true);
+  second.dispose();
+
+  storage.setItem('uku.update.pending', '1.2.1'); // already installed: throttle applies again
+  const third = make();
+  await third.check({ auto: true });
+  assert.equal(third.getState().status, 'idle');
+  third.dispose();
+});
