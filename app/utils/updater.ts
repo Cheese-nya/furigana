@@ -71,9 +71,6 @@ async function fetchWithTimeout(
         } catch {}
         reject(new Error(`Timeout fetching ${url}`));
       }, timeoutMs);
-      if (typeof timer === 'object' && timer !== null && 'unref' in timer) {
-        (timer as { unref?: () => void }).unref?.();
-      }
     });
 
     return await Promise.race([
@@ -626,9 +623,6 @@ export function createUpdateController(deps: UpdateControllerDeps): UpdateContro
     pollTimer = setInterval(() => {
       void pollOnce();
     }, pollMs);
-    if (typeof pollTimer === 'object' && pollTimer !== null && 'unref' in pollTimer) {
-      (pollTimer as { unref?: () => void }).unref?.();
-    }
   }
 
   async function startDownload(): Promise<void> {

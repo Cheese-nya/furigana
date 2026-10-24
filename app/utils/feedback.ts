@@ -188,9 +188,6 @@ export async function submitFeedback(
         } catch {}
         reject(new Error('Request timed out'));
       }, timeoutMs);
-      if (typeof timer === 'object' && timer !== null && 'unref' in timer) {
-        (timer as { unref?: () => void }).unref?.();
-      }
     });
 
     const response = await Promise.race([
