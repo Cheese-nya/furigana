@@ -270,6 +270,7 @@ public class MainActivity extends Activity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         recordHistoricalExitReasons();
+        UpdateManager.cleanupInstalled(this);
 
         Window window = getWindow();
         if (window != null) {

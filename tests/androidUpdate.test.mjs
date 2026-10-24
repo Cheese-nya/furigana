@@ -242,3 +242,10 @@ test('plain http is only accepted for the emulator host and only in a debuggable
   assert.match(source, /startsWith\("http:\/\/10\.0\.2\.2:"\)/);
   assert.doesNotMatch(source, /startsWith\("http:\/\/"\)/);
 });
+
+test('already-installed update files are removed on startup', () => {
+  const manager = readFileSync(fileURLToPath(new URL('../android/src/com/cheese/uku/UpdateManager.java', import.meta.url)), 'utf8');
+  const activity = readFileSync(fileURLToPath(new URL('../android/src/com/cheese/uku/MainActivity.java', import.meta.url)), 'utf8');
+  assert.match(manager, /static void cleanupInstalled\(Context context\)/);
+  assert.match(activity, /UpdateManager\.cleanupInstalled\(this\)/);
+});

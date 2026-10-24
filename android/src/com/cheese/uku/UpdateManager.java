@@ -511,6 +511,35 @@ public class UpdateManager {
         }
     }
 
+    /** Deletes downloaded APKs this build already is (or is newer than) and leftover partial files. */
+    public static void cleanupInstalled(Context context) {
+        try {
+            String installed = context.getPackageManager().getPackageInfo(context.getPackageName(), 0).versionName;
+            File[] files = getUpdateDir(context).listFiles();
+            if (installed == null || files == null) return;
+            for (File file : files) {
+                String name = file.getName();
+                java.util.regex.Matcher m = java.util.regex.Pattern.compile("^Uku-Furigana-v([0-9.]+)\\.apk(\\.part)?$").matcher(name);
+                if (m.matches() && (m.group(2) != null || compareVersionNames(m.group(1), installed) <= 0)) {
+                    file.delete();
+                }
+            }
+        } catch (Exception ignored) {
+            // leftover files are only wasted space
+        }
+    }
+
+    private static int compareVersionNames(String a, String b) {
+        String[] x = a.split("\\.");
+        String[] y = b.split("\\.");
+        for (int i = 0; i < Math.max(x.length, y.length); i++) {
+            int p = i < x.length && x[i].matches("\\d+") ? Integer.parseInt(x[i]) : 0;
+            int q = i < y.length && y[i].matches("\\d+") ? Integer.parseInt(y[i]) : 0;
+            if (p != q) return p < q ? -1 : 1;
+        }
+        return 0;
+    }
+
     private static void cleanupOtherVersions(File dir, String keepFinalName, String keepPartName) {
         File[] files = dir.listFiles();
         if (files == null) return;
