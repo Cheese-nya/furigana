@@ -26,9 +26,25 @@ install attempt opens the "install unknown apps" page; allow it, go back and tap
 Use an emulator image with a recent WebView (the API 28 image ships Chrome 69 and cannot run the app).
 Logs: `adb shell run-as com.cheese.uku cat files/native.log`.
 
-## Windows (NOT verified)
+## Windows (verified on the `win10-powerbi` libvirt VM, 2026-10-24)
 
-The desktop download/apply code is covered by `tests/test_desktop_update.py`, but the real swap
-(`build_apply_script` under cmd.exe, a frozen exe, relaunch) has not been run on Windows. To try it, build the exe
-with `NEXT_PUBLIC_RELAY_BASE=http://192.168.122.1:8788 NEXT_PUBLIC_UPDATE_SOURCE=relay`, run it with
-`UKU_UPDATE_TEST_HOST=192.168.122.1:8788`, and serve `Uku-Furigana-v1.2.2-windows.exe` from `dev_relay.py`.
+The whole path ran for real: a frozen `UkuFurigana.exe` found 1.2.2, downloaded and verified it, quit, was swapped
+by the helper script, and the new exe started with a clean first page load (no `.old` left behind).
+
+1. Build the web bundle for the VM: `NEXT_PUBLIC_RELAY_BASE=http://192.168.122.1:8788 NEXT_PUBLIC_UPDATE_SOURCE=relay npm run build:web`,
+   zip `out/` together with `desktop_runner.py`, `app_icon.ico`, `requirements-desktop.txt` and copy it to `C:\uku-test\winpkg.zip`.
+2. `windows/build-win.ps1` unpacks it and builds two exes with PyInstaller (`old\` and `new\`; the second differs by a marker file).
+3. Serve the new exe as the release: `dev_relay.py --dir <dir with Uku-Furigana-v1.2.2-windows.exe> --public-base http://192.168.122.1:8788`.
+4. `windows/launch-win.ps1` installs the old exe into `C:\uku-test\app` and starts it through Explorer in the interactive session,
+   with `UKU_UPDATE_TEST_HOST=192.168.122.1:8788` and `UKU_DEBUG_PORT=9223` set as user variables.
+5. Forward the DevTools port (`ssh -L 9223:127.0.0.1:9223 ...`) and drive the page with `CDP_PORT=9223 node cdp.mjs '...'`.
+   `windows/swap-state.ps1` shows the installed exe hash and running processes; `windows/cleanup-win.ps1` removes the test setup.
+
+Things that bit us (all fixed in `desktop_runner.py` and the front end, each has a test):
+- the apply helper must not use a pipe (`tasklist | find`): detached from a windowed app it aborted before the swap;
+- the new exe must be started with `PYINSTALLER_RESET_ENVIRONMENT=1` and without `_MEIPASS2`/`_PYI_*`, or it looks for DLLs in the old extraction dir;
+- pywebview exposes an empty `api` first, so wait for the methods (`pywebviewready`), not just the object;
+- the desktop build is recognised from `?desktop=1`, because `window.pywebview` can appear after the first render.
+
+Practical notes: the VM's Windows network profile must be *Private* or the SSH firewall rule drops port 22; run PowerShell over ssh with
+`$ProgressPreference = 'SilentlyContinue'` and pass scripts with `-File` (a native command such as `schtasks` swallows a script piped on stdin).
