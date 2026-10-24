@@ -231,6 +231,12 @@ export function toggleBookFavorite(db: LibraryDatabase, bookId: string, now = Da
   return { ...db, books: { ...db.books, [bookId]: { ...book, favorite: !book.favorite, updatedAt: now } } };
 }
 
+/** How far into a script a reader is, by line (a single-chapter book used to read 100% after one scroll). */
+export function lineProgressPercent(lineIndex: number, totalLines: number): number {
+  if (!Number.isFinite(lineIndex) || !Number.isFinite(totalLines) || totalLines <= 1) return totalLines === 1 ? 100 : 0;
+  return Math.round(Math.min(1, Math.max(0, lineIndex / (totalLines - 1))) * 100);
+}
+
 export function updateReadingProgress(db: LibraryDatabase, bookId: string, progress: Omit<ReadingProgress, 'updatedAt'> & { updatedAt?: number }, now = Date.now()): LibraryDatabase {
   const book = db.books[bookId];
   if (!book) return db;
