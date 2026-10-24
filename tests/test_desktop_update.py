@@ -498,5 +498,19 @@ class FrozenApplyTest(unittest.TestCase):
             self.assertEqual(result, {'success': False, 'error': 'no-update'})
 
 
+class TestHostTest(unittest.TestCase):
+    def test_http_is_refused_unless_a_test_host_is_named(self):
+        import os
+        url = 'http://192.168.122.1:8788/api/update/dl/v1.2.2/Uku-Furigana-v1.2.2-windows.exe'
+        os.environ.pop('UKU_UPDATE_TEST_HOST', None)
+        self.assertFalse(launcher._is_https_url(url))
+        os.environ['UKU_UPDATE_TEST_HOST'] = '192.168.122.1:8788'
+        try:
+            self.assertTrue(launcher._is_https_url(url))
+            self.assertFalse(launcher._is_https_url('http://evil.example/x.exe'))
+        finally:
+            os.environ.pop('UKU_UPDATE_TEST_HOST', None)
+
+
 if __name__ == '__main__':
     unittest.main()

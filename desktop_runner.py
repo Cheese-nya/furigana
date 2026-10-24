@@ -198,7 +198,13 @@ def default_data_dir(base=None):
 
 
 def _is_https_url(value):
-    return isinstance(value, str) and value.startswith('https://') and len(value) > len('https://') and not any(ch.isspace() for ch in value)
+    if not isinstance(value, str) or any(ch.isspace() for ch in value):
+        return False
+    if value.startswith('https://') and len(value) > len('https://'):
+        return True
+    # Test setup only: UKU_UPDATE_TEST_HOST=<host:port> lets the VM fetch from the host's fake release server.
+    test_host = os.environ.get('UKU_UPDATE_TEST_HOST', '').strip()
+    return bool(test_host) and value.startswith(f'http://{test_host}/')
 
 
 def validate_update_args(args):

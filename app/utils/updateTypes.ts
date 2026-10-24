@@ -8,7 +8,8 @@ export type Distribution = 'website' | 'play' | 'appstore';
 
 export const GITHUB_REPO = 'Cheese-nya/uku-furigana';
 export const RELEASES_URL = `https://github.com/${GITHUB_REPO}/releases/latest`;
-export const RELAY_BASE = 'https://uku.saiaino.xyz';
+/** NEXT_PUBLIC_RELAY_BASE points a test build at a local relay; production builds leave it unset. */
+export const RELAY_BASE = process.env.NEXT_PUBLIC_RELAY_BASE || 'https://uku.saiaino.xyz';
 export const QQ_GROUP = '1040467160';
 
 /* ───────────── Logging & feedback ───────────── */

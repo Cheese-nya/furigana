@@ -465,3 +465,19 @@ test('createUpdateController handles up-to-date, dismiss, force override, auto t
   assert.match(errCtrl.getState().error ?? '', /Offline/);
   errCtrl.dispose();
 });
+
+test('NEXT_PUBLIC_UPDATE_SOURCE=relay skips the GitHub direct path (test builds only)', async () => {
+  const calls = [];
+  const fetchStub = async url => {
+    calls.push(String(url));
+    return { ok: true, status: 200, json: async () => ({ version: '9.9.9', tag: 'v9.9.9', notes: '', assets: [] }) };
+  };
+  process.env.NEXT_PUBLIC_UPDATE_SOURCE = 'relay';
+  try {
+    const release = await fetchLatestRelease({ fetch: fetchStub });
+    assert.equal(release.version, '9.9.9');
+    assert.ok(calls.length > 0 && calls.every(url => !url.includes('api.github.com')), calls.join(','));
+  } finally {
+    delete process.env.NEXT_PUBLIC_UPDATE_SOURCE;
+  }
+});

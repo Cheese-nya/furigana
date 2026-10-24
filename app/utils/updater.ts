@@ -240,11 +240,14 @@ export async function fetchLatestRelease(deps?: FetchLatestReleaseDeps): Promise
   }
   const timeoutMs = deps?.timeoutMs ?? DEFAULT_FETCH_TIMEOUT_MS;
 
-  let githubErr: unknown;
-  try {
-    return await fetchFromGitHub(fetchFn, timeoutMs);
-  } catch (err) {
-    githubErr = err;
+  let githubErr: unknown = 'skipped';
+  // Test builds (NEXT_PUBLIC_UPDATE_SOURCE=relay) go straight to the relay so a fake release can be served.
+  if (process.env.NEXT_PUBLIC_UPDATE_SOURCE !== 'relay') {
+    try {
+      return await fetchFromGitHub(fetchFn, timeoutMs);
+    } catch (err) {
+      githubErr = err;
+    }
   }
 
   try {

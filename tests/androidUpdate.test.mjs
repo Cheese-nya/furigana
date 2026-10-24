@@ -235,3 +235,10 @@ test('MainActivity 记录崩溃线索到 native.log，含 64KB 上限与 API 30 
     'getHistoricalProcessExitReasons 必须有 Build.VERSION.SDK_INT >= 30 守卫',
   );
 });
+
+test('plain http is only accepted for the emulator host and only in a debuggable build', () => {
+  const source = readFileSync(fileURLToPath(new URL('../android/src/com/cheese/uku/UpdateManager.java', import.meta.url)), 'utf8');
+  assert.match(source, /FLAG_DEBUGGABLE/);
+  assert.match(source, /startsWith\("http:\/\/10\.0\.2\.2:"\)/);
+  assert.doesNotMatch(source, /startsWith\("http:\/\/"\)/);
+});

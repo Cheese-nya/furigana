@@ -101,11 +101,11 @@ public class UpdateManager {
                 setStateLocked("error", 0.0, targetVersion, "invalid-version");
                 return "{\"success\":false,\"error\":\"invalid-version\"}";
             }
-            if (!isHttpsUrl(primaryUrl)) {
+            if (!isAllowedUrl(primaryUrl)) {
                 setStateLocked("error", 0.0, targetVersion, "invalid-url");
                 return "{\"success\":false,\"error\":\"invalid-url\"}";
             }
-            if (!mirrorUrl.isEmpty() && !isHttpsUrl(mirrorUrl)) {
+            if (!mirrorUrl.isEmpty() && !isAllowedUrl(mirrorUrl)) {
                 setStateLocked("error", 0.0, targetVersion, "invalid-mirror-url");
                 return "{\"success\":false,\"error\":\"invalid-mirror-url\"}";
             }
@@ -327,7 +327,7 @@ public class UpdateManager {
             long expectedSize,
             File partFile
     ) throws IOException {
-        if (!isHttpsUrl(sourceUrl)) {
+        if (!isAllowedUrl(sourceUrl)) {
             throw new IOException("Only HTTPS URLs are allowed");
         }
 
@@ -340,8 +340,7 @@ public class UpdateManager {
                 if (isCancelled(taskId)) {
                     throw new IOException("Cancelled");
                 }
-                if (!"https".equalsIgnoreCase(currentUrl.getProtocol())
-                        || !currentUrl.toString().toLowerCase(Locale.US).startsWith("https://")) {
+                if (!isAllowedUrl(currentUrl.toString())) {
                     throw new IOException("Non-HTTPS protocol rejected");
                 }
 
@@ -372,8 +371,7 @@ public class UpdateManager {
                         throw new IOException("Redirect missing Location header");
                     }
                     URL nextUrl = new URL(currentUrl, location.trim());
-                    if (!"https".equalsIgnoreCase(nextUrl.getProtocol())
-                            || !nextUrl.toString().toLowerCase(Locale.US).startsWith("https://")) {
+                    if (!isAllowedUrl(nextUrl.toString())) {
                         throw new IOException("Redirect to non-HTTPS URL rejected");
                     }
                     currentUrl = nextUrl;
@@ -488,6 +486,15 @@ public class UpdateManager {
         } catch (Exception e) {
             return false;
         }
+    }
+
+    /** https only; a debuggable build (emulator test setup) may also fetch from the emulator's host loopback. */
+    private boolean isAllowedUrl(String url) {
+        if (isHttpsUrl(url)) {
+            return true;
+        }
+        boolean debuggable = (appContext.getApplicationInfo().flags & android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) != 0;
+        return debuggable && url != null && url.toLowerCase(Locale.US).startsWith("http://10.0.2.2:");
     }
 
     private static boolean isHttpsUrl(String url) {
